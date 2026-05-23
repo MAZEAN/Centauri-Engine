@@ -1,0 +1,5 @@
+{
+  "shader":  "Assets/Shaders/shader",
+  "texture": "Assets/Textures/rusty.jpg",
+  "color":   [1.0, 1.0, 1.0, 1.0]
+}
