@@ -3,7 +3,6 @@
     {
       "name": "Cube",
       "model":   "Assets/Models/cube.obj",
-      "texture": "Assets/Textures/wall.jpg",
       "material": "Assets/Materials/cube.mat",
       "shader":  "Assets/Shaders/shader",
       "position": [0, 0, 0],
@@ -14,7 +13,6 @@
     {
       "name": "Sphere",
       "model":   "Assets/Models/sphere.obj",
-      "texture": "Assets/Textures/rusty.jpg",
       "material": "Assets/Materials/sphere.mat",
       "shader":  "Assets/Shaders/shader",
       "position": [0, 2, -4],

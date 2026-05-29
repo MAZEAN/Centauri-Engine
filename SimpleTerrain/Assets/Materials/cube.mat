@@ -1,6 +1,6 @@
 {
   "shader":  "Assets/Shaders/shader",
-  "texture": "Assets/Textures/wall.jpg",
+  "texture": "Assets/Textures/brickwall.jpg",
   "color":   [1.0, 1.0, 1.0, 1.0],
   "uvScale":  [1.0, 1.0],
   "uvOffset": [0.0, 0.0]
