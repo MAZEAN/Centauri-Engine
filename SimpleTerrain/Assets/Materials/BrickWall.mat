@@ -1,0 +1,9 @@
+{
+  "shader":    "Assets/Shaders/shaderPBR",
+  "albedo":    "Assets/Textures/BrickWall/red_brick_diff_1k.jpg",
+  "normal":    "Assets/Textures/BrickWall/red_brick_nor_gl_1k.jpg",
+  "roughness": "Assets/Textures/BrickWall/red_brick_rough_1k.jpg",
+  "ao":        "Assets/Textures/BrickWall/red_brick_ao_1k.jpg",
+  "uvScale":   [1.0, 1.0],
+  "uvOffset":  [0.0, 0.0]
+}

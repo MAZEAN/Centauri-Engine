@@ -25,7 +25,7 @@ public static class SceneLoader
             var model    = new Model(gl, e.Model);
             var material = e.Material != null
                 ? LoadMaterialFile(gl, e.Material)
-                : LoadInlineMaterial(gl, e);
+                : throw new Exception($"Entity '{e.Name}' must have a material file.");
 
             var entity = new Entity(model, material);
 
@@ -85,26 +85,20 @@ public static class SceneLoader
         var def  = JsonSerializer.Deserialize<MaterialDefinition>(json, Options)
                    ?? throw new Exception($"Failed to deserialize material file: {path}");
 
-        var shader  = new GLShader(gl, def.Shader + ".vert", def.Shader + ".frag");
-        
-        var texture = def.Texture != null ? new GLTexture(gl, def.Texture) : null;
+        var shader = new GLShader(gl, def.Shader + ".vert", def.Shader + ".frag");
 
-        return new Material(shader, texture)
+        return new Material(shader)
         {
-            Color    = new Vector4(def.Color[0],    def.Color[1],    def.Color[2],    def.Color[3]),
-            UvScale  = new Vector2(def.UvScale[0],  def.UvScale[1]),
-            UvOffset = new Vector2(def.UvOffset[0], def.UvOffset[1])
+            Albedo         = def.Albedo    != null ? new GLTexture(gl, def.Albedo)    : null,
+            Normal         = def.Normal    != null ? new GLTexture(gl, def.Normal)    : null,
+            Roughness      = def.Roughness != null ? new GLTexture(gl, def.Roughness) : null,
+            Metallic       = def.Metallic  != null ? new GLTexture(gl, def.Metallic)  : null,
+            AO             = def.AO        != null ? new GLTexture(gl, def.AO)        : null,
+            RoughnessValue = def.RoughnessValue,
+            MetallicValue  = def.MetallicValue,
+            Color          = new Vector4(def.Color[0],   def.Color[1],   def.Color[2],   def.Color[3]),
+            UvScale        = new Vector2(def.UvScale[0],  def.UvScale[1]),
+            UvOffset       = new Vector2(def.UvOffset[0], def.UvOffset[1])
         };
-    }
-
-    private static Material LoadInlineMaterial(GL gl, EntityDefinition e)
-    {
-        if (e.Shader == null)
-            throw new Exception($"Entity '{e.Name}' has no material file or inline shader.");
-
-        var shader  = new GLShader(gl, e.Shader + ".vert", e.Shader + ".frag");
-        var texture = e.Texture != null ? new GLTexture(gl, e.Texture) : null;
-
-        return new Material(shader, texture);
     }
 }

@@ -1,4 +1,5 @@
 namespace SimpleTerrain.Scene;
+
 using System.Text.Json.Serialization;
 
 public class SceneDefinition
@@ -18,15 +19,8 @@ public class EntityDefinition
     [JsonPropertyName("model")]
     public string Model { get; set; } = "";
 
-    // either "material" OR inline "shader"/"texture", not both
     [JsonPropertyName("material")]
-    public string? Material { get; set; }
-
-    [JsonPropertyName("shader")]
-    public string? Shader { get; set; }
-
-    [JsonPropertyName("texture")]
-    public string? Texture { get; set; }
+    public string Material { get; set; } = ""; // no longer nullable — required
 
     [JsonPropertyName("position")]
     public float[] Position { get; set; } = [0f, 0f, 0f];
@@ -43,8 +37,28 @@ public class MaterialDefinition
     [JsonPropertyName("shader")]
     public string Shader { get; set; } = "";
 
-    [JsonPropertyName("texture")]
-    public string? Texture { get; set; }
+    // PBR texture maps — all optional
+    [JsonPropertyName("albedo")]
+    public string? Albedo { get; set; }
+
+    [JsonPropertyName("normal")]
+    public string? Normal { get; set; }
+
+    [JsonPropertyName("roughness")]
+    public string? Roughness { get; set; }
+
+    [JsonPropertyName("metallic")]
+    public string? Metallic { get; set; }
+
+    [JsonPropertyName("ao")]
+    public string? AO { get; set; }
+
+    // scalar fallbacks when maps are missing
+    [JsonPropertyName("roughnessValue")]
+    public float RoughnessValue { get; set; } = 0.5f;
+
+    [JsonPropertyName("metallicValue")]
+    public float MetallicValue { get; set; } = 0.0f;
 
     [JsonPropertyName("color")]
     public float[] Color { get; set; } = [1f, 1f, 1f, 1f];
