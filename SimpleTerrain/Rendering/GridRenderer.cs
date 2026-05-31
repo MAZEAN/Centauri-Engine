@@ -1,56 +1,51 @@
 namespace SimpleTerrain.Rendering;
 using Silk.NET.OpenGL;
 using SimpleTerrain.Scene;
-using System.Numerics;
+using SimpleTerrain.Config;
 
 public class GridRenderer : IDisposable
 {
     private readonly GL _gl;
     private readonly GLShader _shader;
     private readonly Mesh _mesh;
-    private readonly Config.WindowConfig _config;
+    private readonly WindowConfig _config;
 
-    public GridRenderer(GL gl, Config.WindowConfig config)
+    public GridRenderer(GL gl, WindowConfig config)
     {
         _gl     = gl;
         _config = config;
         _shader = new GLShader(gl, "Assets/Shaders/grid.vert", "Assets/Shaders/grid.frag");
 
-        // fullscreen quad in NDC space
+        // fullscreen quad in NDC space (-1 to 1)
+        // stride is 11 floats to match updated Mesh layout
+        // normal and tangent are placeholders — grid shader doesn't use them
         float[] vertices =
         [
-            -1f,  1f, 0f,   0f, 0f, 1f,   0f, 1f,
-            -1f, -1f, 0f,   0f, 0f, 1f,   0f, 0f,
-            1f,  1f, 0f,   0f, 0f, 1f,   1f, 1f,
-            1f, -1f, 0f,   0f, 0f, 1f,   1f, 0f,
+            // position       normal        uv        tangent
+            -1f,  1f,  0f,  0f, 0f, 1f,  0f, 1f,  1f, 0f, 0f,
+            -1f, -1f,  0f,  0f, 0f, 1f,  0f, 0f,  1f, 0f, 0f,
+             1f,  1f,  0f,  0f, 0f, 1f,  1f, 1f,  1f, 0f, 0f,
+             1f, -1f,  0f,  0f, 0f, 1f,  1f, 0f,  1f, 0f, 0f,
         ];
 
         uint[] indices = [0, 1, 2, 2, 1, 3];
         _mesh = new Mesh(gl, vertices, indices);
     }
 
-    // GridRenderer.cs
     public void Render(Camera camera)
     {
         SetGL();
-        
-        _shader.Use();
 
-        _shader.SetUniform("uView", camera.GetViewMatrix());
-        _shader.SetUniform("uProjection", camera.GetProjectionMatrix());
-        _shader.SetUniform("uCameraPos", camera.GetPosition());
-        _shader.SetUniform("background", _config.ClearColor);
+        _shader.Use();
+        _shader.SetUniform("uView",        camera.GetViewMatrix());
+        _shader.SetUniform("uProjection",  camera.GetProjectionMatrix());
+        _shader.SetUniform("uCameraPos",   camera.GetPosition());
 
         _mesh.Bind();
-
         unsafe
         {
-            _gl.DrawElements(
-                PrimitiveType.Triangles,
-                6,
-                DrawElementsType.UnsignedInt,
-                (void*)0
-            );
+            _gl.DrawElements(PrimitiveType.Triangles, 6,
+                DrawElementsType.UnsignedInt, (void*)0);
         }
 
         RestoreGL();
@@ -59,7 +54,7 @@ public class GridRenderer : IDisposable
     private void SetGL()
     {
         _gl.DepthFunc(GLEnum.Lequal);
-        _gl.DepthMask(false); // Critical: don't let transparent grid overwrite depth
+        _gl.DepthMask(false);
     }
 
     private void RestoreGL()

@@ -64,6 +64,14 @@ public class Renderer
                 shader.SetUniform("uColor",          mat.Color);
 
                 shader.SetUniform("uModel",    entity.Transform.WorldMatrix);
+                shader.SetUniform("uModel", entity.Transform.WorldMatrix);
+
+                if (Matrix4x4.Invert(entity.Transform.WorldMatrix, out var invModel))
+                    shader.SetUniformMat3x3("uNormalMatrix", Matrix4x4.Transpose(invModel));
+                else
+                    shader.SetUniformMat3x3("uNormalMatrix", Matrix4x4.Transpose(entity.Transform.WorldMatrix));
+                
+                shader.SetUniformMat3x3("uNormalMatrix", Matrix4x4.Transpose(invModel));
                 shader.SetUniform("uUvScale",  mat.UvScale);
                 shader.SetUniform("uUvOffset", mat.UvOffset);
 
@@ -105,7 +113,7 @@ public class Renderer
             shader.SetUniform($"uPointLights[{i}].quadratic", points[i].Quadratic);
         }
         
-        // spot lights
+        // spotlights
         var spots = lights.SpotLights.Where(l => l.Enabled).ToList();
         shader.SetUniform("uSpotLightCount", spots.Count);
         for (int i = 0; i < spots.Count; i++)

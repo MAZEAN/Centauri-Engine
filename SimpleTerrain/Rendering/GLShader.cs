@@ -60,6 +60,23 @@ public class GLShader : IDisposable
         }
         _gl.UniformMatrix4(location, 1, false, (float*) &value);
     }
+    
+    public unsafe void SetUniformMat3x3(string name, Matrix4x4 m)
+    {
+        int location = _gl.GetUniformLocation(_handle, name);
+        if (location == -1)
+            throw new Exception($"Uniform '{name}' not found in shader.");
+
+        float[] mat3 =
+        [
+            m.M11, m.M12, m.M13,
+            m.M21, m.M22, m.M23,
+            m.M31, m.M32, m.M33
+        ];
+
+        fixed (float* ptr = mat3)
+            _gl.UniformMatrix3(location, 1, false, ptr);
+    }
 
     public void SetUniform(string name, float value)
     {

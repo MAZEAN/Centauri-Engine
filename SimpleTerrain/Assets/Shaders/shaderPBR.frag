@@ -1,7 +1,9 @@
 #version 330 core
 
+//  ─── constants ───────────────────────────────────────────────────────────────
 const float PI               = 3.14159265359;
 const int   MAX_POINT_LIGHTS = 16;
+const int   MAX_SPOT_LIGHTS  = 16;
 
 // ─── structs ──────────────────────────────────────────────────────────────────
 struct DirLight {
@@ -19,14 +21,26 @@ struct PointLight {
     float quadratic;
 };
 
-// ─── uniforms ─────────────────────────────────────────────────────────────────
-uniform sampler2D uAlbedoMap;
-uniform sampler2D uNormalMap;
-uniform sampler2D uRoughnessMap;
-uniform sampler2D uMetallicMap;
-uniform sampler2D uAOMap;
+struct SpotLight {
+    vec3  position;
+    vec3  direction;
+    vec3  color;
+    float intensity;
+    float constant;
+    float linear;
+    float quadratic;
+    float innerCutoff; // pre-converted to cosine on CPU
+    float outerCutoff; // pre-converted to cosine on CPU
+};
 
-uniform int   uHasAlbedo;
+// ─── uniforms ─────────────────────────────────────────────────────────────────
+uniform sampler2D uAlbedoMap;    // slot 0 — base color
+uniform sampler2D uNormalMap;    // slot 1 — surface detail
+uniform sampler2D uRoughnessMap; // slot 2 — how rough/smooth
+uniform sampler2D uMetallicMap;  // slot 3 — metal or not
+uniform sampler2D uAOMap;        // slot 4 — shadow in crevices
+
+uniform int uHasAlbedo;          // 1 if bound, 0 if using scalar fallback
 uniform int   uHasNormal;
 uniform int   uHasRoughness;
 uniform int   uHasMetallic;
@@ -36,15 +50,21 @@ uniform float uRoughnessValue;
 uniform float uMetallicValue;
 uniform vec4  uColor;
 
+// ─── lighting ──────────────────────────────────────────────────────────────────
 uniform vec3       uCameraPos;
 uniform DirLight   uDirLight;
+
 uniform PointLight uPointLights[MAX_POINT_LIGHTS];
 uniform int        uPointLightCount;
+
+uniform SpotLight  uSpotLights[MAX_SPOT_LIGHTS];
+uniform int        uSpotLightCount;
 
 // ─── inputs ───────────────────────────────────────────────────────────────────
 in vec2 fUv;
 in vec3 fNormal;
 in vec3 fFragPos;
+in mat3 fTBN;
 
 out vec4 FragColor;
 
@@ -56,6 +76,7 @@ float DistributionGGX(vec3 N, vec3 H, float roughness)
 {
     float a      = roughness * roughness;
     float a2     = a * a;
+    
     float NdotH  = max(dot(N, H), 0.0);
     float NdotH2 = NdotH * NdotH;
 
@@ -86,8 +107,7 @@ vec3 FresnelSchlick(float cosTheta, vec3 F0)
 }
 
 // ─── per-light PBR calculation ────────────────────────────────────────────────
-vec3 CalcPBR(vec3 L, vec3 radiance, vec3 N, vec3 V,
-vec3 albedo, float roughness, float metallic)
+vec3 CalcPBR(vec3 L, vec3 radiance, vec3 N, vec3 V, vec3 albedo, float roughness, float metallic)
 {
     // F0 = base reflectivity
     // non-metals reflect grey (0.04), metals reflect their albedo color
@@ -112,30 +132,53 @@ vec3 albedo, float roughness, float metallic)
     return (kD * albedo / PI + spec) * radiance * NdotL;
 }
 
+vec3 CalcSpotLight(SpotLight light, vec3 N, vec3 V, vec3 albedo, float roughness, float metallic)
+{
+    vec3  lightDir    = light.position - fFragPos;
+    float dist        = length(lightDir);
+    vec3  L           = normalize(lightDir);
+
+    // attenuation — same as point light
+    float attenuation = 1.0 / (light.constant
+                      + light.linear    * dist
+                      + light.quadratic * dist * dist);
+
+    // spotlight cone — angle between light direction and fragment direction
+    float theta     = dot(L, normalize(-light.direction));
+    float epsilon   = light.innerCutoff - light.outerCutoff;
+
+    // smoothstep between inner and outer cone edges
+    // inside inner cone = full intensity
+    // between inner/outer = soft falloff
+    // outside outer cone = no light
+    float coneIntensity = clamp((theta - light.outerCutoff) / epsilon, 0.0, 1.0);
+
+    vec3 radiance = light.color * light.intensity * attenuation * coneIntensity;
+
+    return CalcPBR(L, radiance, N, V, albedo, roughness, metallic);
+}
+
 // ─── main ─────────────────────────────────────────────────────────────────────
 void main()
 {
-    // sample maps or use scalar fallbacks
     vec4  albedoSample = uHasAlbedo    == 1 ? texture(uAlbedoMap,    fUv) : uColor;
     float roughness    = uHasRoughness == 1 ? texture(uRoughnessMap, fUv).r : uRoughnessValue;
     float metallic     = uHasMetallic  == 1 ? texture(uMetallicMap,  fUv).r : uMetallicValue;
     float ao           = uHasAO        == 1 ? texture(uAOMap,        fUv).r : 1.0;
 
-    vec3 albedo = pow(albedoSample.rgb, vec3(2.2)); // gamma correction
+    vec3 albedo = pow(albedoSample.rgb, vec3(2.2));
     if (albedoSample.a < 0.1) discard;
 
-    // normal — use map if available, else use interpolated vertex normal
     vec3 N = uHasNormal == 1
-    ? normalize(texture(uNormalMap, fUv).rgb * 2.0 - 1.0)
-    : normalize(fNormal);
+        ? normalize(fTBN * (texture(uNormalMap, fUv).rgb * 2.0 - 1.0))
+        : normalize(fNormal);
 
-    vec3 V = normalize(uCameraPos - fFragPos);
-
+    vec3 V  = normalize(uCameraPos - fFragPos);
     vec3 Lo = vec3(0.0);
 
-    // directional light
-    vec3 L         = normalize(-uDirLight.direction);
-    vec3 radiance  = uDirLight.color * uDirLight.intensity;
+    // directional
+    vec3 L        = normalize(-uDirLight.direction);
+    vec3 radiance = uDirLight.color * uDirLight.intensity;
     Lo += CalcPBR(L, radiance, N, V, albedo, roughness, metallic);
 
     // point lights
@@ -144,21 +187,23 @@ void main()
         vec3  lightDir    = uPointLights[i].position - fFragPos;
         float dist        = length(lightDir);
         float attenuation = 1.0 / (uPointLights[i].constant
-        + uPointLights[i].linear    * dist
-        + uPointLights[i].quadratic * dist * dist);
+                          + uPointLights[i].linear    * dist
+                          + uPointLights[i].quadratic * dist * dist);
 
-        vec3 Lp       = normalize(lightDir);
+        vec3 Lp        = normalize(lightDir);
         vec3 radianceP = uPointLights[i].color * uPointLights[i].intensity * attenuation;
         Lo += CalcPBR(Lp, radianceP, N, V, albedo, roughness, metallic);
     }
 
-    // ambient using AO map
+    // spotlights
+    for (int i = 0; i < uSpotLightCount; i++)
+        Lo += CalcSpotLight(uSpotLights[i], N, V, albedo, roughness, metallic);
+
     vec3 ambient = vec3(0.03) * albedo * ao;
     vec3 color   = ambient + Lo;
 
-    // HDR tone mapping + gamma correction
-    color = color / (color + vec3(1.0));        // Reinhard tone map
-    color = pow(color, vec3(1.0 / 2.2));        // gamma correction
+    color = color / (color + vec3(1.0));
+    color = pow(color, vec3(1.0 / 2.2));
 
     FragColor = vec4(color, albedoSample.a);
 }

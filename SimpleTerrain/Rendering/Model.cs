@@ -95,7 +95,7 @@ public class Model : IDisposable
     private static float[] BuildVertices(List<Vertex> vertexCollection)
     {
         // 8 floats per vertex: pos(3) + normal(3) + uv(2)
-        var vertices = new float[vertexCollection.Count * 8];
+        var vertices = new float[vertexCollection.Count * 11];
         int i = 0;
 
         foreach (var v in vertexCollection)
@@ -108,6 +108,9 @@ public class Model : IDisposable
             vertices[i++] = v.Normal.Z;
             vertices[i++] = v.TexCoords.X;
             vertices[i++] = v.TexCoords.Y;
+            vertices[i++] = v.Tangent.X;
+            vertices[i++] = v.Tangent.Y;
+            vertices[i++] = v.Tangent.Z;
         }
 
         return vertices;

@@ -23,10 +23,11 @@ public class Mesh : IDisposable
         _vbo = new BufferObject<float>(_gl, vertices, BufferTargetARB.ArrayBuffer);
         _vao = new VertexArrayObject<float, uint>(_gl, _vbo, _ebo);
         
-        // stride = 8 (3 pos + 3 normal + 2 uv)
-        _vao.VertexAttributePointer(0, 3, VertexAttribPointerType.Float, 8, 0); // position
-        _vao.VertexAttributePointer(1, 3, VertexAttribPointerType.Float, 8, 3); // normal
-        _vao.VertexAttributePointer(2, 2, VertexAttribPointerType.Float, 8, 6); // uv
+        // stride = 11 (pos=3, normal=3, uv=2, tangent=3)
+        _vao.VertexAttributePointer(0, 3, VertexAttribPointerType.Float, 11, 0);  // position
+        _vao.VertexAttributePointer(1, 3, VertexAttribPointerType.Float, 11, 3);  // normal
+        _vao.VertexAttributePointer(2, 2, VertexAttribPointerType.Float, 11, 6);  // uv
+        _vao.VertexAttributePointer(3, 3, VertexAttribPointerType.Float, 11, 8);  // tangent
         
         _gl.BindVertexArray(0);
         _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);

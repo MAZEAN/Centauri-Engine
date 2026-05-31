@@ -20,7 +20,7 @@ public class EntityDefinition
     public string Model { get; set; } = "";
 
     [JsonPropertyName("material")]
-    public string Material { get; set; } = ""; // no longer nullable — required
+    public string Material { get; set; } = "";
 
     [JsonPropertyName("position")]
     public float[] Position { get; set; } = [0f, 0f, 0f];
