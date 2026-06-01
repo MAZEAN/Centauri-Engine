@@ -15,7 +15,7 @@ public class Renderer
     private readonly List<PointLight> _activePointLights = new();
     private readonly List<SpotLight>  _activeSpotLights  = new();
 
-    private readonly uint[] _boundTextures = new uint[16];
+    private uint[] _boundTextures = null!;
     
     private bool _projectionDirty = true;
 
@@ -95,6 +95,9 @@ public class Renderer
     {
         int index = (int)slot - (int)TextureUnit.Texture0;
         uint handle = tex?.Handle ?? 0;
+        
+        if (index < 0 || index >= _boundTextures.Length)
+            throw new Exception($"Texture slot {slot} exceeds supported range.");
 
         if (_boundTextures[index] == handle)
             return;
@@ -121,8 +124,7 @@ public class Renderer
         shader.SetUniform("uMetallicMap",  3);
         shader.SetUniform("uAOMap",        4);
     }
-
-
+    
     // -----------------------------
     // Material
     // -----------------------------
@@ -143,8 +145,7 @@ public class Renderer
         shader.SetUniform("uUvScale",        mat.UvScale);
         shader.SetUniform("uUvOffset",       mat.UvOffset);
     }
-
-
+    
     // -----------------------------
     // Transform
     // -----------------------------
@@ -159,8 +160,7 @@ public class Renderer
         else
             shader.SetUniformMat3x3("uNormalMatrix", Matrix4x4.Transpose(model));
     }
-
-
+    
     // -----------------------------
     // Lighting
     // -----------------------------
@@ -237,21 +237,17 @@ public class Renderer
             shader.SetUniform($"uSpotLights[{i}].direction", light.Direction);
             shader.SetUniform($"uSpotLights[{i}].color",     light.Color);
             shader.SetUniform($"uSpotLights[{i}].intensity", light.Intensity);
-
-            shader.SetUniform($"uSpotLights[{i}].innerCutoff",
-                MathF.Cos(light.InnerCutoff * MathF.PI / 180f));
-
-            shader.SetUniform($"uSpotLights[{i}].outerCutoff",
-                MathF.Cos(light.OuterCutoff * MathF.PI / 180f));
+            shader.SetUniform($"uSpotLights[{i}].innerCutoff", MathF.Cos(light.InnerCutoff * MathF.PI / 180f));
+            shader.SetUniform($"uSpotLights[{i}].outerCutoff", MathF.Cos(light.OuterCutoff * MathF.PI / 180f));
         }
     }
 
     private void InitializeTextureCache()
     {
+        _gl.GetInteger(GLEnum.MaxTextureImageUnits, out var maxUnits);
 
-        for (int i = 0; i < _boundTextures.Length; i++)
-            _boundTextures[i] = uint.MaxValue;
-
+        _boundTextures = new uint[maxUnits];
+        Array.Fill(_boundTextures, uint.MaxValue);
     }
 
     public void OnResize()
