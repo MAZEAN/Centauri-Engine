@@ -1,5 +1,6 @@
 namespace SimpleTerrain.Rendering;
-using SimpleTerrain.Scene;
+
+using Scene;
 
 public class Entity
 {

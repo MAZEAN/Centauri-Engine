@@ -7,53 +7,138 @@ public class Transform
     private Vector3 _position = Vector3.Zero;
     private Vector3 _scale = Vector3.One;
     private Quaternion _rotation = Quaternion.Identity;
-    private Matrix4x4 _cachedMatrix;
-    private bool _dirty = true;
 
-    public Transform? Parent { get; set; }
+    private Matrix4x4 _localMatrix;
+    private Matrix4x4 _worldMatrix;
+
+    private bool _localDirty = true;
+    private bool _worldDirty = true;
+
+    private readonly List<Transform> _children = new();
+    public IReadOnlyList<Transform> Children => _children;
+    private Transform? _parent;
     
-    public bool IsDirty => _dirty;
-    public void ClearDirty() => _dirty = false;
+    public Transform? Parent
+    {
+        get => _parent;
+        set
+        {
+            if (value == this)
+                throw new Exception("Transform cannot be parent of itself");
+            
+            if (value != null && IsDescendantOf(value))
+                throw new Exception("Cannot assign parent: cycle detected.");
 
+
+            if (_parent == value) return;
+
+            // remove from old parent
+            _parent?._children.Remove(this);
+
+            _parent = value;
+
+            // add to new parent
+            _parent?._children.Add(this);
+
+            MarkWorldDirty();
+        }
+    }
+
+
+    // -----------------------------
+    // Properties
+    // -----------------------------
     public Vector3 Position
     {
         get => _position;
-        set { _position = value; _dirty = true; }
+        set
+        {
+            _position = value;
+            MarkDirty();
+        }
     }
 
     public Vector3 Scale
     {
         get => _scale;
-        set { _scale = value; _dirty = true; }
+        set
+        {
+            _scale = value;
+            MarkDirty();
+        }
     }
 
     public Quaternion Rotation
     {
         get => _rotation;
-        set { _rotation = Quaternion.Normalize(value); _dirty = true; }
+        set
+        {
+            _rotation = Quaternion.Normalize(value);
+            MarkDirty();
+        }
     }
 
+    // -----------------------------
+    // Dirty propagation
+    // -----------------------------
+    private void MarkDirty()
+    {
+        _localDirty = true;
+        MarkWorldDirty();
+    }
+
+    private void MarkWorldDirty()
+    {
+        _worldDirty = true;
+
+        foreach (var child in _children)
+            child.MarkWorldDirty();
+    }
+
+    // -----------------------------
+    // Matrices
+    // -----------------------------
     public Matrix4x4 LocalMatrix
     {
         get
         {
-            if (_dirty)
+            if (_localDirty)
             {
-                _cachedMatrix =
+                _localMatrix =
                     Matrix4x4.CreateScale(_scale) *
                     Matrix4x4.CreateFromQuaternion(_rotation) *
                     Matrix4x4.CreateTranslation(_position);
-                _dirty = false;
+
+                _localDirty = false;
             }
-            return _cachedMatrix;
+
+            return _localMatrix;
         }
     }
 
-    public Matrix4x4 WorldMatrix =>
-        Parent != null
-            ? LocalMatrix * Parent.WorldMatrix
-            : LocalMatrix;
+    public Matrix4x4 WorldMatrix
+    {
+        get
+        {
+            if (_worldDirty)
+            {
+                
+                var local = LocalMatrix;
 
+                _worldMatrix = Parent != null
+                    ? local * Parent.WorldMatrix
+                    : local;
+
+                _worldDirty = false;
+            }
+
+            return _worldMatrix;
+        }
+    }
+
+    // -----------------------------
+    // Transform helpers
+    // -----------------------------
     public void Translate(Vector3 delta)
     {
         Position += delta;
@@ -76,5 +161,19 @@ public class Transform
             float.DegreesToRadians(pitchDeg),
             float.DegreesToRadians(rollDeg)
         );
+    }
+    
+    private bool IsDescendantOf(Transform potentialParent)
+    {
+        var current = potentialParent;
+
+        while (current != null)
+        {
+            if (current == this)
+                return true;
+
+            current = current.Parent;
+        }
+        return false;
     }
 }
