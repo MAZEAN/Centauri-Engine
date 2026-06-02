@@ -14,7 +14,7 @@ public class SceneLoader : IDisposable
     private readonly GL _gl;
     private readonly Scene _scene;
     private readonly string _path;
-    private readonly RenderConfig _config;
+    private readonly AppConfig _config;
     
     private AssetCache<GLTexture> _textures;
     private AssetCache<GLShader> _shaders;
@@ -25,11 +25,11 @@ public class SceneLoader : IDisposable
         PropertyNameCaseInsensitive = true
     };
 
-    public SceneLoader(GL gl, Scene scene, RenderConfig config)
+    public SceneLoader(GL gl, Scene scene, AppConfig config)
     {
         _gl = gl;
         _scene = scene;
-        _path = config.ScenePath;
+        _path = config.Render.ScenePath;
         _config = config;
         
         InitializeCaches();
@@ -40,7 +40,14 @@ public class SceneLoader : IDisposable
         var json = File.ReadAllText(_path);
         var def  = JsonSerializer.Deserialize<SceneDefinition>(json, Options)
                    ?? throw new Exception($"Failed to deserialize scene file: {_path}");
+        
+        LoadEntities(def);
+        LoadLighting(def);
+        LoadCameras(def);
+    }
 
+    private void LoadEntities(SceneDefinition def)
+    {
         foreach (var e in def.Entities)
         {
             var model = _models.Get(e.Model);
@@ -58,8 +65,10 @@ public class SceneLoader : IDisposable
 
             _scene.AddEntity(entity);
         }
-        
-        // load lights
+    }
+
+    private void LoadLighting(SceneDefinition def)
+    {
         foreach (var d in def.Lights.Directional)
         {
             _scene.Lighting.Add(new DirectionalLight
@@ -100,6 +109,40 @@ public class SceneLoader : IDisposable
         }
     }
 
+    private void LoadCameras(SceneDefinition def)
+    {
+        foreach (var c in def.Cameras)
+        {
+            var camera = new Camera(
+                _config.Camera,
+                c.Name,
+                new Vector3(c.Position[0], c.Position[1], c.Position[2]),
+                ParseUp(c.Up),
+                c.Yaw,
+                c.Pitch
+            );
+
+            _scene.AddCamera(camera);
+        }
+        
+        if (def.Cameras.Count == 0)
+        {
+            throw new Exception("Scene must contain at least one camera.");
+        }
+        
+        var primaryName = _config.Camera.PrimaryCamera;
+        var primary = def.Cameras.FirstOrDefault(c => c.Name == primaryName);
+        
+        if (primary != null)
+        {
+            _scene.SetActiveCamera(primaryName);
+        }
+        else
+        {
+            _scene.SetActiveCamera(def.Cameras[0].Name);
+        }
+    }
+
     private Material LoadMaterialFile(string path)
     {
         var json = File.ReadAllText(path);
@@ -126,12 +169,12 @@ public class SceneLoader : IDisposable
     private void InitializeCaches()
     {
         _textures = new AssetCache<GLTexture>(
-            _config.TextureCacheSize,
+            _config.Render.TextureCacheSize,
             path => new GLTexture(_gl, Path.GetFullPath(path))
         );
 
         _shaders = new AssetCache<GLShader>(
-            _config.ShaderCacheSize,
+            _config.Render.ShaderCacheSize,
             shaderBase =>
                 new GLShader(
                     _gl,
@@ -139,8 +182,19 @@ public class SceneLoader : IDisposable
                     shaderBase + ".frag"));
 
         _models = new AssetCache<Model>(
-            _config.ModelCacheSize,
+            _config.Render.ModelCacheSize,
             path => new Model(_gl, path));
+    }
+    
+    private static Vector3 ParseUp(string axis)
+    {
+        return axis.ToUpper() switch
+        {
+            "X" => Vector3.UnitX,
+            "Y" => Vector3.UnitY,
+            "Z" => Vector3.UnitZ,
+            _ => throw new Exception($"Invalid up axis: {axis}")
+        };
     }
 
     public void Dispose()

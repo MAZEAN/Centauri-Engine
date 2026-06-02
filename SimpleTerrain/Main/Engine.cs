@@ -14,7 +14,6 @@ public class Engine
 {
     private IWindow _window = null!;
     private GL _gl = null!;
-    private Camera _camera = null!;
     private AppConfig _config = null!;
     private Renderer _renderer = null!;
     private InputSystem _input = null!;
@@ -72,24 +71,17 @@ public class Engine
         try
         {
             InitializeOpenGL();
-            _camera = new Camera(
-                _config.Camera,
-                new Vector3(0f, 0f, 3f),
-                new Vector3(0f, 0f, -1f),
-                Vector3.UnitY,
-                -90f,
-                0f
-            );
-            
-            _camera.SetAspectRatio(_window.FramebufferSize);
 
-            _renderer = new Renderer(_gl, _camera, _config);
-            
-            _input    = new InputSystem(_window, _camera, _config);
-            _input.Initialize();
+            _renderer = new Renderer(_gl, _config);
 
-            _sceneLoader = new SceneLoader(_gl, _scene, _config.Render);
+            _sceneLoader = new SceneLoader(_gl, _scene, _config);
             _sceneLoader.Load();
+            
+            foreach (var cam in _scene.Cameras)
+                cam.SetAspectRatio(_window.FramebufferSize);
+            
+            _input    = new InputSystem(_window, _scene, _config);
+            _input.Initialize();
             
             _grid = new GridRenderer(_gl, _config.Window);
         }
@@ -171,17 +163,18 @@ public class Engine
     {
         _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
         
-        _grid.Render(_camera);
+        _grid.Render(_scene.GetActiveCamera());
         _renderer.Render(_scene, (float) deltaTime);
     }
-
-    // Engine.cs
+    
     private void OnResize(Vector2D<int> size)
     {
         _gl.Viewport(size);
-        _camera.SetAspectRatio(size);
-        _renderer.OnResize();
+        
+        foreach (var cam in _scene.Cameras)
+            cam.SetAspectRatio(size);
     }
+    
     private void OnClose()
     {
         _scene.Dispose();

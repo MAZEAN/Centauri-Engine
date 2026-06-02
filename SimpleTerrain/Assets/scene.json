@@ -26,6 +26,25 @@
     }
     
   ],
+
+  "cameras": [
+    {
+      "name": "Main",
+      "position": [0, 0, 3],
+      "up": "Y",
+      "yaw": -90,
+      "pitch": 0,
+      "active": true
+    },
+    {
+      "name": "Debug",
+      "position": [3, 0, 0],
+      "up": "Y",
+      "yaw": -180,
+      "pitch": 0,
+      "active": false
+    }
+  ],
   "lights": {
     "directional": [
       {

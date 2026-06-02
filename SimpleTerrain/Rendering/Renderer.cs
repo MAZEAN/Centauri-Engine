@@ -9,20 +9,17 @@ using Lighting;
 public class Renderer
 {
     private readonly GL _gl;
-    private readonly Camera _camera;
+    private Camera? _camera;
     private readonly AppConfig _config;
     
     private readonly List<PointLight> _activePointLights = new();
     private readonly List<SpotLight>  _activeSpotLights  = new();
 
     private uint[] _boundTextures = null!;
-    
-    private bool _projectionDirty = true;
 
-    public Renderer(GL gl, Camera camera, AppConfig config)
+    public Renderer(GL gl, AppConfig config)
     {
         _gl = gl;
-        _camera = camera;
         _config = config;
         
         InitializeTextureCache();
@@ -30,6 +27,8 @@ public class Renderer
 
     public void Render(Scene scene, float deltaTime)
     {
+        _camera = scene.GetActiveCamera();
+        
         var view = _camera.GetViewMatrix();
         var cameraPosition = _camera.GetPosition();
         bool lightingDirty = scene.Lighting.IsDirty;
@@ -41,8 +40,7 @@ public class Renderer
             shader.SetUniform("uView", view);
             shader.SetUniform("uCameraPos", cameraPosition);
             
-            if (_projectionDirty)
-                UploadGlobalUniforms(shader);
+            UploadGlobalUniforms(shader);
 
             if (lightingDirty)
                 UploadLighting(shader, scene.Lighting);
@@ -71,9 +69,6 @@ public class Renderer
                 }
             }
         }
-        
-        if (_projectionDirty)
-            _projectionDirty = false;
 
         if (lightingDirty)
             scene.Lighting.ClearDirty();
@@ -248,10 +243,5 @@ public class Renderer
 
         _boundTextures = new uint[maxUnits];
         Array.Fill(_boundTextures, uint.MaxValue);
-    }
-
-    public void OnResize()
-    {
-        _projectionDirty = true;
     }
 }

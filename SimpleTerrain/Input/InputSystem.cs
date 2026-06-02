@@ -10,78 +10,140 @@ using Scene;
 
 public class InputSystem
 {
-    
     private readonly IWindow _window;
-    private readonly Camera _camera;
+    private readonly Scene _scene;
     private readonly AppConfig _config;
     
-    private CameraController _cameraController = null!;
+    private readonly Dictionary<Camera, CameraController> _controllers = new();
     private IKeyboard _keyboard= null!;
-    public InputSystem(IWindow window, Camera camera, AppConfig config)
+    
+    public InputSystem(IWindow window, Scene scene, AppConfig config)
     {
         _window = window;
-        _camera = camera;
+        _scene = scene;
         _config = config;
     }
+
 
     public void Initialize()
     {
         var input = _window.CreateInput();
-        
-        _cameraController = new CameraController(_camera, _config.Camera);
+
         _keyboard = input.Keyboards.FirstOrDefault()
                     ?? throw new InvalidOperationException("Keyboard not available");
+
         _keyboard.KeyDown += OnKeyDown;
-        
+
         foreach (var mouse in input.Mice)
         {
             mouse.Cursor.CursorMode = CursorMode.Raw;
-            mouse.MouseMove += _cameraController.OnMouseMove;
-            mouse.Scroll += _cameraController.OnMouseWheel;
+
+            mouse.MouseMove += OnMouseMove;
+            mouse.Scroll += OnMouseWheel;
         }
     }
     
     public void UpdateMovement(float deltaTime)
     {
         var moveSpeed = _config.MoveSpeed * deltaTime;
+        var camera = _scene.GetActiveCamera();
 
         if (_keyboard.IsKeyPressed(Key.W))
         {
             //Move forwards
-            _camera.UpdatePosition(_camera.Forward * moveSpeed);
+            camera.UpdatePosition(camera.Forward * moveSpeed);
         }
         if (_keyboard.IsKeyPressed(Key.S))
         {
             //Move backwards
-            _camera.UpdatePosition(_camera.Forward * -moveSpeed);
+            camera.UpdatePosition(camera.Forward * -moveSpeed);
         }
         if (_keyboard.IsKeyPressed(Key.A))
         {
             //Move left
-            _camera.UpdatePosition(Vector3.Normalize(Vector3.Cross(_camera.Forward, _camera.Up)) * -moveSpeed);
+            camera.UpdatePosition(Vector3.Normalize(Vector3.Cross(camera.Forward, camera.Up)) * -moveSpeed);
         }
         if (_keyboard.IsKeyPressed(Key.D))
         {
             //Move right
-            _camera.UpdatePosition(Vector3.Normalize(Vector3.Cross(_camera.Forward, _camera.Up)) * moveSpeed);
+            camera.UpdatePosition(Vector3.Normalize(Vector3.Cross(camera.Forward, camera.Up)) * moveSpeed);
         }
         if (_keyboard.IsKeyPressed(Key.Space))
         {
             //Move up
-            _camera.UpdatePosition(_camera.Up * moveSpeed);
+            camera.UpdatePosition(camera.Up * moveSpeed);
         }
         if (_keyboard.IsKeyPressed(Key.ControlLeft))
         {
             //Move down
-            _camera.UpdatePosition(_camera.Up * -moveSpeed);
+            camera.UpdatePosition(camera.Up * -moveSpeed);
         }
     }
+    
+    private void OnMouseMove(IMouse mouse, Vector2 position)
+    {
+        var cam = _scene.GetActiveCamera();
+        if (!_controllers.TryGetValue(cam, out var controller))
+        {
+            controller = new CameraController(cam, _config.Camera);
+            _controllers[cam] = controller;
+        }
 
+        controller.OnMouseMove(mouse, position);
+    }
+    
+    private void OnMouseWheel(IMouse mouse, ScrollWheel scroll)
+    {
+        var cam = _scene.GetActiveCamera();
+        if (!_controllers.TryGetValue(cam, out var controller))
+        {
+            controller = new CameraController(cam, _config.Camera);
+            _controllers[cam] = controller;
+        }
+
+        controller.OnMouseWheel(mouse, scroll);
+    }
+    
     private void OnKeyDown(IKeyboard keyboard, Key key, int code)
     {
         if (key == Key.Escape)
-        {
             _window.Close();
+
+        if (key == Key.F1)
+            SwitchCamera("Main");
+
+        if (key == Key.F2)
+            SwitchCamera("Debug");
+
+        if (key == Key.Tab)
+        {
+            _scene.CycleCamera();
+            ResetActiveController();
         }
+    }
+    
+    private CameraController GetController(Camera cam)
+    {
+        if (!_controllers.TryGetValue(cam, out var controller))
+        {
+            controller = new CameraController(cam, _config.Camera);
+            _controllers[cam] = controller;
+        }
+
+        return controller;
+    }
+    
+    private void SwitchCamera(string name)
+    {
+        _scene.SetActiveCamera(name);
+        ResetActiveController();
+    }
+
+    private void ResetActiveController()
+    {
+        var cam = _scene.GetActiveCamera();
+        var controller = GetController(cam);
+
+        controller.Reset();
     }
 }

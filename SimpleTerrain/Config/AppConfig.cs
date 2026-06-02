@@ -21,12 +21,15 @@ public class RenderConfig
 
 public class CameraConfig
 {
+    public string PrimaryCamera { get; init; } = "Main";
     public float FOV { get; init; } = 45f;
     public float Near { get; init; } = 0.1f;
     public float Far { get; init; } = 1000f;
     public float SensitivityX { get; init; } = 0.1f;
     public float SensitivityY { get; init; } = 0.1f;
     public float ZoomSensitivity { get; init; } = 1.5f;
+    public float MinZoom { get; init; } = 1.0f;
+    public float MaxZoom { get; init; } = 45.0f;
 }
 
 public class WindowConfig

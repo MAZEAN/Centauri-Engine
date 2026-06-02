@@ -9,6 +9,9 @@ public class SceneDefinition
 
     [JsonPropertyName("lights")]
     public LightsDefinition Lights { get; set; } = new(); 
+    
+    [JsonPropertyName("cameras")]
+    public List<CameraDefinition> Cameras { get; set; } = [];
 }
 
 public class EntityDefinition
@@ -152,4 +155,25 @@ public class SpotLightDefinition
 
     [JsonPropertyName("enabled")]
     public bool Enabled { get; set; } = true;
+}
+
+public class CameraDefinition
+{
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = "";
+
+    [JsonPropertyName("position")]
+    public float[] Position { get; set; } = [0f, 0f, 0f];
+    
+    [JsonPropertyName("up")]
+    public string Up { get; set; } = "Y";
+
+    [JsonPropertyName("yaw")]
+    public float Yaw { get; set; }
+
+    [JsonPropertyName("pitch")]
+    public float Pitch { get; set; }
+    
+    [JsonPropertyName("active")]
+    public bool Active { get; set; }
 }

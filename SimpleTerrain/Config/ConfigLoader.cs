@@ -12,7 +12,7 @@ public static class ConfigLoader
         IncludeFields = true,
         Converters =
         {
-            new JsonStringEnumConverter() // ✅ Fix enum parsing
+            new JsonStringEnumConverter()
         }
     };
 

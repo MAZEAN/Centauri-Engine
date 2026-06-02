@@ -5,26 +5,51 @@ using Lighting;
 
 public class Scene
 {
+    // -----------------------------
+    // Entities
+    // -----------------------------
     private readonly List<Entity> _entities = new();
     public IReadOnlyList<Entity> Entities => _entities;
+
+    // -----------------------------
+    // Lighting
+    // -----------------------------
     public LightingSystem Lighting { get; } = new();
 
-    private Dictionary<GLShader, List<Entity>> _shaderGroups = new();
-    
+    // -----------------------------
+    // Shader grouping
+    // -----------------------------
+    private readonly Dictionary<GLShader, List<Entity>> _shaderGroups = new();
     private bool _shaderGroupsDirty = true;
 
-    public Dictionary<GLShader, List<Entity>> GetEntitiesByShader()
+    public IReadOnlyDictionary<GLShader, List<Entity>> GetEntitiesByShader()
     {
-        if (!_shaderGroupsDirty) return _shaderGroups;
+        if (!_shaderGroupsDirty)
+            return _shaderGroups;
 
-        _shaderGroups = _entities
-            .GroupBy(e => e.Material.Shader)
-            .ToDictionary(
-                g => g.Key,
-                g => g.OrderBy(e => e.Material.SortKey).ToList()
-            );
-        
-        ClearDirty();
+        _shaderGroups.Clear();
+
+        foreach (var entity in _entities)
+        {
+            var shader = entity.Material.Shader;
+
+            if (!_shaderGroups.TryGetValue(shader, out var list))
+            {
+                list = new List<Entity>();
+                _shaderGroups[shader] = list;
+            }
+
+            list.Add(entity);
+        }
+
+        // ✅ sort per shader group
+        foreach (var list in _shaderGroups.Values)
+        {
+            list.Sort((a, b) =>
+                a.Material.SortKey.CompareTo(b.Material.SortKey));
+        }
+
+        _shaderGroupsDirty = false;
         return _shaderGroups;
     }
 
@@ -40,22 +65,69 @@ public class Scene
         _shaderGroupsDirty = true;
     }
 
-    public void ClearDirty()
+    // -----------------------------
+    // Cameras
+    // -----------------------------
+    private readonly List<Camera> _cameras = new();
+    public IReadOnlyList<Camera> Cameras => _cameras;
+
+    private readonly Dictionary<string, Camera> _cameraLookup = new();
+    private Camera? _activeCamera;
+
+    public void AddCamera(Camera cam)
     {
-        _shaderGroupsDirty = false;
+        if (_cameraLookup.ContainsKey(cam.Name))
+            throw new Exception($"Camera with name '{cam.Name}' already exists.");
+
+        _cameras.Add(cam);
+        _cameraLookup[cam.Name] = cam;
+
+        _activeCamera ??= cam;
     }
-    
-    public void MarkDirty()
+
+    public Camera GetActiveCamera()
     {
-        _shaderGroupsDirty = true;
+        return _activeCamera ?? throw new Exception("No active camera set.");
     }
-    
+
+    public void SetActiveCamera(string name)
+    {
+        if (!_cameraLookup.TryGetValue(name, out var cam))
+            throw new Exception($"Camera '{name}' not found");
+
+        _activeCamera = cam;
+    }
+
+    public void CycleCamera()
+    {
+        if (_cameras.Count == 0)
+            throw new Exception("No cameras available.");
+
+        if (_activeCamera == null)
+        {
+            _activeCamera = _cameras[0];
+            return;
+        }
+
+        int index = _cameras.IndexOf(_activeCamera);
+        index = (index + 1) % _cameras.Count;
+
+        _activeCamera = _cameras[index];
+    }
+
+    // -----------------------------
+    // Cleanup
+    // -----------------------------
     public void Dispose()
     {
         foreach (var entity in _entities)
         {
             entity.Dispose();
         }
+
         _entities.Clear();
+        _shaderGroups.Clear();
+        _cameras.Clear();
+        _cameraLookup.Clear();
     }
 }
