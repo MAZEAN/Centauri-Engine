@@ -2,15 +2,25 @@ namespace SimpleTerrain.Scene;
 
 using Lighting;
 using Rendering.Resources;
+using Config;
 
 public class Scene
 {
+    private readonly AppConfig _config;
     private readonly List<Entity> _entities = new();
     public IReadOnlyList<Entity> Entities => _entities;
     public LightingSystem Lighting { get; } = new();
     
     private readonly Dictionary<GLShader, List<Entity>> _shaderGroups = new();
+    
     private bool _shaderGroupsDirty = true;
+
+    public bool EnableCulling { get; private set; } = true;
+
+    public Scene(AppConfig config)
+    {
+        _config = config;
+    }
 
     public IReadOnlyDictionary<GLShader, List<Entity>> GetEntitiesByShader()
     {
@@ -76,6 +86,11 @@ public class Scene
     {
         return _activeCamera ?? throw new Exception("No active camera set.");
     }
+    
+    public Camera GetPrimaryCamera()
+    {
+        return Cameras.First(c => c.Name == _config.Camera.PrimaryCamera);
+    }
 
     public void SetActiveCamera(string name)
     {
@@ -100,6 +115,11 @@ public class Scene
         index = (index + 1) % _cameras.Count;
 
         _activeCamera = _cameras[index];
+    }
+
+    public void ToggleEnableCulling()
+    {
+        EnableCulling = !EnableCulling;
     }
     
     public void Dispose()

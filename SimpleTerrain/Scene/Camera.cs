@@ -1,9 +1,12 @@
+using Silk.NET.Assimp;
+
 namespace SimpleTerrain.Scene;
 
 using System.Numerics;
-using Config;
 using Silk.NET.Maths;
+using Plane = System.Numerics.Plane;
 
+using Config;
 using Utils;
 
 public class Camera
@@ -11,45 +14,36 @@ public class Camera
     public string Name { get; }
 
     private readonly CameraConfig _config;
-
-    private Vector3 _position;
-    public Vector3 Position => _position;
-
-    private Vector3 _forward;
-    public Vector3 Forward => _forward;
-
-    private Vector3 _right;
-    public Vector3 Right => _right;
-
-    private Vector3 _up;
-    public Vector3 Up => _up;
+    public Vector3 Position { get; private set; }
+    public Vector3 Forward { get; private set;}
+    public Vector3 Right { get; private set;}
+    public Vector3 Up { get; private set;}
 
     private readonly Vector3 _worldUp;
 
     private float _yaw;
     private float _pitch;
-
-    private float _zoom;
-    private float _aspectRatio;
+    public float Zoom { get; private set;}
+    public float AspectRatio { get; private set;}
 
     public Camera(CameraConfig config, string name, Vector3 position, Vector3 worldUp, float yaw, float pitch)
     {
         _config = config;
         Name = name;
 
-        _position = position;
+        Position = position;
         _worldUp = worldUp;
 
         _yaw = yaw;
         _pitch = pitch;
-        _zoom = config.FOV;
+        Zoom = config.FOV;
 
         UpdateVectors();
     }
     
     public void UpdatePosition(Vector3 delta)
     {
-        _position += delta;
+        Position += delta;
     }
     
     public void ModifyDirection(float xOffset, float yOffset)
@@ -65,78 +59,43 @@ public class Camera
 
     public void AdjustZoom(float zoomDelta)
     {
-        _zoom = Math.Clamp(_zoom + zoomDelta, _config.MinZoom, _config.MaxZoom);
+        Zoom = Math.Clamp(Zoom + zoomDelta, _config.MinZoom, _config.MaxZoom);
     }
     
     private void UpdateVectors()
     {
-        var cameraDirection = Vector3.Zero;
-        cameraDirection.X = MathF.Cos(MathHelper.DegreesToRadians(_yaw)) * MathF.Cos(MathHelper.DegreesToRadians(_pitch));
-        cameraDirection.Y = MathF.Sin(MathHelper.DegreesToRadians(_pitch));
-        cameraDirection.Z = MathF.Sin(MathHelper.DegreesToRadians(_yaw)) * MathF.Cos(MathHelper.DegreesToRadians(_pitch));
+        float yawRad = MathHelper.DegreesToRadians(_yaw);
+        float pitchRad = MathHelper.DegreesToRadians(_pitch);
 
-        _forward = Vector3.Normalize(cameraDirection);
+        var direction = new Vector3(
+            MathF.Cos(yawRad) * MathF.Cos(pitchRad),
+            MathF.Sin(pitchRad),
+            MathF.Sin(yawRad) * MathF.Cos(pitchRad)
+        );
 
-        // ✅ derive right + up
-        _right = Vector3.Normalize(Vector3.Cross(_forward, _worldUp));
-        _up    = Vector3.Normalize(Vector3.Cross(_right, _forward));
+        Forward = Vector3.Normalize(direction);
+        
+        Right = Vector3.Normalize(Vector3.Cross(Forward, _worldUp));
+        Up    = Vector3.Normalize(Vector3.Cross(Right, Forward));
     }
     
     public void SetAspectRatio(Vector2D<int> newSize)
     {
-        _aspectRatio = (float) newSize.X / newSize.Y;
-    }
-    
-    public Vector3[] GetFrustumCorners()
-    {
-        float fov = MathHelper.DegreesToRadians(_zoom);
-        float tanFov = MathF.Tan(fov / 2f);
-
-        float near = _config.Near;
-        float far  = 100f;
-
-        float nearHeight = 2f * tanFov * near;
-        float nearWidth  = nearHeight * _aspectRatio;
-
-        float farHeight = 2f * tanFov * far;
-        float farWidth  = farHeight * _aspectRatio;
-
-        Vector3 forward = Forward;
-        Vector3 right   = Right;
-        Vector3 up      = Up;
-
-        Vector3 nearCenter = Position + forward * near;
-        Vector3 farCenter  = Position + forward * far;
-
-        Vector3[] corners = new Vector3[8];
-
-        // near plane
-        corners[0] = nearCenter + up * (nearHeight * 0.5f) - right * (nearWidth * 0.5f);
-        corners[1] = nearCenter + up * (nearHeight * 0.5f) + right * (nearWidth * 0.5f);
-        corners[2] = nearCenter - up * (nearHeight * 0.5f) - right * (nearWidth * 0.5f);
-        corners[3] = nearCenter - up * (nearHeight * 0.5f) + right * (nearWidth * 0.5f);
-
-        // far plane
-        corners[4] = farCenter + up * (farHeight * 0.5f) - right * (farWidth * 0.5f);
-        corners[5] = farCenter + up * (farHeight * 0.5f) + right * (farWidth * 0.5f);
-        corners[6] = farCenter - up * (farHeight * 0.5f) - right * (farWidth * 0.5f);
-        corners[7] = farCenter - up * (farHeight * 0.5f) + right * (farWidth * 0.5f);
-
-        return corners;
+        if (newSize.Y <= 0)
+            throw new ArgumentException("Height must be positive.");
+        AspectRatio = (float)newSize.X / newSize.Y;
     }
     
     public Matrix4x4 GetViewMatrix()
     {
-        return Matrix4x4.CreateLookAt(_position, _position + _forward, _up);
+        return Matrix4x4.CreateLookAt(Position, Position + Forward, Up);
     }
     
     public Matrix4x4 GetProjectionMatrix()
     {
-        return Matrix4x4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(_zoom), _aspectRatio, _config.Near, _config.Far);
-    }
-    
-    public Vector3 GetPosition()
-    {
-        return _position;
+        if (AspectRatio <= 0)
+            throw new InvalidOperationException("Aspect ratio has not been set.");
+        
+        return Matrix4x4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(Zoom), AspectRatio, _config.Near, _config.Far);
     }
 }

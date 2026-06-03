@@ -10,7 +10,6 @@ using Resources;
 public class Renderer
 {
     private readonly GL _gl;
-    private Camera? _camera;
     private readonly AppConfig _config;
     
     private readonly List<PointLight> _activePointLights = new();
@@ -28,10 +27,17 @@ public class Renderer
 
     public void Render(Scene scene, float deltaTime)
     {
-        _camera = scene.GetActiveCamera();
+        var viewCamera = scene.GetActiveCamera(); 
+        var cullingCamera = scene.GetPrimaryCamera();
         
-        var view = _camera.GetViewMatrix();
-        var cameraPosition = _camera.GetPosition();
+        var frustum = new Frustum(
+            cullingCamera.GetViewMatrix(),
+            cullingCamera.GetProjectionMatrix()
+        );
+        
+        var view = viewCamera.GetViewMatrix();
+        var cameraPosition = viewCamera.Position;
+        
         bool lightingDirty = scene.Lighting.IsDirty;
 
         foreach (var (shader, entities) in scene.GetEntitiesByShader())
@@ -41,13 +47,16 @@ public class Renderer
             shader.SetUniform("uView", view);
             shader.SetUniform("uCameraPos", cameraPosition);
             
-            UploadGlobalUniforms(shader);
+            UploadGlobalUniforms(shader, viewCamera);
 
             if (lightingDirty)
                 UploadLighting(shader, scene.Lighting);
 
             foreach (var entity in entities)
             {
+                if (scene.EnableCulling && !IsVisible(entity, frustum.Planes))
+                    continue;
+
                 var mat = entity.Material;
                 
                 BindMaterialTextures(mat);
@@ -107,9 +116,9 @@ public class Renderer
     // -----------------------------
     // Global uniforms
     // -----------------------------
-    private void UploadGlobalUniforms(GLShader shader)
+    private void UploadGlobalUniforms(GLShader shader, Camera camera)
     {
-        var projection = _camera.GetProjectionMatrix();
+        var projection = camera.GetProjectionMatrix();
 
         shader.SetUniform("uProjection", projection);
 
@@ -236,6 +245,22 @@ public class Renderer
             shader.SetUniform($"uSpotLights[{i}].innerCutoff", MathF.Cos(light.InnerCutoff * MathF.PI / 180f));
             shader.SetUniform($"uSpotLights[{i}].outerCutoff", MathF.Cos(light.OuterCutoff * MathF.PI / 180f));
         }
+    }
+    
+    private bool IsVisible(Entity entity, Plane[] planes)
+    {
+        Vector3 position = entity.Transform.WorldMatrix.Translation;
+        float radius = entity.BoundingRadius;
+
+        foreach (var plane in planes)
+        {
+            float distance = Vector3.Dot(plane.Normal, position) + plane.D;
+
+            if (distance < -radius)
+                return false;
+        }
+
+        return true;
     }
 
     private void InitializeTextureCache()

@@ -120,6 +120,9 @@ public class InputSystem
             _scene.CycleCamera();
             ResetActiveController();
         }
+        
+        if (key == Key.C)
+            _scene.ToggleEnableCulling();
     }
     
     private CameraController GetController(Camera cam)

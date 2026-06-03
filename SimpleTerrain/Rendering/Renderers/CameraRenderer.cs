@@ -165,7 +165,7 @@ public class CameraRenderer : IDisposable
         _shader.SetUniform("uModel", Matrix4x4.Identity);
         _shader.SetUniform("uColor", _frustumColor);
 
-        var c = cam.GetFrustumCorners();
+        var c = Frustum.GetFrustumCorners(cam);
 
         // edges (12 lines)
         int[] indices =

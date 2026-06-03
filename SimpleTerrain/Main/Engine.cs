@@ -32,7 +32,7 @@ public class Engine
             "config.json");
 
         _config = ConfigLoader.Load(configPath);
-        _scene  = new Scene();
+        _scene  = new Scene(_config);
 
         var options = CreateWindowOptions();
         _window = Window.Create(options);
