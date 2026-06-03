@@ -4,15 +4,19 @@ using System.Numerics;
 using Plane = System.Numerics.Plane;
 
 using Utils;
+using Config;
 
 public class Frustum
 {
     private readonly Camera _camera;
+    private readonly CameraConfig _config;
+
     public Plane[] Planes { get; } = new Plane[6];
     
-    public Frustum(Camera camera)
+    public Frustum(Camera camera, CameraConfig config)
     {
         _camera = camera;
+        _config = config;
     }
 
     public void BuildFrustumPlanes()
@@ -41,8 +45,8 @@ public class Frustum
         float fov = MathHelper.DegreesToRadians(_camera.Zoom);
         float tanFov = MathF.Tan(fov / 2f);
 
-        float near = 0.1f;
-        float far  = 100f;
+        float near = _config.Near;
+        float far  = _config.Far;
 
         float nearHeight = 2f * tanFov * near;
         float nearWidth  = nearHeight * _camera.AspectRatio;

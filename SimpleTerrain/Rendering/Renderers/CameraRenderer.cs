@@ -20,7 +20,7 @@ public class CameraRenderer : IDisposable
 
     private readonly float _scale = 0.5f;
     private readonly float _modelBase = -0.4f;
-    private readonly float _dirLength = 0.2f;
+    private readonly float _dirLength = 100.0f;
 
     public CameraRenderer(GL gl)
     {

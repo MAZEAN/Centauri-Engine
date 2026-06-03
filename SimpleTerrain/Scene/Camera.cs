@@ -40,7 +40,7 @@ public class Camera
         _pitch = pitch;
         Zoom = config.FOV;
 
-        Frustum = new Frustum(this);
+        Frustum = new Frustum(this, _config);
 
         UpdateVectors();
     }
