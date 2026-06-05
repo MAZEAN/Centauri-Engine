@@ -28,9 +28,9 @@ public class Engine
 
     public void Run()
     {
-        var configPath = Path.Combine(
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..")),
-            "Config/config.json");
+        var configPath = Path.GetFullPath(
+            Path.Combine(AppContext.BaseDirectory, "..", "..", "..",
+                "Config", "config.json"));
 
         _config = ConfigLoader.Load(configPath);
         _scene  = new Scene(_config);
