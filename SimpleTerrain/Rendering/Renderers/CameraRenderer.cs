@@ -2,7 +2,7 @@ namespace SimpleTerrain.Rendering.Renderers;
 
 using Silk.NET.OpenGL;
 using System.Numerics;
-using Scene;
+using World;
 using Resources;
 
 public class CameraRenderer : IDisposable
@@ -80,18 +80,18 @@ public class CameraRenderer : IDisposable
         _gl.BindVertexArray(0);
     }
 
-    public void Render(World world)
+    public void Render(Scene scene)
     {
         SetDebugRenderState();
         
-        var activeCamera = world.GetActiveCamera();
+        var activeCamera = scene.GetActiveCamera();
         
         _shader.Use();
 
         _shader.SetUniform("uView", activeCamera.GetViewMatrix());
         _shader.SetUniform("uProjection", activeCamera.GetProjectionMatrix());
 
-        foreach (var cam in world.Cameras)
+        foreach (var cam in scene.Cameras)
         {
             if (cam == activeCamera)
                 continue;

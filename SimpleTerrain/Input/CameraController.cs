@@ -2,7 +2,7 @@ namespace SimpleTerrain.Input;
 
 using Silk.NET.Input;
 using System.Numerics;
-using Scene;
+using World;
 using Config;
 
 public class CameraController

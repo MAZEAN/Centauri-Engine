@@ -1,7 +1,7 @@
 namespace SimpleTerrain.Rendering.Renderers;
 
 using Silk.NET.OpenGL;
-using Scene;
+using World;
 using Config;
 using Resources;
 

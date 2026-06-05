@@ -1,10 +1,10 @@
-namespace SimpleTerrain.Scene;
+namespace SimpleTerrain.World;
 
 using Rendering.Resources;
 using Config;
 using Rendering;
 
-public class World
+public class Scene
 {
     private readonly AppConfig _config;
     private readonly List<Entity> _entities = new();
@@ -17,7 +17,7 @@ public class World
 
     public bool EnableCulling { get; private set; } = true;
 
-    public World(AppConfig config)
+    public Scene(AppConfig config)
     {
         _config = config;
     }

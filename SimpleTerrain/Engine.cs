@@ -3,8 +3,9 @@ namespace SimpleTerrain;
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
 using Silk.NET.Maths;
+
 using Config;
-using Scene;
+using World;
 using Rendering.Renderers;
 using Input;
 using Rendering;
@@ -16,10 +17,10 @@ public class Engine
     private AppConfig _config = null!;
     private Renderer _renderer = null!;
     private InputSystem _input = null!;
-    private World _world = null!;
+    private Scene _scene = null!;
     private GridRenderer _grid = null!;
     private ResourceSystem _resourceSystem = null!;
-    private SceneLoader _worldLoader = null!;
+    private SceneLoader _sceneLoader = null!;
     private CameraRenderer _cameraRenderer = null!;
     
     private int _frameCount;
@@ -32,7 +33,7 @@ public class Engine
             "Config/config.json");
 
         _config = ConfigLoader.Load(configPath);
-        _world  = new World(_config);
+        _scene  = new Scene(_config);
 
         var options = CreateWindowOptions();
         _window = Window.Create(options);
@@ -77,13 +78,13 @@ public class Engine
 
             _resourceSystem = new ResourceSystem(_gl, _config);
 
-            _worldLoader = new SceneLoader(_resourceSystem, _world, _config);
-            _worldLoader.Load();
+            _sceneLoader = new SceneLoader(_resourceSystem, _scene, _config);
+            _sceneLoader.Load();
             
-            foreach (var cam in _world.Cameras)
+            foreach (var cam in _scene.Cameras)
                 cam.SetAspectRatio(_window.FramebufferSize);
             
-            _input    = new InputSystem(_window, _world, _config);
+            _input    = new InputSystem(_window, _scene, _config);
             _input.Initialize();
             
             _grid = new GridRenderer(_gl, _config.Window);
@@ -167,22 +168,22 @@ public class Engine
     {
         _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
         
-        _grid.Render(_world.GetActiveCamera());
-        _renderer.Render(_world, (float) deltaTime);
-        _cameraRenderer.Render(_world);
+        _grid.Render(_scene.GetActiveCamera());
+        _renderer.Render(_scene, (float) deltaTime);
+        _cameraRenderer.Render(_scene);
     }
     
     private void OnResize(Vector2D<int> size)
     {
         _gl.Viewport(size);
         
-        foreach (var cam in _world.Cameras)
+        foreach (var cam in _scene.Cameras)
             cam.SetAspectRatio(size);
     }
     
     private void OnClose()
     {
-        _world.Dispose();
+        _scene.Dispose();
         _grid.Dispose();
         _resourceSystem.Dispose();
         _cameraRenderer.Dispose();

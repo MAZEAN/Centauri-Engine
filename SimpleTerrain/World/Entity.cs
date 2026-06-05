@@ -1,4 +1,4 @@
-namespace SimpleTerrain.Scene;
+namespace SimpleTerrain.World;
 
 using Rendering.Resources;
 

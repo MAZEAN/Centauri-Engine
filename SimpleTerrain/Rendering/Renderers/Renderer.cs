@@ -2,7 +2,7 @@ namespace SimpleTerrain.Rendering.Renderers;
 
 using Silk.NET.OpenGL;
 using Config;
-using Scene;
+using World;
 using System.Numerics;
 using Resources;
 
@@ -24,19 +24,19 @@ public class Renderer
         InitializeTextureCache();
     }
 
-    public void Render(World world, float deltaTime)
+    public void Render(Scene scene, float deltaTime)
     {
-        var viewCamera = world.GetActiveCamera(); 
-        var cullingCamera = world.GetPrimaryCamera();
+        var viewCamera = scene.GetActiveCamera(); 
+        var cullingCamera = scene.GetPrimaryCamera();
         
         cullingCamera.Frustum.BuildFrustumPlanes();
         
         var view = viewCamera.GetViewMatrix();
         var cameraPosition = viewCamera.Position;
         
-        bool lightingDirty = world.Lighting.IsDirty;
+        bool lightingDirty = scene.Lighting.IsDirty;
 
-        foreach (var (shader, entities) in world.GetEntitiesByShader())
+        foreach (var (shader, entities) in scene.GetEntitiesByShader())
         {
             shader.Use();
             
@@ -46,11 +46,11 @@ public class Renderer
             UploadGlobalUniforms(shader, viewCamera);
 
             if (lightingDirty)
-                UploadLighting(shader, world.Lighting);
+                UploadLighting(shader, scene.Lighting);
 
             foreach (var entity in entities)
             {
-                if (world.EnableCulling && !cullingCamera.Frustum.IsVisible(entity))
+                if (scene.EnableCulling && !cullingCamera.Frustum.IsVisible(entity))
                     continue;
 
                 var mat = entity.Material;
@@ -77,7 +77,7 @@ public class Renderer
         }
 
         if (lightingDirty)
-            world.Lighting.ClearDirty();
+            scene.Lighting.ClearDirty();
     }
     
     // -----------------------------
