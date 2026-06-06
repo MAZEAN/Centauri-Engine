@@ -5,6 +5,7 @@ using Config;
 using World;
 using System.Numerics;
 using Resources;
+using Systems;
 
 public class Renderer
 {
@@ -50,7 +51,7 @@ public class Renderer
 
             foreach (var entity in entities)
             {
-                if (scene.EnableCulling && !cullingCamera.Frustum.IsVisible(entity))
+                if (scene.EnableCulling && !cullingCamera.Frustum.IsVisibleAABB(entity.GetWorldBounds()))
                     continue;
 
                 var mat = entity.Material;
@@ -75,9 +76,8 @@ public class Renderer
                 }
             }
         }
-
-        if (lightingDirty)
-            scene.Lighting.ClearDirty();
+        
+        scene.Lighting.ClearDirty();
     }
     
     // -----------------------------

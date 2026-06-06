@@ -1,4 +1,4 @@
-namespace SimpleTerrain.Rendering;
+namespace SimpleTerrain.Rendering.Systems;
 
 using World;
 

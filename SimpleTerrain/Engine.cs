@@ -6,22 +6,19 @@ using Silk.NET.Maths;
 
 using Config;
 using World;
-using Rendering.Renderers;
+using Rendering.Systems;
 using Input;
-using Rendering;
 
 public class Engine
 {
     private IWindow _window = null!;
     private GL _gl = null!;
     private AppConfig _config = null!;
-    private Renderer _renderer = null!;
     private InputSystem _input = null!;
     private Scene _scene = null!;
-    private GridRenderer _grid = null!;
+    private RenderingSystem _renderingSystem = null!;
     private ResourceSystem _resourceSystem = null!;
     private SceneLoader _sceneLoader = null!;
-    private CameraRenderer _cameraRenderer = null!;
     
     private int _frameCount;
     private double _fpsTimer;
@@ -74,7 +71,7 @@ public class Engine
         {
             InitializeOpenGL();
 
-            _renderer = new Renderer(_gl, _config);
+            _renderingSystem = new RenderingSystem(_gl, _config);
 
             _resourceSystem = new ResourceSystem(_gl, _config);
 
@@ -86,9 +83,6 @@ public class Engine
             
             _input    = new InputSystem(_window, _scene, _config);
             _input.Initialize();
-            
-            _grid = new GridRenderer(_gl, _config.Window);
-            _cameraRenderer = new CameraRenderer(_gl);
         }
         catch (Exception e)
         {
@@ -168,9 +162,7 @@ public class Engine
     {
         _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
         
-        _grid.Render(_scene.GetActiveCamera());
-        _renderer.Render(_scene, (float) deltaTime);
-        _cameraRenderer.Render(_scene);
+        _renderingSystem.Render(_scene, deltaTime);
     }
     
     private void OnResize(Vector2D<int> size)
@@ -184,8 +176,7 @@ public class Engine
     private void OnClose()
     {
         _scene.Dispose();
-        _grid.Dispose();
         _resourceSystem.Dispose();
-        _cameraRenderer.Dispose();
+        _renderingSystem.Dispose();
     }
 }

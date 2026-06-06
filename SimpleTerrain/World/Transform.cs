@@ -1,86 +1,66 @@
 namespace SimpleTerrain.World;
-
 using System.Numerics;
 
 public class Transform
 {
-    private Vector3 _position = Vector3.Zero;
-    private Vector3 _scale = Vector3.One;
+    private Vector3    _position = Vector3.Zero;
+    private Vector3    _scale    = Vector3.One;
     private Quaternion _rotation = Quaternion.Identity;
 
     private Matrix4x4 _localMatrix;
     private Matrix4x4 _worldMatrix;
-
-    private bool _localDirty = true;
-    private bool _worldDirty = true;
+    private bool      _localDirty = true;
+    private bool      _worldDirty = true;
 
     private readonly List<Transform> _children = new();
-    public IReadOnlyList<Transform> Children => _children;
     private Transform? _parent;
-    
+
+    public IReadOnlyList<Transform> Children => _children;
+    public event Action? OnChanged;
+
     public Transform? Parent
     {
         get => _parent;
         set
         {
             if (value == this)
-                throw new Exception("Transform cannot be parent of itself");
-            
-            if (value != null && IsDescendantOf(value))
-                throw new Exception("Cannot assign parent: cycle detected.");
+                throw new InvalidOperationException("Transform cannot be its own parent.");
 
+            if (value != null && IsAncestorOf(value))
+                throw new InvalidOperationException("Cannot assign parent: would create a cycle.");
 
             if (_parent == value) return;
 
-            // remove from old parent
             _parent?._children.Remove(this);
-
             _parent = value;
-
-            // add to new parent
             _parent?._children.Add(this);
 
             MarkWorldDirty();
         }
     }
 
+    // ── Properties ────────────────────────────────────────────────────────────
 
-    // -----------------------------
-    // Properties
-    // -----------------------------
     public Vector3 Position
     {
         get => _position;
-        set
-        {
-            _position = value;
-            MarkDirty();
-        }
+        set { _position = value; MarkDirty(); }
     }
 
     public Vector3 Scale
     {
         get => _scale;
-        set
-        {
-            _scale = value;
-            MarkDirty();
-        }
+        set { _scale = value; MarkDirty(); }
     }
 
     public Quaternion Rotation
     {
         get => _rotation;
-        set
-        {
-            _rotation = Quaternion.Normalize(value);
-            MarkDirty();
-        }
+        set { _rotation = Quaternion.Normalize(value); MarkDirty(); }
     }
 
-    // -----------------------------
-    // Dirty propagation
-    // -----------------------------
+    // ── Dirty propagation ─────────────────────────────────────────────────────
+
     private void MarkDirty()
     {
         _localDirty = true;
@@ -89,15 +69,17 @@ public class Transform
 
     private void MarkWorldDirty()
     {
+        if (_worldDirty) return; // already dirty — stop propagation
+
         _worldDirty = true;
+        OnChanged?.Invoke();
 
         foreach (var child in _children)
             child.MarkWorldDirty();
     }
 
-    // -----------------------------
-    // Matrices
-    // -----------------------------
+    // ── Matrices ──────────────────────────────────────────────────────────────
+
     public Matrix4x4 LocalMatrix
     {
         get
@@ -108,10 +90,8 @@ public class Transform
                     Matrix4x4.CreateScale(_scale) *
                     Matrix4x4.CreateFromQuaternion(_rotation) *
                     Matrix4x4.CreateTranslation(_position);
-
                 _localDirty = false;
             }
-
             return _localMatrix;
         }
     }
@@ -122,37 +102,20 @@ public class Transform
         {
             if (_worldDirty)
             {
-                
-                var local = LocalMatrix;
-
                 _worldMatrix = Parent != null
-                    ? local * Parent.WorldMatrix
-                    : local;
-
+                    ? LocalMatrix * Parent.WorldMatrix
+                    : LocalMatrix;
                 _worldDirty = false;
             }
-
             return _worldMatrix;
         }
     }
 
-    // -----------------------------
-    // Transform helpers
-    // -----------------------------
-    public void Translate(Vector3 delta)
-    {
-        Position += delta;
-    }
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
-    public void RotateLocal(Quaternion delta)
-    {
-        Rotation = delta * _rotation;
-    }
-
-    public void RotateWorld(Quaternion delta)
-    {
-        Rotation = _rotation * delta;
-    }
+    public void Translate(Vector3 delta)       => Position += delta;
+    public void RotateLocal(Quaternion delta)   => Rotation = delta * _rotation;
+    public void RotateWorld(Quaternion delta)   => Rotation = _rotation * delta;
 
     public void SetEulerAngles(float pitchDeg, float yawDeg, float rollDeg)
     {
@@ -162,17 +125,15 @@ public class Transform
             float.DegreesToRadians(rollDeg)
         );
     }
-    
-    private bool IsDescendantOf(Transform potentialParent)
-    {
-        var current = potentialParent;
 
+    // checks if this transform is an ancestor of the given node
+    private bool IsAncestorOf(Transform node)
+    {
+        var current = node._parent;
         while (current != null)
         {
-            if (current == this)
-                return true;
-
-            current = current.Parent;
+            if (current == this) return true;
+            current = current._parent;
         }
         return false;
     }

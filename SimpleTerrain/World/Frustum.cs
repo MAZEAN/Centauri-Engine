@@ -4,6 +4,7 @@ using System.Numerics;
 using Plane = System.Numerics.Plane;
 
 using Utils.Math;
+using Utils.Geometry;
 using Config;
 
 public class Frustum
@@ -78,16 +79,19 @@ public class Frustum
         return corners;
     }
     
-    public bool IsVisible(Entity entity)
+    public bool IsVisibleAABB(BoundingBox box)
     {
-        Vector3 position = entity.Transform.WorldMatrix.Translation;
-        float radius = entity.BoundingRadius;
-
         foreach (var plane in Planes)
         {
-            float distance = Vector3.Dot(plane.Normal, position) + plane.D;
+            var normal = plane.Normal;
 
-            if (distance < -radius)
+            var p = new Vector3(
+                normal.X >= 0 ? box.Max.X : box.Min.X,
+                normal.Y >= 0 ? box.Max.Y : box.Min.Y,
+                normal.Z >= 0 ? box.Max.Z : box.Min.Z
+            );
+
+            if (Vector3.Dot(normal, p) + plane.D < 0)
                 return false;
         }
 

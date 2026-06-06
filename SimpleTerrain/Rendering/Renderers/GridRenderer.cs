@@ -34,10 +34,12 @@ public class GridRenderer : IDisposable
         _mesh = new Mesh(gl, vertices, indices);
     }
 
-    public void Render(Camera camera)
+    public void Render(Scene scene)
     {
         SetDebugRenderState();
 
+        var camera = scene.GetActiveCamera();
+        
         _shader.Use();
         _shader.SetUniform("uView",        camera.GetViewMatrix());
         _shader.SetUniform("uProjection",  camera.GetProjectionMatrix());

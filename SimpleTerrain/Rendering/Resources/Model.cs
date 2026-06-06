@@ -3,16 +3,20 @@ namespace SimpleTerrain.Rendering.Resources;
 using Silk.NET.Assimp;
 using Silk.NET.OpenGL;
 using System.Numerics;
+
 using Core;
+using Utils.Geometry;
+
 using AssimpMesh = Silk.NET.Assimp.Mesh;
 
 public class Model : IDisposable
 {
-    private readonly GL _gl;
-    private readonly Assimp _assimp;
+    private readonly GL      _gl;
+    private readonly Assimp? _assimp; // nullable — not needed for code-generated models
 
-    public string Directory { get; private set; } = string.Empty;
-    public List<Mesh> Meshes { get; private set; } = new();
+    public string      AssetDirectory { get; private set; } = string.Empty;
+    public List<Mesh>  Meshes    { get; private set; } = new();
+    public BoundingBox Bounds    { get; private set; } // private set so it can be assigned after construction
 
     // constructor for file-loaded models
     public Model(GL gl, string path)
@@ -25,9 +29,9 @@ public class Model : IDisposable
     // constructor for code-generated models (floor plane, terrain etc.)
     public Model(GL gl, IEnumerable<Mesh> meshes)
     {
-        _gl     = gl;
-        _assimp = Assimp.GetApi();
-        Meshes  = meshes.ToList();
+        _gl    = gl;
+        Meshes = meshes.ToList();
+        Bounds = ComputeBounds(Meshes); // compute bounds from provided meshes
     }
 
     private unsafe void LoadModel(string path)
@@ -35,12 +39,12 @@ public class Model : IDisposable
         if (!System.IO.File.Exists(path))
             throw new FileNotFoundException($"Model file not found: {path}");
 
-        var scene = _assimp.ImportFile(path, (uint)(
-            PostProcessSteps.Triangulate       |
-            PostProcessSteps.GenerateNormals   |
-            PostProcessSteps.CalculateTangentSpace |
-            PostProcessSteps.FlipUVs           |
-            PostProcessSteps.JoinIdenticalVertices  // reduces vertex count
+        var scene = _assimp!.ImportFile(path, (uint)(
+            PostProcessSteps.Triangulate            |
+            PostProcessSteps.GenerateNormals        |
+            PostProcessSteps.CalculateTangentSpace  |
+            PostProcessSteps.FlipUVs                |
+            PostProcessSteps.JoinIdenticalVertices
         ));
 
         if (scene == null
@@ -50,8 +54,9 @@ public class Model : IDisposable
             throw new Exception($"Assimp failed to load '{path}': {_assimp.GetErrorStringS()}");
         }
 
-        Directory = Path.GetDirectoryName(path) ?? string.Empty;
+        AssetDirectory = Path.GetDirectoryName(path) ?? string.Empty;
         ProcessNode(scene->MRootNode, scene);
+        Bounds = ComputeBounds(Meshes); // assign after all meshes are loaded
     }
 
     private unsafe void ProcessNode(Node* node, Scene* scene)
@@ -94,7 +99,7 @@ public class Model : IDisposable
 
     private static float[] BuildVertices(List<Vertex> vertexCollection)
     {
-        // 8 floats per vertex: pos(3) + normal(3) + uv(2)
+        // 11 floats per vertex: pos(3) + normal(3) + uv(2) + tangent(3)
         var vertices = new float[vertexCollection.Count * 11];
         int i = 0;
 
@@ -118,11 +123,28 @@ public class Model : IDisposable
 
     private static uint[] BuildIndices(List<uint> indices) => indices.ToArray();
 
+    private static BoundingBox ComputeBounds(List<Mesh> meshes)
+    {
+        if (meshes.Count == 0)
+            return new BoundingBox(Vector3.Zero, Vector3.Zero);
+
+        var min = new Vector3(float.MaxValue);
+        var max = new Vector3(float.MinValue);
+
+        foreach (var mesh in meshes)
+        {
+            min = Vector3.Min(min, mesh.Bounds.Min);
+            max = Vector3.Max(max, mesh.Bounds.Max);
+        }
+
+        return new BoundingBox(min, max);
+    }
+
     public void Dispose()
     {
         foreach (var mesh in Meshes)
             mesh.Dispose();
 
-        _assimp.Dispose();
+        _assimp?.Dispose(); // null-safe — not created for code-generated models
     }
 }

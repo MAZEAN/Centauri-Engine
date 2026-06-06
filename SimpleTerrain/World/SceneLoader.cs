@@ -5,7 +5,7 @@ using System.Numerics;
 
 using Rendering.Resources;
 using Config;
-using Rendering;
+using Rendering.Systems;
 
 public class SceneLoader
 {
