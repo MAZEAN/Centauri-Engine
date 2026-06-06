@@ -15,13 +15,13 @@
     "SensitivityY": 0.1,
     "ZoomSensitivity": 1.5,
     "MinZoom": 1.0,
-    "MaxZoom": 45.0
+    "MaxZoom": 45.0,
+    "MoveSpeed": 2.5
   },
   "Render": {
     "TextureCacheSize": 128,
     "ModelCacheSize": 64,
     "ShaderCacheSize": 32,
     "ScenePath": "Assets/scene.json"
-  },
-  "MoveSpeed": 2.5
+  }
 }

@@ -8,7 +8,6 @@ public class AppConfig
     public WindowConfig Window { get; init; } = new();
     public CameraConfig Camera { get; init; } = new();
     public RenderConfig Render { get; init; } = new();
-    public float MoveSpeed { get; init; } = 2.5f;
 }
 
 public class RenderConfig
@@ -30,6 +29,7 @@ public class CameraConfig
     public float ZoomSensitivity { get; init; } = 1.5f;
     public float MinZoom { get; init; } = 1.0f;
     public float MaxZoom { get; init; } = 45.0f;
+    public float MoveSpeed { get; init; } = 2.5f;
 }
 
 public class WindowConfig

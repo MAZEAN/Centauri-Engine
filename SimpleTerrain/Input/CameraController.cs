@@ -18,7 +18,29 @@ public class CameraController
         _camera = camera;
         _config = config;
     }
+    
+    public void UpdateMovement(IKeyboard keyboard, float deltaTime)
+    {
+        float moveSpeed = _config.MoveSpeed * deltaTime;
 
+        if (keyboard.IsKeyPressed(Key.W))
+            _camera.UpdatePosition(_camera.Forward * moveSpeed);
+
+        if (keyboard.IsKeyPressed(Key.S))
+            _camera.UpdatePosition(-_camera.Forward * moveSpeed);
+
+        if (keyboard.IsKeyPressed(Key.A))
+            _camera.UpdatePosition(-_camera.Right * moveSpeed);
+
+        if (keyboard.IsKeyPressed(Key.D))
+            _camera.UpdatePosition(_camera.Right * moveSpeed);
+
+        if (keyboard.IsKeyPressed(Key.Space))
+            _camera.UpdatePosition(_camera.Up * moveSpeed);
+
+        if (keyboard.IsKeyPressed(Key.ControlLeft))
+            _camera.UpdatePosition(-_camera.Up * moveSpeed);
+    }
     
     public void OnMouseMove(IMouse mouse, Vector2 position)
     {

@@ -135,7 +135,7 @@ public class Engine
         _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Fill);
     }
 
-    private void SetFPSCounter(double deltaTime)
+    private void SetFPSCounter(float deltaTime)
     {
         _fpsTimer   += deltaTime;
         _frameCount += 1;
@@ -154,8 +154,9 @@ public class Engine
 
     private void OnUpdate(double deltaTime)
     {
-        _input.UpdateMovement((float)deltaTime);
-        SetFPSCounter(deltaTime);
+        var delta = (float)deltaTime;
+        _input.Update(delta);
+        SetFPSCounter(delta);
     }
 
     private void OnRender(double deltaTime)
