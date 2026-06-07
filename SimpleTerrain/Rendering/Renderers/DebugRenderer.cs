@@ -28,7 +28,8 @@ public class DebugRenderer : IDisposable
     private static readonly Vector3 ColorCamera  = new(1.0f, 0.5f, 0.0f);
     private static readonly Vector3 ColorDir     = new(1.0f, 1.0f, 1.0f);
     private static readonly Vector3 ColorFrustum = new(1.0f, 1.0f, 0.0f);
-    private static readonly Vector3 ColorAABB    = new(0.0f, 1.0f, 0.0f);
+    private static readonly Vector3 ColorAABB        = new(0.0f, 1.0f, 0.0f); // green  — visible
+    private static readonly Vector3 ColorAABBCulled  = new(1.0f, 0.0f, 0.0f); // red    — culled
 
     private static readonly int[] BoxEdgeIndices =
     [
@@ -83,7 +84,7 @@ public class DebugRenderer : IDisposable
     public void DrawCameras(Scene scene)
     {
         AssertActive();
-        if (!scene.Settings.ShowCameras) return;
+        if (!scene.DebugSettings.ShowCameras) return;
         
         var active = scene.GetActiveCamera();
 
@@ -94,34 +95,26 @@ public class DebugRenderer : IDisposable
             DrawCameraShape(cam);
             DrawDirectionLine(cam);
             
-            if (scene.Settings.ShowFrustums) 
+            if (scene.DebugSettings.ShowFrustums) 
                 DrawFrustum(cam);
         }
     }
 
-    public void DrawAllAABBs(Scene scene)
+    public void DrawAllAABBs(Scene scene, Frustum cullingFrustum)
     {
         AssertActive();
-        if (!scene.Settings.ShowBoundingBoxes) return;
-        
+        if (!scene.DebugSettings.ShowBoundingBoxes) return;
+    
         _shader.SetUniform("uModel", Matrix4x4.Identity);
-        _shader.SetUniform("uColor", ColorAABB);
 
         foreach (var entity in scene.Entities)
         {
-            var b = entity.GetWorldBounds();
-            DrawBoxEdges(GetBoxCorners(b.Min, b.Max));
-        }
-    }
-
-    public void DrawSingleAABB(Scene scene, BoundingBox box)
-    {
-        AssertActive();
-        if (!scene.Settings.ShowBoundingBoxes) return;
+            var bounds  = entity.GetWorldBounds();
+            var culled  = !cullingFrustum.IsVisibleAABB(bounds);
         
-        _shader.SetUniform("uModel", Matrix4x4.Identity);
-        _shader.SetUniform("uColor", ColorAABB);
-        DrawBoxEdges(GetBoxCorners(box.Min, box.Max));
+            _shader.SetUniform("uColor", culled ? ColorAABBCulled : ColorAABB);
+            DrawBoxEdges(GetBoxCorners(bounds.Min, bounds.Max));
+        }
     }
 
     // ── Private drawing ───────────────────────────────────────────────────────

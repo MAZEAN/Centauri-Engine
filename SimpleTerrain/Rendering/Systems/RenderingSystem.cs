@@ -27,13 +27,15 @@ public class RenderingSystem : IDisposable
         _gridRenderer.Render(scene);
         _renderer.Render(scene, (float)deltaTime);
 
-        if (scene.Settings.ShowDebugView)
+        if (scene.DebugSettings.ShowDebugView)
         {
-            var active = scene.GetActiveCamera();
+            var active         = scene.GetActiveCamera();
+            var cullingCamera  = scene.GetPrimaryCamera();
+
             _debugRenderer.Begin(active);
 
             _debugRenderer.DrawCameras(scene);
-            _debugRenderer.DrawAllAABBs(scene);
+            _debugRenderer.DrawAllAABBs(scene, cullingCamera.Frustum);
 
             _debugRenderer.End();
         }

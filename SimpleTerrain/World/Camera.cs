@@ -5,6 +5,7 @@ using Silk.NET.Maths;
 
 using Config;
 using Utils.Math;
+using Utils.Geometry;
 
 public class Camera
 {
@@ -12,18 +13,19 @@ public class Camera
 
     private readonly CameraConfig _config;
     public Vector3 Position { get; private set; }
-    public Vector3 Forward { get; private set;}
-    public Vector3 Right { get; private set;}
-    public Vector3 Up { get; private set;}
+    public Vector3 Forward { get; private set; }
+    public Vector3 Right { get; private set; }
+    public Vector3 Up { get; private set; }
 
     private readonly Vector3 _worldUp;
-
     private float _yaw;
     private float _pitch;
-    public float Zoom { get; private set;}
-    public float AspectRatio { get; private set;}
+    public float Zoom { get; private set; }
+    public float AspectRatio { get; private set; }
+    public Frustum Frustum { get; private set; }
+    public bool IsFrustumDirty { get; private set; } = true;
     
-    public Frustum Frustum { get; private set;}
+    public void ClearFrustumDirty() => IsFrustumDirty = false;
 
     public Camera(CameraConfig config, string name, Vector3 position, Vector3 worldUp, float yaw, float pitch)
     {
@@ -45,6 +47,7 @@ public class Camera
     public void UpdatePosition(Vector3 delta)
     {
         Position += delta;
+        IsFrustumDirty = true;
     }
     
     public void ModifyDirection(float xOffset, float yOffset)
@@ -56,6 +59,7 @@ public class Camera
         _pitch = Math.Clamp(_pitch, -89f, 89f);
 
         UpdateVectors();
+        IsFrustumDirty = true;
     }
 
     public void AdjustZoom(float zoomDelta)
@@ -85,6 +89,7 @@ public class Camera
         if (newSize.Y <= 0)
             throw new ArgumentException("Height must be positive.");
         AspectRatio = (float)newSize.X / newSize.Y;
+        IsFrustumDirty = true;
     }
     
     public Matrix4x4 GetViewMatrix()

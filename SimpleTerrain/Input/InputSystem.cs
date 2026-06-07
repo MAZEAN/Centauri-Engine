@@ -98,11 +98,11 @@ public class InputSystem
     {
         switch (key)
         {
-            case Key.F1: _scene.Settings.ToggleShowDebugView();     break;
-            case Key.F2: _scene.Settings.ToggleShowBoundingBoxes(); break;
-            case Key.F3: _scene.Settings.ToggleShowFrustums();      break;
-            case Key.F4: _scene.Settings.ToggleShowCameras();       break;
-            case Key.F5: _scene.Settings.ToggleEnableCulling();     break;
+            case Key.F1: _scene.DebugSettings.ToggleShowDebugView();     break;
+            case Key.F2: _scene.DebugSettings.ToggleShowBoundingBoxes(); break;
+            case Key.F3: _scene.DebugSettings.ToggleShowFrustums();      break;
+            case Key.F4: _scene.DebugSettings.ToggleShowCameras();       break;
+            case Key.F5: _scene.DebugSettings.ToggleEnableCulling();     break;
         }
     }
     

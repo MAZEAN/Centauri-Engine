@@ -1,18 +1,18 @@
-namespace SimpleTerrain.World;
+namespace SimpleTerrain.Utils.Geometry;
 
 using System.Numerics;
 using Plane = System.Numerics.Plane;
 
-using Utils.Math;
-using Utils.Geometry;
+using Math;
 using Config;
+using World;
 
 public class Frustum
 {
     private readonly Camera _camera;
     private readonly CameraConfig _config;
 
-    public Plane[] Planes { get; } = new Plane[6];
+    private Plane[] Planes { get; } = new Plane[6];
     
     public Frustum(Camera camera, CameraConfig config)
     {
@@ -22,6 +22,8 @@ public class Frustum
 
     public void BuildFrustumPlanes()
     {
+        if (!_camera.IsFrustumDirty) return;
+        
         var vp = _camera.GetViewMatrix() * _camera.GetProjectionMatrix();
 
         Planes[0] = CreatePlane(vp.M14 + vp.M11, vp.M24 + vp.M21, vp.M34 + vp.M31, vp.M44 + vp.M41); // left
@@ -35,7 +37,7 @@ public class Frustum
     private static Plane CreatePlane(float a, float b, float c, float d)
     {
         var normal = new Vector3(a, b, c);
-        float length = normal.Length();
+        var length = normal.Length();
 
         return new Plane(normal / length, d / length);
     }
@@ -43,26 +45,26 @@ public class Frustum
     // Only used for visualization
     public Vector3[] GetFrustumCorners()
     {
-        float fov = MathHelper.DegreesToRadians(_camera.Zoom);
-        float tanFov = MathF.Tan(fov / 2f);
+        var fov = MathHelper.DegreesToRadians(_camera.Zoom);
+        var tanFov = MathF.Tan(fov / 2f);
 
-        float near = _config.Near;
-        float far  = _config.Far;
+        var near = _config.Near;
+        var far  = _config.Far;
 
-        float nearHeight = 2f * tanFov * near;
-        float nearWidth  = nearHeight * _camera.AspectRatio;
+        var nearHeight = 2f * tanFov * near;
+        var nearWidth  = nearHeight * _camera.AspectRatio;
 
-        float farHeight = 2f * tanFov * far;
-        float farWidth  = farHeight * _camera.AspectRatio;
+        var farHeight = 2f * tanFov * far;
+        var farWidth  = farHeight * _camera.AspectRatio;
 
-        Vector3 forward = _camera.Forward;
-        Vector3 right   = _camera.Right;
-        Vector3 up      = _camera.Up;
+        var forward = _camera.Forward;
+        var right   = _camera.Right;
+        var up      = _camera.Up;
 
-        Vector3 nearCenter = _camera.Position + forward * near;
-        Vector3 farCenter  = _camera.Position + forward * far;
+        var nearCenter = _camera.Position + forward * near;
+        var farCenter  = _camera.Position + forward * far;
 
-        Vector3[] corners = new Vector3[8];
+        var corners = new Vector3[8];
 
         // near plane
         corners[0] = nearCenter + up * (nearHeight * 0.5f) - right * (nearWidth * 0.5f);
@@ -94,7 +96,6 @@ public class Frustum
             if (Vector3.Dot(normal, p) + plane.D < 0)
                 return false;
         }
-
         return true;
     }
 }

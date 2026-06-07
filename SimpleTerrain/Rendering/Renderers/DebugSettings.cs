@@ -1,6 +1,6 @@
 namespace SimpleTerrain.Rendering.Renderers;
 
-public class RenderSettings
+public class DebugSettings
 {
     public bool EnableCulling      { get; private set; } = true;
     public bool ShowDebugView      { get; private set; } = false;
