@@ -15,6 +15,7 @@
         <PackageReference Include="Silk.NET.Windowing" />
         <PackageReference Include="Silk.NET.Assimp" />
         <PackageReference Include="SixLabors.ImageSharp" />
+        <PackageReference Include="Silk.NET.OpenGL.Extensions.ImGui" />
     </ItemGroup>
 
     <ItemGroup>

@@ -3,7 +3,7 @@ namespace SimpleTerrain.Config;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-using World;
+using Utils.Misc;
 
 public static class ConfigLoader
 {

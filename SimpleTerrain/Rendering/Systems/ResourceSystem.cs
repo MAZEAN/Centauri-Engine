@@ -5,7 +5,7 @@ using Silk.NET.OpenGL;
 using Utils.Caching;
 using Resources;
 using Config;
-using World;
+using Utils.Misc;
 
 public class ResourceSystem : IDisposable
 {

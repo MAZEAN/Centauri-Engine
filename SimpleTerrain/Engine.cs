@@ -68,17 +68,19 @@ public class Engine
             InitializeOpenGL();
 
             _renderingSystem = new RenderingSystem(_gl, _config);
-
-            _resourceSystem = new ResourceSystem(_gl, _config);
+            _resourceSystem  = new ResourceSystem(_gl, _config);
 
             _sceneLoader = new SceneLoader(_resourceSystem, _scene, _config);
             _sceneLoader.Load();
-            
+
             foreach (var cam in _scene.Cameras)
                 cam.SetAspectRatio(_window.FramebufferSize);
-            
-            _input    = new InputSystem(_window, _scene, _config);
+
+            _input = new InputSystem(_window, _scene, _config, _renderingSystem);
             _input.Initialize();
+
+            // ImGui needs both GL and the input context — initialize after both are ready
+            _renderingSystem.InitializeImGui(_window, _input.InputContext);
         }
         catch (Exception e)
         {
@@ -131,28 +133,11 @@ public class Engine
         _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Fill);
     }
 
-    private void SetFPSCounter(float deltaTime)
-    {
-        _fpsTimer   += deltaTime;
-        _frameCount += 1;
-
-        if (_fpsTimer >= 1.0)
-        {
-            var fps = _frameCount / _fpsTimer;
-            var ms  = 1000.0 / fps;
-
-            _window.Title = $"{_config.Window.Title} — {fps:F1} FPS ({ms:F2} ms)";
-
-            _frameCount = 0;
-            _fpsTimer   = 0;
-        }
-    }
-
     private void OnUpdate(double deltaTime)
     {
         var delta = (float)deltaTime;
         _input.Update(delta);
-        SetFPSCounter(delta);
+        _renderingSystem.Update(delta);
     }
 
     private void OnRender(double deltaTime)

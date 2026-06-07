@@ -7,34 +7,38 @@ using System.Numerics;
 
 using Config;
 using World;
+using Rendering.Systems;
 
 public class InputSystem
 {
     private readonly IWindow _window;
     private readonly Scene _scene;
     private readonly AppConfig _config;
+    private readonly RenderingSystem _renderingSystem;
     
     private readonly Dictionary<Camera, CameraController> _controllers = new();
     private IKeyboard _keyboard= null!;
     
-    public InputSystem(IWindow window, Scene scene, AppConfig config)
+    private IInputContext _inputContext = null!;
+    public IInputContext InputContext => _inputContext;
+    
+    public InputSystem(IWindow window, Scene scene, AppConfig config, RenderingSystem renderingSystem)
     {
-        _window = window;
-        _scene = scene;
-        _config = config;
+        _window           = window;
+        _scene            = scene;
+        _config           = config;
+        _renderingSystem  = renderingSystem;
     }
-
-
+    
     public void Initialize()
     {
-        var input = _window.CreateInput();
-
-        _keyboard = input.Keyboards.FirstOrDefault()
-                    ?? throw new InvalidOperationException("Keyboard not available");
+        _inputContext = _window.CreateInput();
+        _keyboard     = _inputContext.Keyboards.FirstOrDefault()
+                        ?? throw new InvalidOperationException("Keyboard not available");
 
         _keyboard.KeyDown += OnKeyDown;
 
-        foreach (var mouse in input.Mice)
+        foreach (var mouse in _inputContext.Mice)
         {
             mouse.Cursor.CursorMode = CursorMode.Raw;
 
@@ -90,6 +94,9 @@ public class InputSystem
             case Key.F4:
             case Key.F5:
                 HandleDebugToggle(key);
+                break;
+            case Key.F6:
+                _renderingSystem.ToggleStatsOverlay();
                 break;
         }
     }

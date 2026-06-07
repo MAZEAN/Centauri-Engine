@@ -6,6 +6,7 @@ using System.Numerics;
 using Rendering.Resources;
 using Config;
 using Rendering.Systems;
+using Utils.Misc;
 
 public class SceneLoader
 {

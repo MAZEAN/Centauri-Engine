@@ -1,4 +1,4 @@
-namespace SimpleTerrain.World;
+namespace SimpleTerrain.Utils.Misc;
 
 public static class AssetPath
 {

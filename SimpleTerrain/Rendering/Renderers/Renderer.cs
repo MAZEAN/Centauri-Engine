@@ -1,11 +1,13 @@
 namespace SimpleTerrain.Rendering.Renderers;
 
 using Silk.NET.OpenGL;
+using System.Numerics;
+
 using Config;
 using World;
-using System.Numerics;
 using Resources;
 using Systems;
+using Utils.Misc;
 
 public class Renderer
 {
@@ -25,34 +27,40 @@ public class Renderer
         InitializeTextureCache();
     }
 
-    public void Render(Scene scene, float deltaTime)
+    public void Render(Scene scene, float deltaTime, ref FrameStats stats)
     {
-        var viewCamera = scene.GetActiveCamera(); 
+        var viewCamera    = scene.GetActiveCamera();
         var cullingCamera = scene.GetPrimaryCamera();
-        
+
+        stats.FrustumRebuilt = cullingCamera.IsFrustumDirty;
         cullingCamera.Frustum.BuildFrustumPlanes();
-        
-        var view = viewCamera.GetViewMatrix();
+
+        var view           = viewCamera.GetViewMatrix();
         var cameraPosition = viewCamera.Position;
+
+        SetFrameStats(scene, ref stats);
 
         foreach (var (shader, entities) in scene.GetEntitiesByShader())
         {
             shader.Use();
-            
-            shader.SetUniform("uView", view);
+
+            shader.SetUniform("uView",      view);
             shader.SetUniform("uCameraPos", cameraPosition);
-            
+
             UploadGlobalUniforms(shader, viewCamera);
             UploadLighting(shader, scene.Lighting);
 
             foreach (var entity in entities)
             {
-                if (scene.DebugSettings.EnableCulling && !cullingCamera.Frustum.IsVisibleAABB(entity.GetWorldBounds()))
+                if (scene.DebugSettings.EnableCulling &&
+                    !cullingCamera.Frustum.IsVisibleAABB(entity.GetWorldBounds()))
                     continue;
 
+                stats.DrawnEntities++;
+
                 var mat = entity.Material;
-                
-                BindMaterialTextures(mat);
+
+                stats.TextureBinds += BindMaterialTextures(mat);
                 UploadMaterialFlags(shader, mat);
                 UploadTransform(shader, entity);
                 UploadMaterialProperties(shader, mat);
@@ -62,45 +70,52 @@ public class Renderer
                     mesh.Bind();
                     unsafe
                     {
-                        _gl.DrawElements(
-                            PrimitiveType.Triangles,
-                            mesh.IndexCount,
-                            DrawElementsType.UnsignedInt,
-                            (void*)0
-                        );
+                        _gl.DrawElements(PrimitiveType.Triangles, mesh.IndexCount,
+                            DrawElementsType.UnsignedInt, (void*)0);
                     }
+                    stats.DrawCalls++;
                 }
             }
         }
+    }
+
+    private void SetFrameStats(Scene scene, ref FrameStats stats)
+    {
+        stats.TotalEntities = scene.Entities.Count;
+        stats.DrawnEntities = 0;
+        stats.DrawCalls     = 0;
+        stats.TextureBinds  = 0;
     }
     
     // -----------------------------
     // Material + Texture handling
     // -----------------------------
-    private void BindMaterialTextures(Material mat)
+    private int BindMaterialTextures(Material mat)
     {
-        BindTexture(mat.Albedo,    TextureUnit.Texture0);
-        BindTexture(mat.Normal,    TextureUnit.Texture1);
-        BindTexture(mat.Roughness, TextureUnit.Texture2);
-        BindTexture(mat.Metallic,  TextureUnit.Texture3);
-        BindTexture(mat.AO,        TextureUnit.Texture4);
+        int binds = 0;
+        binds += BindTexture(mat.Albedo,    TextureUnit.Texture0);
+        binds += BindTexture(mat.Normal,    TextureUnit.Texture1);
+        binds += BindTexture(mat.Roughness, TextureUnit.Texture2);
+        binds += BindTexture(mat.Metallic,  TextureUnit.Texture3);
+        binds += BindTexture(mat.AO,        TextureUnit.Texture4);
+        return binds;
     }
 
-    private void BindTexture(GLTexture? tex, TextureUnit slot)
+    private int BindTexture(GLTexture? tex, TextureUnit slot)
     {
-        int index = (int)slot - (int)TextureUnit.Texture0;
+        int index  = (int)slot - (int)TextureUnit.Texture0;
         uint handle = tex?.Handle ?? 0;
-        
+
         if (index < 0 || index >= _boundTextures.Length)
             throw new Exception($"Texture slot {slot} exceeds supported range.");
 
         if (_boundTextures[index] == handle)
-            return;
+            return 0; // cache hit — no GPU bind
 
         _gl.ActiveTexture(slot);
         _gl.BindTexture(TextureTarget.Texture2D, handle);
-
         _boundTextures[index] = handle;
+        return 1;
     }
     
     // -----------------------------
