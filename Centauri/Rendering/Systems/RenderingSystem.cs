@@ -45,7 +45,11 @@ public class RenderingSystem : IDisposable
     public void Update(float deltaTime)
     {
         _imGui?.Update(deltaTime);
+        UpdateFPSCounter(deltaTime);
+    }
 
+    private void UpdateFPSCounter(float deltaTime)
+    {
         // FPS + frametime smoothed over 1 second
         _fpsTimer   += deltaTime;
         _frameCount += 1;
@@ -61,12 +65,14 @@ public class RenderingSystem : IDisposable
 
     public void Render(Scene scene, double deltaTime)
     {
-        _gridRenderer.Render(scene);
+        if (scene.DebugSettings.ShowGrid)
+            _gridRenderer.Render(scene);
+        
         _renderer.Render(scene, (float)deltaTime, ref _stats);
 
         if (scene.DebugSettings.ShowDebugView)
         {
-            var active        = scene.GetActiveCamera();
+            var active = scene.GetActiveCamera();
             var cullingCamera = scene.GetPrimaryCamera();
 
             _debugRenderer.Begin(active);
@@ -74,9 +80,10 @@ public class RenderingSystem : IDisposable
             _debugRenderer.DrawAllAABBs(scene, cullingCamera.Frustum);
             _debugRenderer.End();
         }
-
-        // ImGui last — draws on top of everything
-        _statsOverlay.Render(_stats);
+        
+        if (_statsOverlay.IsVisible)
+            _statsOverlay.Render(_stats);
+        
         _imGui?.Render();
     }
 

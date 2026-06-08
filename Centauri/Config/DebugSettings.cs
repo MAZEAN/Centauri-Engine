@@ -7,6 +7,8 @@ public class DebugSettings
     public bool ShowBoundingBoxes  { get; private set; } = false;
     public bool ShowFrustums       { get; private set; } = false;
     public bool ShowCameras        { get; private set; } = false;
+    
+    public bool ShowGrid           { get; private set; } = true;
 
     public void ToggleShowDebugView()
     {
@@ -24,4 +26,5 @@ public class DebugSettings
     public void ToggleShowBoundingBoxes() => ShowBoundingBoxes = !ShowBoundingBoxes;
     public void ToggleShowFrustums() => ShowFrustums = !ShowFrustums;
     public void ToggleShowCameras() => ShowCameras = !ShowCameras;
+    public void ToggleShowGrid() => ShowGrid = !ShowGrid;
 }

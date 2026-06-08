@@ -71,40 +71,11 @@ public class InputSystem
     {
         switch (key)
         {
-            case Key.Escape:
-                _window.Close();
-                break;
-
-            case Key.Number1:
-                SwitchCamera("Main");
-                break;
-
-            case Key.Number2:
-                SwitchCamera("Debug");
-                break;
-
-            case Key.Tab:
-                _scene.CycleCamera();
-                ResetActiveController();
-                break;
+            case Key.Escape: _window.Close(); break;
+            case Key.M: _renderingSystem.ToggleStatsOverlay(); break;
+            case Key.F6: _scene.DebugSettings.ToggleShowGrid(); break;
+            case Key.Tab: _scene.CycleCamera(); ResetActiveController(); break;
             
-            case Key.F1:
-            case Key.F2:
-            case Key.F3:
-            case Key.F4:
-            case Key.F5:
-                HandleDebugToggle(key);
-                break;
-            case Key.F6:
-                _renderingSystem.ToggleStatsOverlay();
-                break;
-        }
-    }
-    
-    private void HandleDebugToggle(Key key)
-    {
-        switch (key)
-        {
             case Key.F1: _scene.DebugSettings.ToggleShowDebugView();     break;
             case Key.F2: _scene.DebugSettings.ToggleShowBoundingBoxes(); break;
             case Key.F3: _scene.DebugSettings.ToggleShowFrustums();      break;

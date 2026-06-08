@@ -7,25 +7,22 @@ using Utils.Misc;
 public class StatsOverlay
 {
     private bool _visible = false;
-
-    public bool Visible => _visible;
+    public bool IsVisible => _visible;
     public void Toggle() => _visible = !_visible;
 
     public void Render(FrameStats stats)
     {
-        if (!_visible) return;
-
-        const float Padding   = 10f;
-        const float WindowWidth = 260f;
+        const float padding   = 10f;
+        const float windowWidth = 260f;
 
         var viewport = ImGui.GetMainViewport();
         var pos      = new Vector2(
-            viewport.WorkPos.X + viewport.WorkSize.X - WindowWidth - Padding,
-            viewport.WorkPos.Y + Padding
+            viewport.WorkPos.X + viewport.WorkSize.X - windowWidth - padding,
+            viewport.WorkPos.Y + padding
         );
-
+        
         ImGui.SetNextWindowPos(pos, ImGuiCond.Always);
-        ImGui.SetNextWindowSize(new Vector2(WindowWidth, 0), ImGuiCond.Always);
+        ImGui.SetNextWindowSize(new Vector2(windowWidth, 0), ImGuiCond.Always);
         ImGui.SetNextWindowBgAlpha(0.75f);
 
         var flags =
@@ -40,8 +37,8 @@ public class StatsOverlay
             ImGui.End();
             return;
         }
-
-        // ── Frametiming ───────────────────────────────────────────────────────
+        
+        // ── Frame timing ───────────────────────────────────────────────────────
         ImGui.TextColored(new Vector4(1f, 0.8f, 0.2f, 1f), "Performance");
         ImGui.Separator();
         ImGui.Text($"FPS        {stats.FPS:F1}");
@@ -72,11 +69,10 @@ public class StatsOverlay
 
         var frustumColor = stats.FrustumRebuilt
             ? new Vector4(1f, 0.5f, 0.2f, 1f)  // orange — rebuilt this frame
-            : new Vector4(0.5f, 0.5f, 0.5f, 1f); // grey   — skipped
+            : new Vector4(0.5f, 0.5f, 0.5f, 1f); // gray — skipped
 
         ImGui.TextColored(frustumColor,
             $"Frustum  {(stats.FrustumRebuilt ? "rebuilt" : "cached")}");
-
         ImGui.End();
     }
 }
