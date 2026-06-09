@@ -22,11 +22,11 @@
     },
     {
       "name":     "Dragon",
-      "model":    "Assets/Objects/dragon.glb",
+      "model":    "Assets/Objects/reduced_dragon.glb",
       "material": "Assets/Materials/Default.mat",
       "position": [0, 1, -8],
       "scale":    [1, 1, 1],
-      "rotation": [0, -90, 0],
+      "rotation": [0, 0, 0],
       "uvScale":  [1.0, 1.0],
       "uvOffset": [0.0, 0.0]
     },
