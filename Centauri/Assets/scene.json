@@ -21,6 +21,16 @@
       "uvOffset": [0.0, 0.0]
     },
     {
+      "name":     "Dragon",
+      "model":    "Assets/Objects/dragon.glb",
+      "material": "Assets/Materials/Default.mat",
+      "position": [0, 1, -8],
+      "scale":    [1, 1, 1],
+      "rotation": [0, -90, 0],
+      "uvScale":  [1.0, 1.0],
+      "uvOffset": [0.0, 0.0]
+    },
+    {
     "name":     "Floor",
     "model":    "Assets/Objects/cube.glb",
     "material": "Assets/Materials/ChessTiles.mat",
@@ -73,10 +83,10 @@
     {
       "name":     "Cone",
       "model":    "Assets/Objects/cone.glb",
-      "material": "Assets/Materials/BlueMetalPlate.mat",
+      "material": "Assets/Materials/Gold.mat",
       "position": [3, 3, -3],
       "scale":    [1, 1, 1],
-      "rotation": [0, 0, 0],
+      "rotation": [0, -90, 15],
       "uvScale":  [1.0, 1.0],
       "uvOffset": [0.0, 0.0]
     }
