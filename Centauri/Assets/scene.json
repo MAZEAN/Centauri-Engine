@@ -8,7 +8,8 @@
       "scale":    [1, 1, 1],
       "rotation": [0, 0, 0],
       "uvScale":  [1.0, 1.0],
-      "uvOffset": [0.0, 0.0]
+      "uvOffset": [0.0, 0.0],
+      "enabled":  true
     },
     {
       "name":     "Rectangle",
@@ -18,7 +19,8 @@
       "scale":    [1, 0.2, 1],
       "rotation": [0, 0, -45],
       "uvScale":  [1.0, 0.4],
-      "uvOffset": [0.0, 0.0]
+      "uvOffset": [0.0, 0.0],
+      "enabled":  true
     },
     {
       "name":     "Dragon",
@@ -28,17 +30,19 @@
       "scale":    [1, 1, 1],
       "rotation": [0, 0, 0],
       "uvScale":  [1.0, 1.0],
-      "uvOffset": [0.0, 0.0]
+      "uvOffset": [0.0, 0.0],
+      "enabled":  true
     },
     {
-    "name":     "Floor",
-    "model":    "Assets/Objects/cube.glb",
-    "material": "Assets/Materials/ChessTiles.mat",
-    "position": [0, -2, 0],
-    "scale":    [100, 1, 100],
-    "rotation": [0, 0, 0],
-    "uvScale":  [10.0, 10.0],
-    "uvOffset": [0.0, 0.0]
+      "name":     "Floor",
+      "model":    "Assets/Objects/cube.glb",
+      "material": "Assets/Materials/ChessTiles.mat",
+      "position": [0, -2, 0],
+      "scale":    [100, 1, 100],
+      "rotation": [0, 0, 0],
+      "uvScale":  [10.0, 10.0],
+      "uvOffset": [0.0, 0.0],
+      "enabled":  true
     },
     {
       "name":     "Sphere1",
@@ -48,7 +52,8 @@
       "scale":    [1, 1, 1],
       "rotation": [0, 0, 0],
       "uvScale":  [1.0, 1.0],
-      "uvOffset": [0.0, 0.0]
+      "uvOffset": [0.0, 0.0],
+      "enabled":  true
     },
     {
       "name":     "Sphere2",
@@ -58,7 +63,8 @@
       "scale":    [1, 1, 1],
       "rotation": [0, 0, 0],
       "uvScale":  [1.0, 1.0],
-      "uvOffset": [0.0, 0.0]
+      "uvOffset": [0.0, 0.0],
+      "enabled":  true
     },
     {
       "name":     "Sphere3",
@@ -68,7 +74,8 @@
       "scale":    [0.5, 0.5, 0.5],
       "rotation": [0, 0, 0],
       "uvScale":  [0.5, 0.5],
-      "uvOffset": [0.0, 0.0]
+      "uvOffset": [0.0, 0.0],
+      "enabled":  true
     },
     {
       "name":     "Sphere4",
@@ -78,7 +85,8 @@
       "scale":    [1, 1, 1],
       "rotation": [0, 0, 0],
       "uvScale":  [1.0, 1.0],
-      "uvOffset": [0.0, 0.0]
+      "uvOffset": [0.0, 0.0],
+      "enabled":  true
     },
     {
       "name":     "Torus",
@@ -88,7 +96,8 @@
       "scale":    [1, 1, 1],
       "rotation": [45, 0, 45],
       "uvScale":  [1.0, 1.0],
-      "uvOffset": [0.0, 0.0]
+      "uvOffset": [0.0, 0.0],
+      "enabled":  true
     },
     {
       "name":     "Cone",
@@ -98,7 +107,8 @@
       "scale":    [1, 1, 1],
       "rotation": [0, -90, 15],
       "uvScale":  [1.0, 1.0],
-      "uvOffset": [0.0, 0.0]
+      "uvOffset": [0.0, 0.0],
+      "enabled":  true
     }
   ],
   "cameras": [

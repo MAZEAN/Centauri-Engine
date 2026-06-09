@@ -39,6 +39,9 @@ public class EntityDefinition
 
     [JsonPropertyName("uvOffset")]
     public float[] UvOffset { get; set; } = [0f, 0f];
+    
+    [JsonPropertyName("enabled")]
+    public bool Enabled { get; set; } = true;
 }
 
 public class MaterialDefinition

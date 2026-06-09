@@ -57,6 +57,8 @@ public class SceneLoader
             
             entity.UvScale  = new Vector2(e.UvScale[0],  e.UvScale[1]);
             entity.UvOffset = new Vector2(e.UvOffset[0], e.UvOffset[1]);
+            
+            entity.Enabled =  e.Enabled;
 
             if (e.Rotation is { Length: 3 })
                 entity.Transform.SetEulerAngles(e.Rotation[0], e.Rotation[1], e.Rotation[2]);

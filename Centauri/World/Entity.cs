@@ -15,6 +15,8 @@ public class Entity : IDisposable
     
     public Vector2 UvScale  { get; set; } = Vector2.One;
     public Vector2 UvOffset { get; set; } = Vector2.Zero;
+    
+    public bool    Enabled   { get; set; } = true;
 
     public Transform Transform
     {

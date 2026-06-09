@@ -51,6 +51,8 @@ public class Renderer
 
             foreach (var entity in entities)
             {
+                if (!entity.Enabled) continue;
+                
                 if (scene.DebugSettings.EnableCulling &&
                     !cullingCamera.Frustum.IsVisibleAABB(entity.GetWorldBounds()))
                     continue;
