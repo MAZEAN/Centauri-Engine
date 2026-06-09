@@ -110,7 +110,7 @@ public class Scene
             return;
         }
 
-        int index = _cameras.IndexOf(_activeCamera);
+        var index = _cameras.IndexOf(_activeCamera);
         index = (index + 1) % _cameras.Count;
 
         _activeCamera = _cameras[index];

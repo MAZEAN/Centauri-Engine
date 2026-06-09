@@ -46,7 +46,9 @@ public class Mesh : IDisposable
         var min = new Vector3(float.MaxValue);
         var max = new Vector3(float.MinValue);
 
-        for (int i = 0; i < vertices.Length; i += (int)Stride)
+        const int stride = (int)Stride;
+
+        for (var i = 0; i < vertices.Length; i += stride)
         {
             var pos = new Vector3(vertices[i], vertices[i + 1], vertices[i + 2]);
             min = Vector3.Min(min, pos);

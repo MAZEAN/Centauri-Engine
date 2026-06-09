@@ -17,8 +17,8 @@ public class GLShader : IDisposable
     {
         _gl = gl;
 
-        uint vertex = LoadShader(ShaderType.VertexShader, vertexPath);
-        uint fragment = LoadShader(ShaderType.FragmentShader, fragmentPath);
+        var vertex = LoadShader(ShaderType.VertexShader, vertexPath);
+        var fragment = LoadShader(ShaderType.FragmentShader, fragmentPath);
         
         _handle = _gl.CreateProgram();
         _gl.AttachShader(_handle, vertex);
@@ -54,7 +54,7 @@ public class GLShader : IDisposable
     public void SetUniform(string name, int value)
     {
         if (!HasChanged(name, value)) return;
-        int location = GetLocation(name);
+        var location = GetLocation(name);
         
         if (location == -1)
             return;
@@ -65,7 +65,7 @@ public class GLShader : IDisposable
     public void SetUniform(string name, float value)
     {
         if (!HasChanged(name, value)) return;
-        int location = GetLocation(name);
+        var location = GetLocation(name);
         
         if (location == -1)
             return;
@@ -78,7 +78,7 @@ public class GLShader : IDisposable
         // box as tuple for cache comparison
         var key = (x, y);
         if (!HasChanged(name, key)) return;
-        int location = GetLocation(name);
+        var location = GetLocation(name);
         
         if (location == -1)
             return;

@@ -100,13 +100,14 @@ public class Transform
     {
         get
         {
-            if (_worldDirty)
-            {
-                _worldMatrix = Parent != null
-                    ? LocalMatrix * Parent.WorldMatrix
-                    : LocalMatrix;
-                _worldDirty = false;
-            }
+            if (!_worldDirty) 
+                return _worldMatrix;
+            
+            _worldMatrix = Parent != null
+                ? LocalMatrix * Parent.WorldMatrix
+                : LocalMatrix;
+            _worldDirty = false;
+            
             return _worldMatrix;
         }
     }

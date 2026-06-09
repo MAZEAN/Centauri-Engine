@@ -12,7 +12,6 @@ public class ImGuiSystem : IDisposable
     public ImGuiSystem(GL gl, IWindow window, IInputContext input)
     {
         _controller = new ImGuiController(gl, window, input);
-        
     }
 
     public void Update(float deltaTime) => _controller.Update(deltaTime);
