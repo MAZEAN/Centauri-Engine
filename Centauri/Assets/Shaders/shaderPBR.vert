@@ -10,7 +10,7 @@ uniform mat4 uView;         // camera transform — moves world relative to came
 uniform mat4 uProjection;   // perspective — makes far things smaller
 uniform vec2 uUvScale;      // texture tiling
 uniform vec2 uUvOffset;     // texture offset
-uniform mat3 uNormalMatrix; // inverse of uModel then transposed
+uniform mat3 uNormalMatrix; // transposed inverse of uModel
 
 out vec2 fUv;       // UV after scale/offset applied
 out vec3 fNormal;   // world space normal

@@ -12,12 +12,12 @@ public class RenderingSystem : IDisposable
 {
     private readonly GL            _gl;
     private readonly AppConfig     _config;
-    private readonly Renderer      _renderer;
+    private readonly MainRenderer  _renderer;
     private readonly GridRenderer  _gridRenderer;
     private readonly DebugRenderer _debugRenderer;
-    
-    private StatsOverlay  _statsOverlay;
-    private ImGuiSystem?  _imGui;
+
+    private StatsOverlay _statsOverlay = null!;
+    private ImGuiSystem? _imGui;
 
     private FrameStats _stats;
     
@@ -28,7 +28,7 @@ public class RenderingSystem : IDisposable
     {
         _gl            = gl;
         _config        = config;
-        _renderer      = new Renderer(gl, config);
+        _renderer      = new MainRenderer(gl, config);
         _gridRenderer  = new GridRenderer(gl, config.Window);
         _debugRenderer = new DebugRenderer(gl);
     }
@@ -37,7 +37,7 @@ public class RenderingSystem : IDisposable
     public void InitializeImGui(IWindow window, IInputContext input)
     {
         _imGui = new ImGuiSystem(_gl, window, input);
-        _statsOverlay  = new StatsOverlay();
+        _statsOverlay  = new StatsOverlay(_imGui.Font);
     }
 
     public void ToggleStatsOverlay() => _statsOverlay.Toggle();

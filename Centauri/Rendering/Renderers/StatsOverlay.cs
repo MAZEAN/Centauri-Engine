@@ -8,7 +8,7 @@ using World;
 
 public class StatsOverlay
 {
-    private ImFontPtr _font = null!;
+    private readonly ImFontPtr _font;
     public bool IsVisible { get; private set; }
 
     public void Toggle() => IsVisible = !IsVisible;
@@ -19,20 +19,17 @@ public class StatsOverlay
                                            ImGuiWindowFlags.NoBringToFrontOnFocus |
                                            ImGuiWindowFlags.AlwaysAutoResize;
     
-    private readonly Vector4 _defaultColor = new(1.0f, 1.0f, 1.0f, 1.0f);
-
-    public StatsOverlay()
-    {
-        SetupFont();
-    }
+    // Colors
+    private readonly Vector4 _defaultColor = new (1.0f, 1.0f, 1.0f, 1.0f);
     
-    private void SetupFont()
+    private readonly Vector4 _orangeColor = new (1.0f, 0.8f, 0.2f, 1.0f);
+    private readonly Vector4 _greenColor  = new (0.4f, 0.9f, 0.4f, 1.0f);
+    private readonly Vector4 _blueColor   = new (0.4f, 0.7f, 1.0f, 1.0f);
+    private readonly Vector4 _redColor    = new (1.0f, 0.4f, 0.4f, 1.0f);
+
+    public StatsOverlay(ImFontPtr font)
     {
-        var io = ImGui.GetIO();
-        io.Fonts.AddFontDefault();
-        
-        _font = io.Fonts.AddFontFromFileTTF(PathResolver.Resolve("Assets/Fonts/IosevkaCharon-Regular.ttf"), 18.0f, null);
-        io.Fonts.Build();
+        _font = font;
     }
     
     public void Render(Scene scene, FrameStats stats)
@@ -40,18 +37,7 @@ public class StatsOverlay
         if (!IsVisible)
             return;
 
-        const float padding = 10f;
-        const float width   = 320f;
-
-        var viewport = ImGui.GetMainViewport();
-        var pos = new Vector2(
-            viewport.WorkPos.X + viewport.WorkSize.X - width - padding,
-            viewport.WorkPos.Y + padding
-        );
-
-        ImGui.SetNextWindowPos(pos, ImGuiCond.Always);
-        ImGui.SetNextWindowSize(new Vector2(width, 0), ImGuiCond.Always);
-        ImGui.SetNextWindowBgAlpha(0.85f);
+        SetupWindow();
 
         if (!ImGui.Begin("##StatsOverlay", Flags))
         {
@@ -63,22 +49,22 @@ public class StatsOverlay
         var cam = scene.GetActiveCamera();
         
         ImGui.PushFont(_font);
-        DrawSection("Performance", new Vector4(1f, 0.8f, 0.2f, 1f), () =>
+        DrawSection("Performance", _orangeColor, () =>
         {
             Row("FPS", $"{stats.FPS:F1}");
             Row("Frame Time", $"{stats.FrameTime:F2} ms");
         });
 
-        DrawSection("Culling", new Vector4(0.4f, 0.9f, 0.4f, 1f), () =>
+        DrawSection("Culling", _greenColor, () =>
         {
             Row("Total", stats.TotalEntities.ToString());
 
             var drawnColor = stats.CulledEntities > 0
-                ? new Vector4(0.4f, 1f, 0.4f, 1f)
-                : new Vector4(1f, 1f, 1f, 1f);
+                ? _greenColor
+                : _defaultColor;
 
             RowColored("Drawn", stats.DrawnEntities.ToString(), drawnColor);
-            RowColored("Culled", stats.CulledEntities.ToString(), new Vector4(1f, 0.4f, 0.4f, 1f));
+            RowColored("Culled", stats.CulledEntities.ToString(), _redColor);
             
             var ratio = stats.TotalEntities > 0
                 ? (stats.CulledEntities / (float)stats.TotalEntities) * 100f 
@@ -87,17 +73,17 @@ public class StatsOverlay
             RowColored("Ratio", $"{ratio:F2}%", _defaultColor);
         });
 
-        DrawSection("Renderer", new Vector4(0.4f, 0.7f, 1f, 1f), () =>
+        DrawSection("Renderer", _blueColor, () =>
         {
             Row("Draw Calls", stats.DrawCalls.ToString());
             Row("Texture Binds", stats.TextureBinds.ToString());
         });
 
-        DrawSection("Camera", new Vector4(0.4f, 0.7f, 1f, 1f), () =>
+        DrawSection("Camera", _redColor, () =>
         {
-            Row("Active", cam.Name);
-            Row("Position", FormatVec3(cam.Position));
-            Row("Forward", FormatVec3(cam.Forward));
+            RowColored("Active", cam.Name, _orangeColor);
+            RowColored("Position", FormatVec3(cam.Position), _defaultColor);
+            RowColored("Forward", FormatVec3(cam.Forward),  _defaultColor);
         });
         ImGui.PopFont();
 
@@ -107,6 +93,19 @@ public class StatsOverlay
     // ─────────────────────────────────────────────
     // Helpers
     // ─────────────────────────────────────────────
+
+    private void SetupWindow()
+    {
+        const float padding = 10f;
+
+        var viewport = ImGui.GetMainViewport();
+        var anchor = new Vector2(
+            viewport.WorkPos.X + viewport.WorkSize.X - padding,
+            viewport.WorkPos.Y + padding);
+
+        ImGui.SetNextWindowPos(anchor, ImGuiCond.Always, new Vector2(1f, 0f)); // pivot = top-right
+        ImGui.SetNextWindowBgAlpha(0.85f);
+    }
 
     private void DrawSection(string title, Vector4 color, Action content)
     {
@@ -130,20 +129,22 @@ public class StatsOverlay
     {
         ImGui.TableNextRow();
         ImGui.TableSetColumnIndex(0);
-        ImGui.Text(label);
+        ImGui.TextUnformatted(label);
 
         ImGui.TableSetColumnIndex(1);
-        ImGui.Text(value);
+        ImGui.TextUnformatted(value);
     }
 
     private void RowColored(string label, string value, Vector4 color)
     {
         ImGui.TableNextRow();
         ImGui.TableSetColumnIndex(0);
-        ImGui.Text(label);
+        ImGui.TextUnformatted(label);
 
         ImGui.TableSetColumnIndex(1);
-        ImGui.TextColored(color, value);
+        ImGui.PushStyleColor(ImGuiCol.Text, color);
+        ImGui.TextUnformatted(value);
+        ImGui.PopStyleColor();
     }
 
     private string FormatVec3(Vector3 v)

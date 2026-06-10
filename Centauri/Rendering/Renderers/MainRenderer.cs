@@ -9,7 +9,7 @@ using Resources;
 using Systems;
 using Utils.Misc;
 
-public class Renderer
+public class MainRenderer
 {
     private readonly GL _gl;
     private readonly AppConfig _config;
@@ -19,7 +19,7 @@ public class Renderer
 
     private uint[] _boundTextures = null!;
 
-    public Renderer(GL gl, AppConfig config)
+    public MainRenderer(GL gl, AppConfig config)
     {
         _gl = gl;
         _config = config;
