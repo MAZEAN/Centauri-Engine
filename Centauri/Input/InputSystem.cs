@@ -16,29 +16,30 @@ public class InputSystem
     private readonly AppConfig _config;
     private readonly RenderingSystem _renderingSystem;
     
+    private IKeyboard _keyboard = null!;
+    public IInputContext InputContext { get; private set; } = null!;
+    
     private readonly Dictionary<Camera, CameraController> _controllers = new();
-    private IKeyboard _keyboard= null!;
-    
-    private IInputContext _inputContext = null!;
-    public IInputContext InputContext => _inputContext;
-    
+
     public InputSystem(IWindow window, Scene scene, AppConfig config, RenderingSystem renderingSystem)
     {
         _window           = window;
         _scene            = scene;
         _config           = config;
         _renderingSystem  = renderingSystem;
+        
+        Initialize();
     }
     
     public void Initialize()
     {
-        _inputContext = _window.CreateInput();
-        _keyboard     = _inputContext.Keyboards.FirstOrDefault()
+        InputContext = _window.CreateInput();
+        _keyboard     = InputContext.Keyboards.FirstOrDefault()
                         ?? throw new InvalidOperationException("Keyboard not available");
 
         _keyboard.KeyDown += OnKeyDown;
 
-        foreach (var mouse in _inputContext.Mice)
+        foreach (var mouse in InputContext.Mice)
         {
             mouse.Cursor.CursorMode = CursorMode.Raw;
 

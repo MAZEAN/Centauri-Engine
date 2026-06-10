@@ -19,8 +19,7 @@ public class RenderingSystem : IDisposable
     private          ImGuiSystem?  _imGui;
 
     private FrameStats _stats;
-
-    // FPS smoothing
+    
     private float _fpsTimer;
     private int   _frameCount;
 
@@ -50,7 +49,7 @@ public class RenderingSystem : IDisposable
 
     private void UpdateFPSCounter(float deltaTime)
     {
-        // FPS + frametime smoothed over 1 second
+        // FPS + frame time smoothed over 1 second
         _fpsTimer   += deltaTime;
         _frameCount += 1;
 

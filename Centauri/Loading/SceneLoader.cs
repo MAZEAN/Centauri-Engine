@@ -1,4 +1,4 @@
-namespace Centauri.World;
+namespace Centauri.Loading;
 
 using System.Text.Json;
 using System.Numerics;
@@ -7,6 +7,7 @@ using Rendering.Resources;
 using Config;
 using Rendering.Systems;
 using Utils.Misc;
+using World;
 
 public class SceneLoader
 {
@@ -154,10 +155,10 @@ public class SceneLoader
 
         return new Material(shader)
         {
-            Albedo    = def.Albedo    != null ? _resourceSystem.Textures!.Get(def.Albedo)    : null,
-            Normal    = def.Normal    != null ? _resourceSystem.Textures!.Get(def.Normal)    : null,
-            Roughness = def.Roughness != null ? _resourceSystem.Textures!.Get(def.Roughness) : null,
-            Metallic  = def.Metallic  != null ? _resourceSystem.Textures!.Get(def.Metallic)  : null,
+            Albedo    = def.Albedo    != null ? _resourceSystem.Textures.Get(def.Albedo)    : null,
+            Normal    = def.Normal    != null ? _resourceSystem.Textures.Get(def.Normal)    : null,
+            Roughness = def.Roughness != null ? _resourceSystem.Textures.Get(def.Roughness) : null,
+            Metallic  = def.Metallic  != null ? _resourceSystem.Textures.Get(def.Metallic)  : null,
             AO        = def.AO        != null ? _resourceSystem.Textures.Get(def.AO)         : _resourceSystem.DefaultTexture, 
             RoughnessValue = def.RoughnessValue,
             MetallicValue  = def.MetallicValue,

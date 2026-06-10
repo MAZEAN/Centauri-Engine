@@ -8,8 +8,10 @@ using Config;
 using World;
 using Rendering.Systems;
 using Input;
+using Loading;
+using Windowing;
 
-public class Engine
+public class Engine : IWindowCallbacks
 {
     private IWindow _window = null!;
     private GL _gl = null!;
@@ -25,65 +27,47 @@ public class Engine
         _config = ConfigLoader.Load("Config/config.json");
         _scene  = new Scene(_config);
 
-        var options = CreateWindowOptions();
-        _window = Window.Create(options);
+        using var window = WindowManager.CreateWindow(_config, this);
 
-        _window.Load              += OnLoad;
-        _window.Update            += OnUpdate;
-        _window.Render            += OnRender;
-        _window.FramebufferResize += OnResize;
-        _window.Closing           += OnClose;
-
-        _window.Run();
-        _window.Dispose();
+        _window = window;
+        window.Run();
     }
 
-    private WindowOptions CreateWindowOptions()
-    {
-        var options = WindowOptions.Default;
-        
-        var monitor = Monitor.GetMonitors(null)
-            .OrderByDescending(m =>
-            {
-                var r = m.VideoMode.Resolution;
-                return r.HasValue ? r.Value.X * r.Value.Y : 0;
-            })
-            .First();
-
-        options.WindowState = _config.Window.WindowState;
-        options.Position = monitor.Bounds.Origin;
-        options.Title = _config.Window.Title;
-        options.VSync = _config.Window.EnableVSync;
-        options.Samples = _config.Window.Samples;
-        return options;
-    }
-
-    private void OnLoad()
+    public void OnLoad()
     {
         try
         {
             InitializeOpenGL();
-
-            _renderingSystem = new RenderingSystem(_gl, _config);
-            _resourceSystem  = new ResourceSystem(_gl, _config);
-
-            _sceneLoader = new SceneLoader(_resourceSystem, _scene, _config);
-            _sceneLoader.Load();
-
-            foreach (var cam in _scene.Cameras)
-                cam.SetAspectRatio(_window.FramebufferSize);
-
-            _input = new InputSystem(_window, _scene, _config, _renderingSystem);
-            _input.Initialize();
-
-            // ImGui needs both GL and the input context — initialize after both are ready
-            _renderingSystem.InitializeImGui(_window, _input.InputContext);
+            InitializeSystems();
+            LoadScene();
+            InitializeInput();
         }
-        catch (Exception e)
+        catch (Exception ex)
         {
-            Console.WriteLine($"OnLoad failed: {e}");
+            Console.WriteLine($"OnLoad failed: {ex}");
             throw;
         }
+    }
+
+    private void InitializeSystems()
+    {
+        _resourceSystem  = new ResourceSystem(_gl, _config);
+        _renderingSystem = new RenderingSystem(_gl, _config);
+    }
+
+    private void LoadScene()
+    {
+        _sceneLoader = new SceneLoader(_resourceSystem, _scene, _config);
+        _sceneLoader.Load();
+
+        _scene.InitializeCameras(_window);
+    }
+
+    private void InitializeInput()
+    {
+        _input = new InputSystem(_window, _scene, _config, _renderingSystem);
+
+        _renderingSystem.InitializeImGui(_window, _input.InputContext);
     }
 
     private void InitializeOpenGL()
@@ -130,21 +114,22 @@ public class Engine
         _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Fill);
     }
 
-    private void OnUpdate(double deltaTime)
+    public void OnUpdate(double deltaTime)
     {
         var delta = (float)deltaTime;
+        
         _input.Update(delta);
         _renderingSystem.Update(delta);
     }
 
-    private void OnRender(double deltaTime)
+    public void OnRender(double deltaTime)
     {
         _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
         
         _renderingSystem.Render(_scene, deltaTime);
     }
     
-    private void OnResize(Vector2D<int> size)
+    public void OnResize(Vector2D<int> size)
     {
         _gl.Viewport(size);
         
@@ -152,7 +137,7 @@ public class Engine
             cam.SetAspectRatio(size);
     }
     
-    private void OnClose()
+    public void OnClose()
     {
         _renderingSystem.Dispose();
         _scene.Dispose();

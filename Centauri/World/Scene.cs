@@ -1,3 +1,5 @@
+using Silk.NET.Windowing;
+
 namespace Centauri.World;
 
 using Rendering.Resources;
@@ -15,6 +17,12 @@ public class Scene
     private readonly Dictionary<GLShader, List<Entity>> _shaderGroups = new();
     
     private bool _shaderGroupsDirty = true;
+    
+    private readonly List<Camera> _cameras = new();
+    public IReadOnlyList<Camera> Cameras => _cameras;
+
+    private readonly Dictionary<string, Camera> _cameraLookup = new();
+    private Camera? _activeCamera;
 
     public Scene(AppConfig config)
     {
@@ -63,12 +71,12 @@ public class Scene
         _entities.Remove(entity);
         _shaderGroupsDirty = true;
     }
-    
-    private readonly List<Camera> _cameras = new();
-    public IReadOnlyList<Camera> Cameras => _cameras;
 
-    private readonly Dictionary<string, Camera> _cameraLookup = new();
-    private Camera? _activeCamera;
+    public void InitializeCameras(IWindow window)
+    {
+        foreach (var cam in Cameras)
+            cam.SetAspectRatio(window.FramebufferSize);
+    }
 
     public void AddCamera(Camera cam)
     {

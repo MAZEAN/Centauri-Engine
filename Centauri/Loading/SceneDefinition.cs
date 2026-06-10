@@ -1,4 +1,4 @@
-namespace Centauri.World;
+namespace Centauri.Loading;
 
 using System.Text.Json.Serialization;
 
