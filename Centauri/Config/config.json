@@ -2,7 +2,7 @@
   "window": {
     "title": "Centauri-Engine",
     "windowState": "Maximized",
-    "enableVSync": true,
+    "enableVSync": false,
     "samples": 4,
     "clearColor": [0.3, 0.3, 0.3, 1.0]
   },

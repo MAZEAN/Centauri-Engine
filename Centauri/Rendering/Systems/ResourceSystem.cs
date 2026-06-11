@@ -17,18 +17,15 @@ public class ResourceSystem : IDisposable
     public ResourceSystem(GL gl, AppConfig config)
     {
         Textures = new AssetCache<GLTexture>(
-            config.Render.TextureCacheSize,
             path => new GLTexture(gl, PathResolver.Resolve(path))
         );
 
         Shaders = new AssetCache<GLShader>(
-            config.Render.ShaderCacheSize,
             shaderBase => new GLShader(gl,
                 PathResolver.Resolve(shaderBase + ".vert"),
                 PathResolver.Resolve(shaderBase + ".frag")));
 
         Models = new AssetCache<Model>(
-            config.Render.ModelCacheSize,
             path => new Model(gl, PathResolver.Resolve(path)));
 
         DefaultTexture = CreateDefaultTexture(gl);
@@ -45,6 +42,7 @@ public class ResourceSystem : IDisposable
         Textures.Dispose();
         Shaders.Dispose();
         Models.Dispose();
+        DefaultTexture.Dispose();
 
         Console.WriteLine("[ResourceSystem] Disposed all resources");
     }

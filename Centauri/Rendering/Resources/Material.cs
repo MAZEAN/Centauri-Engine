@@ -2,7 +2,7 @@ namespace Centauri.Rendering.Resources;
 
 using System.Numerics;
 
-public class Material : IDisposable
+public class Material
 {
     public GLShader   Shader    { get; set; }
     public GLTexture? Albedo    { get; set; } // base color
@@ -35,10 +35,5 @@ public class Material : IDisposable
             
             return key;
         }
-    }
-
-    public void Dispose()
-    {
-        Shader.Dispose();
     }
 }

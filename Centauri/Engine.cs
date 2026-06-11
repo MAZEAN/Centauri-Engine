@@ -16,7 +16,7 @@ public class Engine : IWindowCallbacks
     private IWindow _window = null!;
     private GL _gl = null!;
     private AppConfig _config = null!;
-    private InputSystem _input = null!;
+    private InputSystem _inputSystem = null!;
     private Scene _scene = null!;
     private RenderingSystem _renderingSystem = null!;
     private ResourceSystem _resourceSystem = null!;
@@ -65,9 +65,9 @@ public class Engine : IWindowCallbacks
 
     private void InitializeInput()
     {
-        _input = new InputSystem(_window, _scene, _config, _renderingSystem);
+        _inputSystem = new InputSystem(_window, _scene, _config, _renderingSystem);
 
-        _renderingSystem.InitializeImGui(_window, _input.InputContext);
+        _renderingSystem.InitializeImGui(_window, _inputSystem.InputContext);
     }
 
     private void InitializeOpenGL()
@@ -118,7 +118,7 @@ public class Engine : IWindowCallbacks
     {
         var delta = (float)deltaTime;
         
-        _input.Update(delta);
+        _inputSystem.Update(delta);
         _renderingSystem.Update(delta);
     }
 
@@ -140,6 +140,7 @@ public class Engine : IWindowCallbacks
     public void OnClose()
     {
         _renderingSystem.Dispose();
+        _inputSystem.Dispose();
         _scene.Dispose();
         _resourceSystem.Dispose();
     }

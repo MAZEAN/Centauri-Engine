@@ -1,4 +1,4 @@
-namespace Centauri.Rendering.Systems;
+namespace Centauri.Rendering.UI;
 
 using Silk.NET.OpenGL;
 using Silk.NET.OpenGL.Extensions.ImGui;
@@ -10,13 +10,13 @@ using System.Numerics;
 using Utils.Misc;
 using Config;
 
-public class ImGuiSystem : IDisposable
+public class ImGuiManager : IDisposable
 {
     private readonly IWindow _window;
     private readonly ImGuiController _controller;
     public ImFontPtr Font { get; private set; }
 
-    public ImGuiSystem(GL gl, ImGuiConfig config, IWindow window, IInputContext input)
+    public ImGuiManager(GL gl, ImGuiConfig config, IWindow window, IInputContext input)
     {
         _window = window;
         

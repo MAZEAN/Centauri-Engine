@@ -2,35 +2,29 @@ namespace Centauri.Utils.Caching;
 
 public sealed class AssetCache<T> : IDisposable where T : class, IDisposable
 {
-    private readonly LRUCache<string, T> _cache;
+    private readonly Dictionary<string, T> _assets = new();
     private readonly Func<string, T> _factory;
-    private readonly HashSet<T> _all = new();
 
-    public AssetCache(int capacity, Func<string, T> factory)
+    public AssetCache(Func<string, T> factory)
     {
-        _cache = new LRUCache<string, T>(capacity);
         _factory = factory;
     }
 
     public T Get(string key)
     {
-        var asset = _cache.Get(key);
-        if (asset != null)
-            return asset;
+        if (_assets.TryGetValue(key, out var asset))
+            return asset;                 // one instance per key, ever
 
         asset = _factory(key);
-
-        _cache.Put(key, asset);
-        _all.Add(asset);
-
+        _assets[key] = asset;
         return asset;
     }
 
     public void Dispose()
     {
-        foreach (var asset in _all)
+        foreach (var asset in _assets.Values)
             asset.Dispose();
 
-        _all.Clear();
+        _assets.Clear();
     }
 }

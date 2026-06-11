@@ -9,7 +9,7 @@ using Config;
 using World;
 using Rendering.Systems;
 
-public class InputSystem
+public class InputSystem : IDisposable
 {
     private readonly IWindow _window;
     private readonly Scene _scene;
@@ -108,5 +108,18 @@ public class InputSystem
         var controller = GetController(cam);
 
         controller.Reset();
+    }
+    
+    public void Dispose()
+    {
+        _keyboard.KeyDown -= OnKeyDown;
+
+        foreach (var mouse in InputContext.Mice)
+        {
+            mouse.MouseMove -= OnMouseMove;
+            mouse.Scroll    -= OnMouseWheel;
+        }
+
+        InputContext.Dispose();
     }
 }

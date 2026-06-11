@@ -3,10 +3,12 @@ namespace Centauri.Rendering.Systems;
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
 using Silk.NET.Input;
+
 using Config;
 using Renderers;
 using World;
 using Utils.Misc;
+using UI;
 
 public class RenderingSystem : IDisposable
 {
@@ -17,7 +19,7 @@ public class RenderingSystem : IDisposable
     private readonly DebugRenderer _debugRenderer;
 
     private StatsOverlay _statsOverlay = null!;
-    private ImGuiSystem? _imGui;
+    private ImGuiManager? _imGui;
 
     private FrameStats _stats;
     
@@ -36,7 +38,7 @@ public class RenderingSystem : IDisposable
     // called after GL and input are both ready
     public void InitializeImGui(IWindow window, IInputContext input)
     {
-        _imGui = new ImGuiSystem(_gl, _config.ImGui, window, input);
+        _imGui = new ImGuiManager(_gl, _config.ImGui, window, input);
         _statsOverlay  = new StatsOverlay(_imGui.Font);
     }
 

@@ -1,4 +1,4 @@
-namespace Centauri.Rendering.Renderers;
+namespace Centauri.Rendering.UI;
 
 using ImGuiNET;
 using System.Numerics;

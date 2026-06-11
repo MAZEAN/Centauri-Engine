@@ -81,8 +81,6 @@
     },
     {
       "name":     "Lamp",
-      "model":    "Assets/Objects/sphere.glb",
-      "material": "Assets/Materials/Default.mat",
       "position": [0, 2, 0],
       "scale":    [0.01, 0.01, 0.01],
       "light": {
