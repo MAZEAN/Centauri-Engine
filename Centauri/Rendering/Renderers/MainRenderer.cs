@@ -51,12 +51,9 @@ public class MainRenderer
             UploadGlobalUniforms(shader, viewCamera);
             UploadLighting(shader, scene.Lighting);
 
-            foreach (var entity in entities)
+            foreach (var entity in entities.Where(entity => entity.Enabled))
             {
-                if (!entity.Enabled) continue;
-                
-                if (entity.Model is not { } model || entity.Material is not { } mat)
-                    continue;
+                if (entity.Model is not { } model || entity.Material is not { } mat) continue;
                 
                 if (scene.DebugSettings.EnableCulling &&
                     !cullingCamera.Frustum.IsVisibleAABB(entity.GetWorldBounds()))
@@ -69,7 +66,7 @@ public class MainRenderer
                 UploadTransform(shader, entity);
                 UploadMaterialProperties(shader, mat, entity);
 
-                foreach (var mesh in entity.Model.Meshes)
+                foreach (var mesh in model.Meshes)
                 {
                     mesh.Bind();
                     unsafe
@@ -78,6 +75,8 @@ public class MainRenderer
                             DrawElementsType.UnsignedInt, (void*)0);
                     }
                     stats.DrawCalls++;
+                    stats.TotalIndices += (int) mesh.IndexCount;
+                    stats.TotalVertices += (int) mesh.VertexCount;
                 }
             }
         }
@@ -117,7 +116,7 @@ public class MainRenderer
     // -----------------------------
     // Global uniforms
     // -----------------------------
-    private void UploadGlobalUniforms(GLShader shader, Camera camera)
+    private static void UploadGlobalUniforms(GLShader shader, Camera camera)
     {
         var projection = camera.GetProjectionMatrix();
 
@@ -134,7 +133,7 @@ public class MainRenderer
     // -----------------------------
     // Material
     // -----------------------------
-    private void UploadMaterialFlags(GLShader shader, Material mat)
+    private static void UploadMaterialFlags(GLShader shader, Material mat)
     {
         shader.SetUniform("uHasAlbedo",    mat.Albedo    != null ? 1 : 0);
         shader.SetUniform("uHasNormal",    mat.Normal    != null ? 1 : 0);
@@ -142,7 +141,7 @@ public class MainRenderer
         shader.SetUniform("uHasMetallic",  mat.Metallic  != null ? 1 : 0);
     }
 
-    private void UploadMaterialProperties(GLShader shader, Material mat, Entity entity)
+    private static void UploadMaterialProperties(GLShader shader, Material mat, Entity entity)
     {
         shader.SetUniform("uRoughnessValue", mat.RoughnessValue);
         shader.SetUniform("uMetallicValue",  mat.MetallicValue);
@@ -154,7 +153,7 @@ public class MainRenderer
     // -----------------------------
     // Transform
     // -----------------------------
-    private void UploadTransform(GLShader shader, Entity entity)
+    private static void UploadTransform(GLShader shader, Entity entity)
     {
         var model = entity.Transform.WorldMatrix;
 
@@ -169,14 +168,14 @@ public class MainRenderer
     // -----------------------------
     // Lighting
     // -----------------------------
-    private void UploadLighting(GLShader shader, LightingSystem lights)
+    private static void UploadLighting(GLShader shader, LightingSystem lights)
     {
         UploadDirectionalLight(shader, lights);
         UploadPointLights(shader, lights);
         UploadSpotLights(shader, lights);
     }
 
-    private void UploadDirectionalLight(GLShader shader, LightingSystem lights)
+    private static void UploadDirectionalLight(GLShader shader, LightingSystem lights)
     {
         if (lights.DirectionalLights.Count == 0)
             return;
@@ -187,7 +186,7 @@ public class MainRenderer
         shader.SetUniform("uDirLight.intensity", dir.Intensity);
     }
 
-    private void UploadPointLights(GLShader shader, LightingSystem lights)
+    private static void UploadPointLights(GLShader shader, LightingSystem lights)
     {
         var count = Math.Min(lights.PointLights.Count, MaxPointLights);
         shader.SetUniform("uPointLightCount", count);
@@ -206,7 +205,7 @@ public class MainRenderer
         }
     }
 
-    private void UploadSpotLights(GLShader shader, LightingSystem lights)
+    private static void UploadSpotLights(GLShader shader, LightingSystem lights)
     {
         var count = Math.Min(lights.SpotLights.Count, MaxSpotLights);
         shader.SetUniform("uSpotLightCount", count);
@@ -233,11 +232,13 @@ public class MainRenderer
         Array.Fill(_boundTextures, uint.MaxValue);
     }
     
-    private void ResetFrameStats(Scene scene, ref FrameStats stats)
+    private static void ResetFrameStats(Scene scene, ref FrameStats stats)
     {
         stats.TotalEntities = scene.Entities.Count;
         stats.DrawnEntities = 0;
         stats.DrawCalls     = 0;
         stats.TextureBinds  = 0;
+        stats.TotalIndices  = 0;
+        stats.TotalVertices = 0;
     }
 }

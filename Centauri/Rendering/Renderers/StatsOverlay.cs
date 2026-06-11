@@ -80,6 +80,8 @@ public class StatsOverlay
         {
             Row("Draw Calls", stats.DrawCalls.ToString());
             Row("Texture Binds", stats.TextureBinds.ToString());
+            Row("Total Indices", stats.TotalIndices.ToString());
+            Row("Total Vertices", stats.TotalVertices.ToString());
         });
 
         DrawSection("Camera", _redColor, () =>

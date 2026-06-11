@@ -9,4 +9,6 @@ public struct FrameStats
     public int   CulledEntities => TotalEntities - DrawnEntities;
     public int   DrawCalls      { get; set; }
     public int   TextureBinds   { get; set; }
+    public int   TotalIndices   { get; set; }
+    public int   TotalVertices  { get; set; }
 }
