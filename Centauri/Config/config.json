@@ -13,7 +13,7 @@
     "sensitivityX": 0.1,
     "sensitivityY": 0.1,
     "zoomSensitivity": 1.5,
-    "panSensitivity": 0.1,
+    "panSensitivity": 0.01,
     "minZoom": 1.0,
     "maxZoom": 90.0,
     "moveSpeed": 4.0
