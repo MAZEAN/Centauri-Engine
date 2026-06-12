@@ -54,10 +54,13 @@ public class MainRenderer
             foreach (var entity in entities.Where(entity => entity.Enabled))
             {
                 if (entity.Model is not { } model || entity.Material is not { } mat) continue;
-                
-                if (_config.Debug.EnableCulling &&
-                    !cullingCamera.Frustum.IsVisibleAABB(entity.GetWorldBounds()))
+
+                if (_config.Debug.EnableCulling && !cullingCamera.Frustum.IsVisibleAABB(entity.GetWorldBounds()))
+                {
+                    stats.CulledEntities++; 
                     continue;
+                }
+                    
                 
                 stats.TextureBinds += BindMaterialTextures(mat);
                 stats.DrawnEntities++;
@@ -234,11 +237,11 @@ public class MainRenderer
     
     private static void ResetFrameStats(Scene scene, ref FrameStats stats)
     {
-        stats.TotalEntities = scene.Entities.Count;
-        stats.DrawnEntities = 0;
-        stats.DrawCalls     = 0;
-        stats.TextureBinds  = 0;
-        stats.TotalIndices  = 0;
-        stats.TotalVertices = 0;
+        stats.DrawnEntities  = 0;
+        stats.CulledEntities = 0;
+        stats.DrawCalls      = 0;
+        stats.TextureBinds   = 0;
+        stats.TotalIndices   = 0;
+        stats.TotalVertices  = 0;
     }
 }

@@ -11,22 +11,20 @@ public class Scene
 {
     private readonly List<Entity> _entities = new();
     public IReadOnlyList<Entity> Entities => _entities;
-    public LightingSystem Lighting { get; } = new();
-    
     private readonly Dictionary<GLShader, List<Entity>> _shaderGroups = new();
     
     private bool _shaderGroupsDirty = true;
     
+    public LightingSystem Lighting { get; } = new();
+    
     private readonly List<Camera> _cameras = new();
     public IReadOnlyList<Camera> Cameras => _cameras;
-
+    private Camera? _activeCamera, _primaryCamera;
     private readonly Dictionary<string, Camera> _cameraLookup = new();
-    private Camera? _activeCamera;
-    private Camera? _primaryCamera;
     
     public Entity? Selected { get; private set; }
 
-    public void Select(Entity? entity) => Selected = entity;   // entity may be null = deselect
+    public void Select(Entity? entity) => Selected = entity;
     public void ClearSelection() => Selected = null;
 
     public IReadOnlyDictionary<GLShader, List<Entity>> GetEntitiesByShader()

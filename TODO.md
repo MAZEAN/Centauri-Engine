@@ -6,7 +6,7 @@
 
 ## Features
 
-* [ ] Entity inspector
+* [ ] Entity inspector / modifier
 * [ ] Skybox
 * [ ] Raytracing with BVH (Sebastian Lague)
 * [ ] Physics engine integration (BEPUphysics2)
