@@ -8,12 +8,15 @@ using World;
 public class InspectorPanel
 {
     private const float Width   = 300f;
+    private const float Height  = 400f;
     private const float Padding = 10f;
 
     private readonly ImFontPtr _font;
 
     private Entity? _tracked;
     private Vector3 _euler;   // working rotation (deg) for the selected entity
+    
+    private static readonly string[] LightTypes = ["None", "Directional", "Point", "Spot"];
 
     public InspectorPanel(ImFontPtr font) => _font = font;
 
@@ -36,8 +39,6 @@ public class InspectorPanel
         }
         else
         {
-            // re-seed the working euler only when the selection changes,
-            // so dragging doesn't fight a per-frame quaternion conversion
             if (!ReferenceEquals(entity, _tracked))
             {
                 _tracked = entity;
@@ -60,7 +61,8 @@ public class InspectorPanel
         ImGui.SetNextWindowPos(
             new Vector2(vp.WorkPos.X + Padding, vp.WorkPos.Y + Padding),
             ImGuiCond.FirstUseEver);
-        ImGui.SetNextWindowSize(new Vector2(Width, 0), ImGuiCond.FirstUseEver);
+        ImGui.SetNextWindowSize(new Vector2(Width, Height), ImGuiCond.FirstUseEver);
+        ImGui.SetNextWindowCollapsed(false, ImGuiCond.FirstUseEver);
     }
 
     private void DrawTransform(Entity e)
@@ -107,19 +109,33 @@ public class InspectorPanel
         if (ImGui.SliderFloat("Metallic", ref metal, 0f, 1f))
             mat.MetallicValue = metal;
     }
-
+    
     private static void DrawLight(Entity e)
     {
-        if (e.Light is not { } light) return;
         if (!ImGui.CollapsingHeader("Light", ImGuiTreeNodeFlags.DefaultOpen))
             return;
+
+        var typeIndex = e.Light switch
+        {
+            DirectionalLight => 1,
+            PointLight       => 2,
+            SpotLight        => 3,
+            _                => 0
+        };
+
+        // one control to add / remove / switch the light type
+        if (ImGui.Combo("Type", ref typeIndex, LightTypes, LightTypes.Length))
+            e.Light = typeIndex == 0 ? null : CreateLight(typeIndex, e.Light);
+
+        if (e.Light is not { } light)
+            return; // entity has no light — nothing more to draw
 
         var enabled = light.Enabled;
         if (ImGui.Checkbox("Light Enabled", ref enabled))
             light.Enabled = enabled;
 
         var color = light.Color;
-        if (ImGui.ColorEdit3("Color##light", ref color))   // ##id avoids clash with material Color
+        if (ImGui.ColorEdit3("Color##light", ref color))
             light.Color = color;
 
         var intensity = light.Intensity;
@@ -131,8 +147,7 @@ public class InspectorPanel
             case DirectionalLight d:
             {
                 var dir = d.Direction;
-                if (ImGui.DragFloat3("Direction", ref dir, 0.01f))
-                    d.Direction = dir;
+                if (ImGui.DragFloat3("Direction", ref dir, 0.01f)) d.Direction = dir;
                 break;
             }
             case SpotLight s:
@@ -157,5 +172,25 @@ public class InspectorPanel
                 break;
             }
         }
+    }
+
+    // new type instance, carrying over the shared base fields when switching
+    private static Light CreateLight(int typeIndex, Light? from)
+    {
+        Light light = typeIndex switch
+        {
+            1 => new DirectionalLight(),
+            2 => new PointLight(),
+            3 => new SpotLight(),
+            _ => throw new ArgumentOutOfRangeException(nameof(typeIndex))
+        };
+
+        if (from is null) return light;
+        
+        light.Color     = from.Color;
+        light.Intensity = from.Intensity;
+        light.Enabled   = from.Enabled;
+
+        return light;
     }
 }
