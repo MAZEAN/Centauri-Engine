@@ -20,6 +20,7 @@ public class RenderingSystem : IDisposable
 
     private StatsOverlay _statsOverlay = null!;
     private ImGuiManager? _imGui;
+    private InspectorPanel _inspector = null!;
 
     private FrameStats _stats;
     
@@ -43,6 +44,7 @@ public class RenderingSystem : IDisposable
     {
         _imGui = new ImGuiManager(_gl, _config.ImGui, window, input);
         _statsOverlay  = new StatsOverlay(_imGui.Font, _config);
+        _inspector    = new InspectorPanel(_imGui.Font);
     }
 
     public void ToggleStatsOverlay() => _config.Debug.ToggleShowStatsOverlay();
@@ -92,6 +94,9 @@ public class RenderingSystem : IDisposable
         
         if (_config.Debug.ShowStatsOverlay)
             _statsOverlay.Render(scene, _stats);
+        
+        if (_config.Input.Mode == ViewMode.Edit)
+            _inspector.Render(scene);
         
         _imGui?.Render();
     }

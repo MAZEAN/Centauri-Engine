@@ -17,10 +17,11 @@ public class StatsOverlay
     private const ImGuiWindowFlags Flags = ImGuiWindowFlags.NoDecoration           |
                                            ImGuiWindowFlags.NoMove                 |
                                            ImGuiWindowFlags.NoSavedSettings        |
-                                           ImGuiWindowFlags.NoBringToFrontOnFocus;
+                                           ImGuiWindowFlags.NoBringToFrontOnFocus  |
+                                           ImGuiWindowFlags.AlwaysAutoResize;
     
     // Colors
-    private static readonly Vector4 DefaultColor = new(1.0f, 1.0f, 1.0f, 1.0f);
+    private static readonly Vector4 DefaultColor     = new(1.0f, 1.0f, 1.0f, 1.0f);
     
     private static readonly Vector4 PerformanceColor = new(1.00f, 0.75f, 0.20f, 1f);
     private static readonly Vector4 CullingColor     = new(0.35f, 0.85f, 0.45f, 1f);
@@ -83,7 +84,7 @@ public class StatsOverlay
                 ? (stats.CulledEntities / (float)stats.TotalEntities) * 100f 
                 : 0f;
 
-            Row("Ratio", FormatFloat(ratio));
+            Row("Ratio", $"{FormatFloat(ratio)}%");
         });
 
         DrawSection("Renderer", RendererColor, () =>

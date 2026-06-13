@@ -17,6 +17,10 @@ public class Transform
 
     public IReadOnlyList<Transform> Children => _children;
     public event Action? OnChanged;
+    
+    private Vector3 _eulerAngles; // last-set degrees (pitch, yaw, roll) — kept in sync by SetEulerAngles
+
+    public Vector3 EulerAngles => _eulerAngles;
 
     public Transform? Parent
     {
@@ -123,6 +127,7 @@ public class Transform
 
     public void SetEulerAngles(float pitchDeg, float yawDeg, float rollDeg)
     {
+        _eulerAngles = new Vector3(pitchDeg, yawDeg, rollDeg);
         Rotation = Quaternion.CreateFromYawPitchRoll(
             float.DegreesToRadians(yawDeg),
             float.DegreesToRadians(pitchDeg),
