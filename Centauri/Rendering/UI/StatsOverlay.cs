@@ -29,15 +29,22 @@ public class StatsOverlay
     {
         SetupWindow();
 
-        if (!ImGui.Begin("StatsOverlay", Flags))
+        if (!ImGui.Begin("StatsOverlay", GetModeDependentFlags(_config.Input.Mode)))
         {
             ImGui.End();
             return;
         }
-
-        var cam = scene.GetActiveCamera();
+        
         ImGui.PushFont(_font);
 
+        DrawSections(scene, stats);
+
+        ImGui.PopFont();
+        ImGui.End();
+    }
+
+    private void DrawSections(Scene scene, FrameStats stats)
+    {
         Section("Performance",GUI.Amber, () =>
         {
             Row("FPS", GUI.Float(stats.FPS));
@@ -64,7 +71,8 @@ public class StatsOverlay
             Row("Total Indices",  stats.TotalIndices.ToString());
             Row("Total Vertices", stats.TotalVertices.ToString());
         });
-
+        
+        var cam = scene.GetActiveCamera();
         Section("Camera",GUI.Red, () =>
         {
             RowColored("Active", cam.Name,GUI.Amber);
@@ -86,9 +94,6 @@ public class StatsOverlay
             ConfigRow("Cameras",       _config.Debug.ShowCameras);
             ConfigRow("Grid",          _config.Debug.ShowGrid);
         });
-
-        ImGui.PopFont();
-        ImGui.End();
     }
 
     private static void SetupWindow()
@@ -105,8 +110,9 @@ public class StatsOverlay
 
     private static void Section(string title, Vector4 accent, Action rows)
     {
-        bool open = GUI.BeginPanel(title, accent);   // colored, collapsible header
+        var open = GUI.BeginPanel(title, accent);   // colored, collapsible header
         if (open) rows();
+        
         GUI.EndPanel(open);
     }
 
@@ -133,5 +139,13 @@ public class StatsOverlay
         
         ImGui.TextUnformatted(value);
         if (tinted) ImGui.PopStyleColor();
+    }
+
+    private static ImGuiWindowFlags GetModeDependentFlags(ViewMode activeMode)
+    {
+        var flags = Flags;
+        if (activeMode == ViewMode.Fly)
+            flags |= ImGuiWindowFlags.NoInputs;
+        return flags;
     }
 }

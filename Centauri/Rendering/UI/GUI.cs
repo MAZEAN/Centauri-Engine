@@ -158,11 +158,14 @@ internal static class GUI
     // ── formatting ──────────────────────────────────────────────────────────────
     public static string Vec3(Vector3 v) => string.Format(
         CultureInfo.CurrentCulture,
-        "({0,8:+0.00;-0.00}, {1,8:+0.00;-0.00}, {2,8:+0.00;-0.00})", v.X, v.Y, v.Z);
+        "({0,8:+0.00;-0.00}, {1,8:+0.00;-0.00}, {2,8:+0.00;-0.00})",
+        v.X, v.Y, v.Z);
 
     public static string Float(float v, int decimals = 2) =>
-        v.ToString($"F{decimals}", CultureInfo.CurrentCulture);
+        v.ToString($"F{decimals}",
+            CultureInfo.CurrentCulture);
 
     public static string SignedFloat(float v, int decimals = 2) =>
-        v.ToString($"+0.{new string('0', decimals)};-0.{new string('0', decimals)}", CultureInfo.CurrentCulture);
+        v.ToString($"+0.{new string('0', decimals)};-0.{new string('0', decimals)}",
+            CultureInfo.CurrentCulture);
 }

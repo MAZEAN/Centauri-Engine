@@ -55,21 +55,6 @@ public class RenderingSystem : IDisposable
         UpdateFPSCounter(deltaTime);
     }
 
-    private void UpdateFPSCounter(float deltaTime)
-    {
-        // FPS + frame time smoothed over 1 second
-        _fpsTimer   += deltaTime;
-        _frameCount += 1;
-
-        if (_fpsTimer >= 1.0f)
-        {
-            _stats.FPS       = _frameCount / _fpsTimer;
-            _stats.FrameTime = 1000f / _stats.FPS;
-            _frameCount      = 0;
-            _fpsTimer        = 0f;
-        }
-    }
-
     public void Render(Scene scene, double deltaTime)
     {
         if (_config.Debug.ShowGrid)
@@ -99,6 +84,21 @@ public class RenderingSystem : IDisposable
             _inspector.Render(scene);
         
         _imGui?.Render();
+    }
+    
+    private void UpdateFPSCounter(float deltaTime)
+    {
+        // FPS + frame time smoothed over 1 second
+        _fpsTimer   += deltaTime;
+        _frameCount += 1;
+
+        if (_fpsTimer >= 1.0f)
+        {
+            _stats.FPS       = _frameCount / _fpsTimer;
+            _stats.FrameTime = 1000f / _stats.FPS;
+            _frameCount      = 0;
+            _fpsTimer        = 0f;
+        }
     }
 
     public void Dispose()
