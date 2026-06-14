@@ -1,4 +1,4 @@
-namespace Centauri.World.Components;
+namespace Centauri.World.Collections;
 
 using Rendering.Resources;
 

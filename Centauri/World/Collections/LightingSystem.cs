@@ -1,4 +1,4 @@
-namespace Centauri.Rendering.Systems;
+namespace Centauri.World.Collections;
 
 using System.Numerics;
 using World;

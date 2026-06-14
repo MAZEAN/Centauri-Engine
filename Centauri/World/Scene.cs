@@ -2,7 +2,7 @@ namespace Centauri.World;
 
 using Rendering.Systems;
 using Utils.Geometry;
-using Components;
+using Collections;
 
 public class Scene
 {

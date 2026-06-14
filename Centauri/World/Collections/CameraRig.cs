@@ -1,4 +1,4 @@
-namespace Centauri.World.Components;
+namespace Centauri.World.Collections;
 
 using System.Collections;
 using Silk.NET.Windowing;
