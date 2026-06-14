@@ -5,8 +5,8 @@ using System.Text.Json.Serialization;
 public class SceneDefinition
 {
     [JsonPropertyName("entities")] public List<EntityDefinition> Entities { get; set; } = [];
-    [JsonPropertyName("cameras")]  public List<CameraDefinition> Cameras { get; set; } = [];
-    [JsonPropertyName("skybox")]   public SkyboxDefinition?      Skybox   { get; set; }
+    [JsonPropertyName("cameras")]  public List<CameraDefinition> Cameras  { get; set; } = [];
+    [JsonPropertyName("skybox")]   public List<SkyboxDefinition> Skyboxes { get; set; } = [];
 }
 
 public class EntityDefinition
@@ -46,9 +46,7 @@ public class LightDefinition
 
 public class MaterialDefinition
 {
-    [JsonPropertyName("shader")]
-    public string Shader { get; set; } = "";
-
+    [JsonPropertyName("shader")]    public string Shader { get; set; } = "";
     [JsonPropertyName("albedo")]    public string? Albedo    { get; set; }
     [JsonPropertyName("normal")]    public string? Normal    { get; set; }
     [JsonPropertyName("roughness")] public string? Roughness { get; set; }
@@ -56,7 +54,7 @@ public class MaterialDefinition
     [JsonPropertyName("ao")]        public string? AO        { get; set; }
 
     [JsonPropertyName("roughnessValue")] public float RoughnessValue { get; set; } = 0.5f;
-    [JsonPropertyName("metallicValue")]  public float MetallicValue  { get; set; } = 0.0f;
+    [JsonPropertyName("metallicValue")]  public float MetallicValue  { get; set; } = 0.1f;
     [JsonPropertyName("color")]          public float[] Color        { get; set; } = [1f, 1f, 1f, 1f];
 }
 
@@ -73,5 +71,6 @@ public class CameraDefinition
 
 public class SkyboxDefinition
 {
+    [JsonPropertyName("name")]     public string  Name     { get; set; } = "Skybox";
     [JsonPropertyName("cubemap")] public string Cubemap { get; set; } = "";
 }

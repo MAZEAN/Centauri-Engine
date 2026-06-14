@@ -34,7 +34,7 @@ public class ResourceSystem : IDisposable
             path => new Model(gl, PathResolver.Resolve(path)));
         
         Cubemaps = new AssetCache<GLCubemap>(
-            folder => GLCubemap.FromFolder(gl, PathResolver.Resolve(folder)));
+            folder => GLCubemap.FromCross(gl, PathResolver.Resolve(folder)));
 
         DefaultTexture = CreateDefaultTexture(gl);
     }

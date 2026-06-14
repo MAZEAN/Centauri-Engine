@@ -114,8 +114,9 @@
     }
   ],
   "skybox": [
-    { 
-      "cubemap": "Assets/Textures/Skybox"
+    {
+      "name": "Skybox",
+      "cubemap": "Assets/Textures/Skybox/Skybox.png"
     }
   ]
 }
