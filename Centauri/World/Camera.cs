@@ -9,19 +9,16 @@ using Utils.Geometry;
 
 public class Camera
 {
-    public string Name { get; }
-
     private readonly CameraConfig _config;
-    public Vector3 Position { get; private set; }
-    public Vector3 Forward { get; private set; }
-    public Vector3 Right { get; private set; }
-    public Vector3 Up { get; private set; }
-
-    private readonly Vector3 _worldUp;
-    
-    public float Yaw { get; private set; }
-    public float Pitch { get; private set; }
-    public float Zoom { get; private set; }
+    public string Name       { get; }
+    public Vector3 Position  { get; private set; }
+    public Vector3 Forward   { get; private set; }
+    public Vector3 Right     { get; private set; }
+    public Vector3 Up        { get; private set; }
+    public Vector3 WorldUp   { get; }
+    public float Yaw         { get; private set; }
+    public float Pitch       { get; private set; }
+    public float Zoom        { get; private set; }
     public float AspectRatio { get; private set; }
     
     public Frustum Frustum { get; private set; }
@@ -35,7 +32,7 @@ public class Camera
         Name = name;
 
         Position = position;
-        _worldUp = worldUp;
+        WorldUp = worldUp;
 
         Yaw = yaw;
         Pitch = pitch;
@@ -83,7 +80,7 @@ public class Camera
 
         Forward = Vector3.Normalize(direction);
         
-        Right = Vector3.Normalize(Vector3.Cross(Forward, _worldUp));
+        Right = Vector3.Normalize(Vector3.Cross(Forward, WorldUp));
         Up    = Vector3.Normalize(Vector3.Cross(Right, Forward));
     }
     

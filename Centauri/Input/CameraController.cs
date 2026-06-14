@@ -13,8 +13,8 @@ public class CameraController
 
     private Vector2 _lastMouse;
     private bool _seeded;
-    
-    private const float MaxDelta = 400f; 
+
+    private const float MaxDelta = 400f;
 
     public CameraController(Camera camera, CameraConfig config)
     {
@@ -46,13 +46,6 @@ public class CameraController
             _camera.ModifyDirection(d.X * _config.SensitivityX, d.Y * _config.SensitivityY);
     }
 
-    public void Pan(Vector2 position)
-    {
-        if (TryDelta(position, out var d))
-            // drag right → camera left, drag down → camera up ("grab" feel); flip a sign to taste
-            _camera.UpdatePosition((-_camera.Right * d.X + _camera.Up * d.Y) * _config.PanSensitivity);
-    }
-
     public void Zoom(ScrollWheel scroll)
         => _camera.AdjustZoom(-scroll.Y * _config.ZoomSensitivity);
 
@@ -63,20 +56,17 @@ public class CameraController
             _lastMouse = position;
             _seeded = true;
             delta = Vector2.Zero;
-            return false;          // first sample only seeds — no movement
+            return false;
         }
 
         delta = position - _lastMouse;
         _lastMouse = position;
+
+        if (!(delta.LengthSquared() > MaxDelta * MaxDelta)) return true;
         
-        if (delta.LengthSquared() > MaxDelta * MaxDelta)
-        {
-            delta = Vector2.Zero;
-            return false;
-        }
-        
-        return true;
+        delta = Vector2.Zero;
+        return false;
     }
 
-    public void Reset() => BeginDrag(); // used on camera switch
+    public void Reset() => BeginDrag();
 }

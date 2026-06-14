@@ -18,8 +18,7 @@ public class InputSystem : IDisposable
 
     private IKeyboard _keyboard = null!;
     public IInputContext InputContext { get; private set; } = null!;
-    
-    private bool _pan;
+
     private Vector2 _mousePos;
 
     private readonly Dictionary<Camera, CameraController> _controllers = new();
@@ -48,7 +47,6 @@ public class InputSystem : IDisposable
 
             mouse.MouseMove += OnMouseMove;
             mouse.MouseDown += OnMouseDown;
-            mouse.MouseUp   += OnMouseUp;
             mouse.Scroll    += OnMouseWheel;
         }
     }
@@ -62,35 +60,18 @@ public class InputSystem : IDisposable
     private void OnMouseMove(IMouse mouse, Vector2 position)
     {
         _mousePos = position;
+        if (_config.Input.Mode != ViewMode.Fly) return;
 
-        if (_config.Input.Mode != ViewMode.Fly) return; // Edit-mode camera nav comes in Stage 2
-
-        var controller = GetController(_scene.GetActiveCamera());
-        if (_pan) controller.Pan(position);
-        else      controller.Look(position);
+        GetController(_scene.GetActiveCamera()).Look(position);
     }
 
     private void OnMouseDown(IMouse mouse, MouseButton button)
     {
-        switch (_config.Input.Mode)
+        if (_config.Input.Mode == ViewMode.Edit
+            && button == MouseButton.Left
+            && !_renderingSystem.ImGuiWantsMouse)
         {
-            case ViewMode.Fly when button == MouseButton.Middle:
-                _pan = true;
-                GetController(_scene.GetActiveCamera()).BeginDrag();
-                break;
-
-            case ViewMode.Edit when button == MouseButton.Left && !_renderingSystem.ImGuiWantsMouse:
-                PickAtCursor();
-                break;
-        }
-    }
-
-    private void OnMouseUp(IMouse mouse, MouseButton button)
-    {
-        if (button == MouseButton.Middle && _pan)
-        {
-            _pan = false;
-            GetController(_scene.GetActiveCamera()).BeginDrag();
+            PickAtCursor();
         }
     }
 
@@ -116,7 +97,7 @@ public class InputSystem : IDisposable
         switch (key)
         {
             case Key.M:  _renderingSystem.ToggleStatsOverlay();          break;
-            case Key.C:  _scene.CycleCamera(); ResetActiveController();  break; // moved off Tab
+            case Key.C:  _scene.CycleCamera(); ResetActiveController();  break;
 
             case Key.F1: _config.Debug.ToggleShowDebugView();     break;
             case Key.F2: _config.Debug.ToggleShowBoundingBoxes(); break;
@@ -130,10 +111,9 @@ public class InputSystem : IDisposable
     private void ToggleMode()
     {
         _config.Input.ToggleMode();
-        _pan = false;
-        
+
         SetCursor(_config.Input.Mode == ViewMode.Fly ? CursorMode.Raw : CursorMode.Normal);
-        
+
         if (_config.Input.Mode == ViewMode.Fly) ResetActiveController();
     }
 
@@ -163,7 +143,6 @@ public class InputSystem : IDisposable
         {
             mouse.MouseMove -= OnMouseMove;
             mouse.MouseDown -= OnMouseDown;
-            mouse.MouseUp   -= OnMouseUp;
             mouse.Scroll    -= OnMouseWheel;
         }
         InputContext.Dispose();
