@@ -34,7 +34,7 @@ public class SceneLoader
 
         LoadEntities(def);
         LoadCameras(def);
-        LoadSkybox(def);
+        LoadSkyboxes(def);
     }
 
     private void LoadEntities(SceneDefinition def)
@@ -157,13 +157,16 @@ public class SceneLoader
         };
     }
     
-    private void LoadSkybox(SceneDefinition def)
+    private void LoadSkyboxes(SceneDefinition def)
     {
         foreach (var s in def.Skyboxes)
-        {
-            if (s is { Cubemap.Length: > 0 } sky)
-                _scene.Skybox = _resourceSystem.Cubemaps.Get(sky.Cubemap);
-        }
+            if (s.Cubemap.Length > 0)
+                _scene.AddSkybox(s.Name, _resourceSystem.CubeMaps.Get(s.Cubemap));
+
+        // honor an `active` flag like cameras do; otherwise the first stays active
+        var active = def.Skyboxes.FirstOrDefault(s => s.Active);
+        if (active is { Name.Length: > 0 })
+            _scene.SetSkybox(active.Name);
     }
     
     private static Vector3 ParseUp(string axis)

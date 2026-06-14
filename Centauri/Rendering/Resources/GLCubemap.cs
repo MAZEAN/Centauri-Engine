@@ -8,13 +8,10 @@ using SixLabors.ImageSharp.Processing;
 public class GLCubemap : IDisposable
 {
     private readonly GL _gl;
-    public uint Handle { get; }
-
-    private static readonly string[] FaceOrder  = ["right", "left", "top", "bottom", "front", "back"];
-    private static readonly string[] Extensions = [".png", ".jpg", ".jpeg", ".bmp", ".tga"];
+    private uint Handle { get; }
 
     // 6 face images in GL order: +X, -X, +Y, -Y, +Z, -Z
-    public GLCubemap(GL gl, IReadOnlyList<Image<Rgba32>> faces)
+    private GLCubemap(GL gl, IReadOnlyList<Image<Rgba32>> faces)
     {
         if (faces.Count != 6)
             throw new ArgumentException("A cubemap needs exactly 6 faces.", nameof(faces));
@@ -66,7 +63,11 @@ public class GLCubemap : IDisposable
         //  -X  +Z  +X  -Z
         //        -Y
         // (col,row) per face in GL order +X,-X,+Y,-Y,+Z,-Z
-        (int cx, int cy)[] cells = [ (2, 1), (0, 1), (1, 0), (1, 2), (1, 1), (3, 1) ];
+        (int cx, int cy)[] cells = [ 
+            (2, 1), (0, 1),
+            (1, 0), (1, 2),
+            (1, 1), (3, 1) 
+        ];
 
         var faces = new Image<Rgba32>[6];
         for (var i = 0; i < 6; i++)
@@ -75,8 +76,14 @@ public class GLCubemap : IDisposable
             faces[i] = img.Clone(c => c.Crop(new Rectangle(cx * f, cy * f, f, f)));
         }
 
-        try     { return new GLCubemap(gl, faces); }
-        finally { foreach (var im in faces) im.Dispose(); }
+        try
+        {
+            return new GLCubemap(gl, faces);
+        }
+        finally
+        {
+            foreach (var im in faces) im.Dispose();
+        }
     }
 
     public void Bind(TextureUnit unit)

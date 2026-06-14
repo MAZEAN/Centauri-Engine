@@ -114,9 +114,6 @@
     }
   ],
   "skybox": [
-    {
-      "name": "Skybox",
-      "cubemap": "Assets/Textures/Skybox/Skybox.png"
-    }
+    { "name": "Day",   "cubemap": "Assets/Textures/Skybox/Skybox.png", "active": true }
   ]
 }

@@ -15,7 +15,10 @@ public class Scene
     public int Revision { get; private set; }
     
     public LightingSystem Lighting { get; } = new();
-    public GLCubemap? Skybox { get; set; }
+    
+    private readonly Dictionary<string, GLCubemap> _skyboxes = new();
+    public IReadOnlyDictionary<string, GLCubemap> Skyboxes => _skyboxes;
+    public GLCubemap? Skybox { get; private set; }
     
     private readonly List<Camera> _cameras = new();
     public IReadOnlyList<Camera> Cameras => _cameras;
@@ -105,7 +108,7 @@ public class Scene
     public Entity? Pick(Ray ray)
     {
         Entity? hit = null;
-        float best = float.MaxValue;
+        var best = float.MaxValue;
 
         foreach (var e in _entities)
         {
@@ -117,6 +120,19 @@ public class Scene
         }
 
         return hit;
+    }
+    
+    public void AddSkybox(string name, GLCubemap cubemap)
+    {
+        _skyboxes[name] = cubemap;
+        Skybox ??= cubemap;                          // first added becomes active
+    }
+
+    public void SetSkybox(string name)
+    {
+        if (!_skyboxes.TryGetValue(name, out var sky))
+            throw new Exception($"Skybox '{name}' not found.");
+        Skybox = sky;
     }
     
     public void Dispose()

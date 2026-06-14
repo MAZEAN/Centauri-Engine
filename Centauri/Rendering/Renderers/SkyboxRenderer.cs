@@ -34,9 +34,7 @@ public class SkyboxRenderer : IDisposable
         var view = camera.GetViewMatrix();
         view.Translation = Vector3.Zero;        // rotation only — sky doesn't translate
 
-        _gl.DepthFunc(GLEnum.Lequal);
-        _gl.DepthMask(false);
-        _gl.Disable(EnableCap.CullFace);
+        SetSkyboxRenderState();
 
         _shader.Use();
         _shader.SetUniform("uView",       view);
@@ -51,9 +49,7 @@ public class SkyboxRenderer : IDisposable
                 DrawElementsType.UnsignedInt, (void*)0);
         }
 
-        _gl.Enable(EnableCap.CullFace);
-        _gl.DepthMask(true);
-        _gl.DepthFunc(DepthFunction.Less);
+        ResetSkyboxRenderState();
     }
 
     private static (float[] vertices, uint[] indices) BuildCube()
@@ -79,6 +75,20 @@ public class SkyboxRenderer : IDisposable
         ];
 
         return (vertices, indices);
+    }
+
+    private void SetSkyboxRenderState()
+    {
+        _gl.DepthFunc(GLEnum.Lequal);
+        _gl.DepthMask(false);
+        _gl.Disable(EnableCap.CullFace);
+    }
+
+    private void ResetSkyboxRenderState()
+    {
+        _gl.Enable(EnableCap.CullFace);
+        _gl.DepthMask(true);
+        _gl.DepthFunc(DepthFunction.Less);
     }
 
     public void Dispose()

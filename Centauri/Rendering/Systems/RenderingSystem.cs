@@ -35,18 +35,19 @@ public class RenderingSystem : IDisposable
     {
         _gl            = gl;
         _config        = config;
-        _mainRenderer  = new MainRenderer(gl, config);
-        _gridRenderer  = new GridRenderer(gl);
-        _debugRenderer = new DebugRenderer(gl, config);
+        
+        _mainRenderer   = new MainRenderer(gl, config);
+        _gridRenderer   = new GridRenderer(gl);
+        _debugRenderer  = new DebugRenderer(gl, config);
         _skyboxRenderer = new SkyboxRenderer(gl);
     }
 
     // called after GL and input are both ready
     public void InitializeImGui(IWindow window, IInputContext input)
     {
-        _imGui = new ImGuiManager(_gl, _config.ImGui, window, input);
+        _imGui         = new ImGuiManager(_gl, _config.ImGui, window, input);
         _statsOverlay  = new StatsOverlay(_imGui.Font, _config);
-        _inspector    = new InspectorPanel(_imGui.Font);
+        _inspector     = new InspectorPanel(_imGui.Font);
     }
 
     public void ToggleStatsOverlay() => _config.Debug.ToggleShowStatsOverlay();
@@ -60,7 +61,7 @@ public class RenderingSystem : IDisposable
     public void Render(Scene scene, double deltaTime)
     {
         if (_config.Debug.ShowSkybox)
-            _skyboxRenderer?.Render(scene);
+            _skyboxRenderer.Render(scene);
         
         if (_config.Debug.ShowGrid)
             _gridRenderer.Render(scene);

@@ -14,7 +14,7 @@ public class ResourceSystem : IDisposable
     public AssetCache<GLTexture> Textures { get; }
     public AssetCache<GLShader> Shaders { get; }
     public AssetCache<Model> Models { get; }
-    public AssetCache<GLCubemap> Cubemaps { get; }
+    public AssetCache<GLCubemap> CubeMaps { get; }
     public GLTexture DefaultTexture { get; private set; }
 
     public ResourceSystem(GL gl, AppConfig config)
@@ -33,7 +33,7 @@ public class ResourceSystem : IDisposable
         Models = new AssetCache<Model>(
             path => new Model(gl, PathResolver.Resolve(path)));
         
-        Cubemaps = new AssetCache<GLCubemap>(
+        CubeMaps = new AssetCache<GLCubemap>(
             folder => GLCubemap.FromCross(gl, PathResolver.Resolve(folder)));
 
         DefaultTexture = CreateDefaultTexture(gl);
@@ -53,7 +53,7 @@ public class ResourceSystem : IDisposable
         Textures.Dispose();
         Shaders.Dispose();
         Models.Dispose();
-        Cubemaps.Dispose();
+        CubeMaps.Dispose();
         DefaultTexture.Dispose();
 
         Console.WriteLine("[ResourceSystem] Disposed all resources");

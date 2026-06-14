@@ -72,5 +72,6 @@ public class CameraDefinition
 public class SkyboxDefinition
 {
     [JsonPropertyName("name")]     public string  Name     { get; set; } = "Skybox";
-    [JsonPropertyName("cubemap")] public string Cubemap { get; set; } = "";
+    [JsonPropertyName("cubemap")]  public string Cubemap { get; set; } = "";
+    [JsonPropertyName("active")]   public bool Active { get; set; }
 }
