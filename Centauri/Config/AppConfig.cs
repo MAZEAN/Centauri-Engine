@@ -57,12 +57,13 @@ public class ImGuiConfig
 public class DebugConfig
 {
     [JsonPropertyName("enableCulling")]     public bool EnableCulling     { get; set; } = true;
-    [JsonPropertyName("showDebugView")]     public bool ShowDebugView     { get; set; }
-    [JsonPropertyName("showBoundingBoxes")] public bool ShowBoundingBoxes { get; set; }
-    [JsonPropertyName("showFrustums")]      public bool ShowFrustums      { get; set; }
-    [JsonPropertyName("showCameras")]       public bool ShowCameras       { get; set; }
-    [JsonPropertyName("showGrid")]          public bool ShowGrid          { get; set; }
+    [JsonPropertyName("showDebugView")]     public bool ShowDebugView     { get; set; } = false;
+    [JsonPropertyName("showBoundingBoxes")] public bool ShowBoundingBoxes { get; set; } = false;
+    [JsonPropertyName("showFrustums")]      public bool ShowFrustums      { get; set; } = false;
+    [JsonPropertyName("showCameras")]       public bool ShowCameras       { get; set; } = false;
+    [JsonPropertyName("showGrid")]          public bool ShowGrid          { get; set; } = false;
     [JsonPropertyName("showStatsOverlay")]  public bool ShowStatsOverlay  { get; set; } = true;
+    [JsonPropertyName("showSkybox")]        public bool ShowSkybox        { get; set; } = true;
 
     public void ToggleShowDebugView()
     {
@@ -76,7 +77,8 @@ public class DebugConfig
     public void ToggleShowFrustums()      => ShowFrustums      = !ShowFrustums;
     public void ToggleShowCameras()       => ShowCameras       = !ShowCameras;
     public void ToggleShowGrid()          => ShowGrid          = !ShowGrid;
-    public void ToggleShowStatsOverlay() => ShowStatsOverlay = !ShowStatsOverlay;
+    public void ToggleShowStatsOverlay()  => ShowStatsOverlay = !ShowStatsOverlay;
+    public void ToggleShowSkybox()        => ShowSkybox = !ShowSkybox;
 }
 
 public enum ViewMode { Fly, Edit }

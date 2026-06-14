@@ -15,6 +15,7 @@ public class Scene
     public int Revision { get; private set; }
     
     public LightingSystem Lighting { get; } = new();
+    public GLCubemap? Skybox { get; set; }
     
     private readonly List<Camera> _cameras = new();
     public IReadOnlyList<Camera> Cameras => _cameras;
@@ -109,12 +110,10 @@ public class Scene
         foreach (var e in _entities)
         {
             if (!e.Enabled || e.Model is null) continue; // only renderable entities are pickable
-
-            if (e.GetWorldBounds().Intersects(ray, out var t) && t >= 0f && t < best)
-            {
-                best = t;
-                hit  = e;
-            }
+            if (!e.GetWorldBounds().Intersects(ray, out var t) || !(t >= 0f) || !(t < best)) continue;
+            
+            best = t;
+            hit  = e;
         }
 
         return hit;

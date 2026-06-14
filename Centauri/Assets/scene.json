@@ -112,5 +112,10 @@
       "active": false,
       "primary": false
     }
+  ],
+  "skybox": [
+    { 
+      "cubemap": "Assets/Textures/Skybox"
+    }
   ]
 }

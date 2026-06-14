@@ -10,15 +10,17 @@ using Geometry;
 
 public class ResourceSystem : IDisposable
 {
+    private readonly AppConfig _config;
     public AssetCache<GLTexture> Textures { get; }
     public AssetCache<GLShader> Shaders { get; }
     public AssetCache<Model> Models { get; }
+    public AssetCache<GLCubemap> Cubemaps { get; }
     public GLTexture DefaultTexture { get; private set; }
-    
-    private readonly string _defaultShaderPath;
 
     public ResourceSystem(GL gl, AppConfig config)
     {
+        _config = config;
+        
         Textures = new AssetCache<GLTexture>(
             path => new GLTexture(gl, PathResolver.Resolve(path))
         );
@@ -30,10 +32,10 @@ public class ResourceSystem : IDisposable
 
         Models = new AssetCache<Model>(
             path => new Model(gl, PathResolver.Resolve(path)));
-
-        DefaultTexture = CreateDefaultTexture(gl);
         
-        _defaultShaderPath = config.Render.DefaultShader;
+        Cubemaps = new AssetCache<GLCubemap>(
+            folder => GLCubemap.FromFolder(gl, PathResolver.Resolve(folder)));
+
         DefaultTexture = CreateDefaultTexture(gl);
     }
     
@@ -44,13 +46,14 @@ public class ResourceSystem : IDisposable
     }
     
     public Material CreateDefaultMaterial()
-        => new(Shaders.Get(_defaultShaderPath)) { AO = DefaultTexture };
+        => new(Shaders.Get(_config.Render.DefaultShader)) { AO = DefaultTexture };
 
     public void Dispose()
     {
         Textures.Dispose();
         Shaders.Dispose();
         Models.Dispose();
+        Cubemaps.Dispose();
         DefaultTexture.Dispose();
 
         Console.WriteLine("[ResourceSystem] Disposed all resources");

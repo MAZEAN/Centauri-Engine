@@ -4,11 +4,9 @@ using System.Text.Json.Serialization;
 
 public class SceneDefinition
 {
-    [JsonPropertyName("entities")]
-    public List<EntityDefinition> Entities { get; set; } = [];
-
-    [JsonPropertyName("cameras")]
-    public List<CameraDefinition> Cameras { get; set; } = [];
+    [JsonPropertyName("entities")] public List<EntityDefinition> Entities { get; set; } = [];
+    [JsonPropertyName("cameras")]  public List<CameraDefinition> Cameras { get; set; } = [];
+    [JsonPropertyName("skybox")]   public SkyboxDefinition?      Skybox   { get; set; }
 }
 
 public class EntityDefinition
@@ -71,4 +69,9 @@ public class CameraDefinition
     [JsonPropertyName("pitch")]    public float   Pitch    { get; set; }
     [JsonPropertyName("active")]   public bool Active { get; set; }
     [JsonPropertyName("primary")]  public bool Primary { get; set; }
+}
+
+public class SkyboxDefinition
+{
+    [JsonPropertyName("cubemap")] public string Cubemap { get; set; } = "";
 }

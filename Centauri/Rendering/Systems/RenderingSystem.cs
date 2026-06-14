@@ -17,6 +17,7 @@ public class RenderingSystem : IDisposable
     private readonly MainRenderer  _mainRenderer;
     private readonly GridRenderer  _gridRenderer;
     private readonly DebugRenderer _debugRenderer;
+    private readonly SkyboxRenderer _skyboxRenderer;
 
     private StatsOverlay _statsOverlay = null!;
     private ImGuiManager? _imGui;
@@ -34,9 +35,10 @@ public class RenderingSystem : IDisposable
     {
         _gl            = gl;
         _config        = config;
-        _mainRenderer      = new MainRenderer(gl, config);
+        _mainRenderer  = new MainRenderer(gl, config);
         _gridRenderer  = new GridRenderer(gl);
         _debugRenderer = new DebugRenderer(gl, config);
+        _skyboxRenderer = new SkyboxRenderer(gl);
     }
 
     // called after GL and input are both ready
@@ -57,6 +59,9 @@ public class RenderingSystem : IDisposable
 
     public void Render(Scene scene, double deltaTime)
     {
+        if (_config.Debug.ShowSkybox)
+            _skyboxRenderer?.Render(scene);
+        
         if (_config.Debug.ShowGrid)
             _gridRenderer.Render(scene);
         
@@ -107,5 +112,6 @@ public class RenderingSystem : IDisposable
         _gridRenderer.Dispose();
         _mainRenderer.Dispose();
         _debugRenderer.Dispose();
+        _skyboxRenderer.Dispose();
     }
 }

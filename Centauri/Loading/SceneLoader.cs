@@ -34,6 +34,7 @@ public class SceneLoader
 
         LoadEntities(def);
         LoadCameras(def);
+        LoadSkybox(def);
     }
 
     private void LoadEntities(SceneDefinition def)
@@ -154,6 +155,12 @@ public class SceneLoader
             MetallicValue  = def.MetallicValue,
             Color          = new Vector4(def.Color[0],   def.Color[1],   def.Color[2],   def.Color[3])
         };
+    }
+    
+    private void LoadSkybox(SceneDefinition def)
+    {
+        if (def.Skybox is { Cubemap.Length: > 0 } sky)
+            _scene.Skybox = _resourceSystem.Cubemaps.Get(sky.Cubemap);
     }
     
     private static Vector3 ParseUp(string axis)
