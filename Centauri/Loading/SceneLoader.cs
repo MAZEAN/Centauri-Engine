@@ -56,6 +56,8 @@ public class SceneLoader
 
             var entity = new Entity(model, material, light);
 
+            entity.Name = e.Name;
+
             entity.Transform.Position = new Vector3(e.Position[0], e.Position[1], e.Position[2]);
             entity.Transform.Scale    = new Vector3(e.Scale[0],    e.Scale[1],    e.Scale[2]);
             
@@ -66,6 +68,12 @@ public class SceneLoader
 
             if (e.Rotation is { Length: 3 })
                 entity.Transform.SetEulerAngles(e.Rotation[0], e.Rotation[1], e.Rotation[2]);
+            
+            entity.Authored = new TransformSnapshot(
+                entity.Transform.Position,
+                entity.Transform.EulerAngles,
+                entity.Transform.Scale
+            );
 
             _scene.AddEntity(entity);
         }

@@ -14,19 +14,17 @@ internal static class GUI
     public static readonly Vector4 Red     = new(1.00f, 0.35f, 0.35f, 1f);
     public static readonly Vector4 Purple  = new(0.70f, 0.50f, 1.00f, 1f);
     public static readonly Vector4 White   = Vector4.One;
-
-    public static Vector4 Bool(bool value) => value ? Green : Red;
-
-    // ── section header (identical across panels) ────────────────────────────────
-    public static void SectionTitle(string title, Vector4 accent)
-    {
-        ImGui.PushStyleColor(ImGuiCol.Text, accent);
-        ImGui.TextUnformatted(title);
-        ImGui.PopStyleColor();
-        ImGui.Separator();
-    }
     
-        // ── Blender-style property panels & rows ────────────────────────────────────
+    public const ImGuiWindowFlags PanelBase = ImGuiWindowFlags.NoMove          |
+                                              ImGuiWindowFlags.NoCollapse      |
+                                              ImGuiWindowFlags.NoSavedSettings |
+                                              ImGuiWindowFlags.AlwaysAutoResize;
+    
+    private const ImGuiColorEditFlags SwatchFlags = ImGuiColorEditFlags.NoInputs;
+    
+    public static Vector4 Bool(bool value) => value ? Green : Red;
+    
+    // ── Blender-style property panels & rows ────────────────────────────────────
     // A panel is a full-width collapsing header (with disclosure triangle); its
     // body is indented, and each control sits on its own row with a right-aligned
     // label in a fixed left column and the field filling the remainder.
@@ -72,52 +70,56 @@ internal static class GUI
         ImGui.SetCursorPosX(startX + labelW);
         ImGui.SetNextItemWidth(MathF.Max(1f, avail - labelW));
     }
-    
-    // Read-only "label : value" row (for HUD/stat panels).
-    public static void TextRow(string label, string value) => TextRow(label, value, Vector4.Zero);
 
-    public static void TextRow(string label, string value, Vector4 color)
+    // Three axis rows. `reset` is the per-axis default (right-click to apply);
+    // `active` is true while any axis is being dragged/typed.
+    public static bool Vec3Rows(string label, ref Vector3 v, float speed, string fmt, Vector3 reset, out bool active)
     {
-        RowLabel(label);                       // right-aligned label, advances to value column
-        ImGui.AlignTextToFramePadding();
-        bool tinted = color.W > 0f;
-        if (tinted) ImGui.PushStyleColor(ImGuiCol.Text, color);
-        ImGui.TextUnformatted(value);
-        if (tinted) ImGui.PopStyleColor();
-    }
-
-    // Three stacked axis rows (Blender shows the property name only on the first).
-    public static bool Vec3Rows(string label, ref Vector3 v, float speed, string fmt)
-    {
+        active = false;
         var changed = false;
-        changed |= AxisRow($"{label} X", "##" + label + "X", ref v.X, speed, fmt);
-        changed |= AxisRow("Y",          "##" + label + "Y", ref v.Y, speed, fmt);
-        changed |= AxisRow("Z",          "##" + label + "Z", ref v.Z, speed, fmt);
+        
+        changed |= AxisRow($"{label} X", "##" + label + "X", ref v.X, speed, fmt, reset.X, ref active);
+        changed |= AxisRow("Y",          "##" + label + "Y", ref v.Y, speed, fmt, reset.Y, ref active);
+        changed |= AxisRow("Z",          "##" + label + "Z", ref v.Z, speed, fmt, reset.Z, ref active);
         return changed;
     }
 
-    public static void Vec3Rows(string label, Vector3 v, Action<Vector3> set, float speed, string fmt)
+    // Write-back-via-setter convenience (for vectors where stale-caching isn't a concern).
+    public static void Vec3Rows(string label, Vector3 v, Action<Vector3> set, float speed, string fmt, Vector3 reset)
     {
-        if (Vec3Rows(label, ref v, speed, fmt)) set(v);
+        if (Vec3Rows(label, ref v, speed, fmt, reset, out _)) set(v);
     }
 
-    private static bool AxisRow(string label, string id, ref float v, float speed, string fmt)
+    private static bool AxisRow(string label, string id, ref float v, float speed, string fmt, float reset, ref bool active)
     {
         RowLabel(label);
-        return ImGui.DragFloat(id, ref v, speed, 0f, 0f, fmt);
+        var changed = ImGui.DragFloat(id, ref v, speed, 0f, 0f, fmt);
+        
+        active |= ImGui.IsItemActive();
+        changed |= ResetMenu(id, ref v, reset);
+        return changed;
     }
 
-    public static void DragRow(string label, float v, Action<float> set,
-                               float speed, float min, float max, string fmt = "%.3f")
+    public static void DragRow(string label, float v, Action<float> set, float speed, float min, float max, string fmt = "%.3f", float? reset = null)
     {
         RowLabel(label);
-        if (ImGui.DragFloat("##" + label, ref v, speed, min, max, fmt)) set(v);
+        
+        var id = "##" + label;
+        var changed = ImGui.DragFloat(id, ref v, speed, min, max, fmt);
+        
+        if (reset is { } r) changed |= ResetMenu(id, ref v, r);
+        if (changed) set(v);
     }
 
-    public static void SliderRow(string label, float v, Action<float> set, float min, float max)
+    public static void SliderRow(string label, float v, Action<float> set, float min, float max, float? reset = null)
     {
         RowLabel(label);
-        if (ImGui.SliderFloat("##" + label, ref v, min, max, "%.3f")) set(v);
+        
+        var id = "##" + label;
+        var changed = ImGui.SliderFloat(id, ref v, min, max, "%.3f");
+        
+        if (reset is { } r) changed |= ResetMenu(id, ref v, r);
+        if (changed) set(v);
     }
 
     public static void ColorRow4(string label, Vector4 v, Action<Vector4> set)
@@ -143,8 +145,15 @@ internal static class GUI
         RowLabel(label);
         return ImGui.Combo("##" + label, ref index, items, items.Length);
     }
-
-    private const ImGuiColorEditFlags SwatchFlags = ImGuiColorEditFlags.NoInputs;
+    
+    private static bool ResetMenu(string id, ref float v, float reset)
+    {
+        if (!ImGui.BeginPopupContextItem(id)) return false;
+        bool hit = ImGui.MenuItem("Reset");
+        if (hit) v = reset;
+        ImGui.EndPopup();
+        return hit;
+    }
 
     // ── formatting ──────────────────────────────────────────────────────────────
     public static string Vec3(Vector3 v) => string.Format(

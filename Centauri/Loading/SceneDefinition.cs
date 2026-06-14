@@ -13,7 +13,7 @@ public class SceneDefinition
 
 public class EntityDefinition
 {
-    [JsonPropertyName("name")]     public string  Name     { get; set; } = "";
+    [JsonPropertyName("name")]     public string  Name     { get; set; } = "Entity";
     [JsonPropertyName("model")]    public string? Model    { get; set; }   // optional
     [JsonPropertyName("material")] public string? Material { get; set; }   // optional
     [JsonPropertyName("position")] public float[] Position { get; set; } = [0f, 0f, 0f];

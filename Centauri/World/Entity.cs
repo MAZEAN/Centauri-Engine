@@ -6,8 +6,11 @@ using Rendering.Resources;
 using Utils.Geometry;
 using Rendering.Geometry;
 
+public readonly record struct TransformSnapshot(Vector3 Position, Vector3 Euler, Vector3 Scale);
+
 public class Entity : IDisposable
 {
+    public string    Name    { get; set; }
     public Model?    Model    { get; }   // optional now — a pure light has no mesh
     public Material? Material { get; }
     public Light?    Light    { get; set; }
@@ -20,6 +23,7 @@ public class Entity : IDisposable
     public Vector2 UvOffset { get; set; } = Vector2.Zero;
 
     public bool Enabled { get; set; } = true;
+    public TransformSnapshot? Authored { get; set; }
 
     public Transform Transform
     {

@@ -12,11 +12,9 @@ public class StatsOverlay
     private const int   Width   = 350;
     private const float Padding = 10f;
     private const float BgAlpha = 0.85f;
+    private const float LabelWidth = 120f;
     
-    private const ImGuiWindowFlags Flags = ImGuiWindowFlags.NoMove                |
-                                           ImGuiWindowFlags.NoSavedSettings       |
-                                           ImGuiWindowFlags.NoBringToFrontOnFocus |
-                                           ImGuiWindowFlags.AlwaysAutoResize;
+    private const ImGuiWindowFlags Flags = GUI.PanelBase | ImGuiWindowFlags.NoBringToFrontOnFocus; 
 
     private readonly ImFontPtr _font;
     private readonly AppConfig _config;
@@ -113,11 +111,27 @@ public class StatsOverlay
     }
 
     private static void Row(string label, string value) =>
-        GUI.TextRow(label, value);
+        StatRow(label, value, default);
 
     private static void RowColored(string label, string value, Vector4 color) =>
-        GUI.TextRow(label, value, color);
+        StatRow(label, value, color);
 
     private static void ConfigRow(string label, bool value) =>
-        GUI.TextRow(label, value.ToString(), GUI.Bool(value));
+        StatRow(label, value.ToString(), GUI.Bool(value));
+
+    // Left-aligned label in a fixed column, value follows on the same line.
+    private static void StatRow(string label, string value, Vector4 color)
+    {
+        var startX = ImGui.GetCursorPosX();
+        
+        ImGui.TextUnformatted(label);
+        ImGui.SameLine();
+        ImGui.SetCursorPosX(startX + LabelWidth);
+
+        var tinted = color.W > 0f;
+        if (tinted) ImGui.PushStyleColor(ImGuiCol.Text, color);
+        
+        ImGui.TextUnformatted(value);
+        if (tinted) ImGui.PopStyleColor();
+    }
 }
