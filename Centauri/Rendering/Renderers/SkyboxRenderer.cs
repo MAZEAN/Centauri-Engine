@@ -27,9 +27,9 @@ public class SkyboxRenderer : IDisposable
 
     public void Render(Scene scene)
     {
-        if (scene.Skybox is not { } cubemap) return;   // scene has no skybox — nothing to draw
+        if (scene.Skyboxes.Active is not { } cubemap) return;   // scene has no skybox — nothing to draw
 
-        var camera = scene.GetActiveCamera();
+        var camera = scene.Cameras.Active;
 
         var view = camera.GetViewMatrix();
         view.Translation = Vector3.Zero;        // rotation only — sky doesn't translate

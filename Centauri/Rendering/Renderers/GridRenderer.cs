@@ -40,7 +40,7 @@ public class GridRenderer : IDisposable
     {
         SetDebugRenderState();
 
-        var camera = scene.GetActiveCamera();
+        var camera = scene.Cameras.Active;
         
         _shader.Use();
         _shader.SetUniform("uView",        camera.GetViewMatrix());

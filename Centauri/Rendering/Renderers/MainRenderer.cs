@@ -38,8 +38,8 @@ public class MainRenderer : IDisposable
 
     public void Render(Scene scene, float deltaTime, ref FrameStats stats)
     {
-        var viewCamera    = scene.GetActiveCamera();
-        var cullingCamera = scene.GetPrimaryCamera();
+        var viewCamera    = scene.Cameras.Active;
+        var cullingCamera = scene.Cameras.Primary;
         
         cullingCamera.Frustum.BuildFrustumPlanes();
 

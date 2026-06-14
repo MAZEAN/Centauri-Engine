@@ -72,7 +72,7 @@ public class StatsOverlay
             Row("Total Vertices", stats.TotalVertices.ToString());
         });
         
-        var cam = scene.GetActiveCamera();
+        var cam = scene.Cameras.Active;
         Section("Camera",GUI.Red, () =>
         {
             RowColored("Active", cam.Name,GUI.Amber);

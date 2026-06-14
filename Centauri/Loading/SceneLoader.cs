@@ -123,16 +123,16 @@ public class SceneLoader
                 c.Pitch
             );
 
-            _scene.AddCamera(camera);
+            _scene.Cameras.Add(camera);
         }
 
         // active (view) camera — honor the scene's `active` flag, fall back to the first
         var active = def.Cameras.FirstOrDefault(c => c.Active) ?? def.Cameras[0];
-        _scene.SetActiveCamera(active.Name);
+        _scene.Cameras.SetActive(active.Name);
 
         // primary (culling) camera — honor `primary`, fall back to the active camera
         var primary = def.Cameras.FirstOrDefault(c => c.Primary) ?? active;
-        _scene.SetPrimaryCamera(primary.Name);
+        _scene.Cameras.SetPrimary(primary.Name);
     }
 
     private Material LoadMaterialFile(string path)
@@ -161,12 +161,12 @@ public class SceneLoader
     {
         foreach (var s in def.Skyboxes)
             if (s.Cubemap.Length > 0)
-                _scene.AddSkybox(s.Name, _resourceSystem.CubeMaps.Get(s.Cubemap));
+                _scene.Skyboxes.Add(s.Name, _resourceSystem.CubeMaps.Get(s.Cubemap));
 
         // honor an `active` flag like cameras do; otherwise the first stays active
         var active = def.Skyboxes.FirstOrDefault(s => s.Active);
         if (active is { Name.Length: > 0 })
-            _scene.SetSkybox(active.Name);
+            _scene.Skyboxes.SetActive(active.Name);
     }
     
     private static Vector3 ParseUp(string axis)

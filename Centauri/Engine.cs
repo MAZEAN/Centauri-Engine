@@ -60,7 +60,7 @@ public class Engine : IWindowCallbacks
         _sceneLoader = new SceneLoader(_resourceSystem, _scene, _config);
         _sceneLoader.Load();
 
-        _scene.InitializeCameras(_window);
+        _scene.Cameras.InitializeAspect(_window);
     }
 
     private void InitializeInput()

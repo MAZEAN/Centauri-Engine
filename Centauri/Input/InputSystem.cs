@@ -54,7 +54,7 @@ public class InputSystem : IDisposable
     public void Update(float deltaTime)
     {
         if (_config.Input.Mode != ViewMode.Fly) return;
-        GetController(_scene.GetActiveCamera()).UpdateMovement(_keyboard, deltaTime);
+        GetController(_scene.Cameras.Active).UpdateMovement(_keyboard, deltaTime);
     }
 
     private void OnMouseMove(IMouse mouse, Vector2 position)
@@ -62,7 +62,7 @@ public class InputSystem : IDisposable
         _mousePos = position;
         if (_config.Input.Mode != ViewMode.Fly) return;
 
-        GetController(_scene.GetActiveCamera()).Look(position);
+        GetController(_scene.Cameras.Active).Look(position);
     }
 
     private void OnMouseDown(IMouse mouse, MouseButton button)
@@ -77,12 +77,12 @@ public class InputSystem : IDisposable
 
     private void OnMouseWheel(IMouse mouse, ScrollWheel scroll)
     {
-        GetController(_scene.GetActiveCamera()).Zoom(scroll);
+        GetController(_scene.Cameras.Active).Zoom(scroll);
     }
 
     private void PickAtCursor()
     {
-        var cam = _scene.GetActiveCamera();
+        var cam = _scene.Cameras.Active;
         var ray = cam.ScreenPointToRay(_mousePos, new Vector2(_window.Size.X, _window.Size.Y));
         _scene.Select(_scene.Pick(ray));
     }
@@ -97,7 +97,7 @@ public class InputSystem : IDisposable
         switch (key)
         {
             case Key.M:  _renderingSystem.ToggleStatsOverlay();          break;
-            case Key.C:  _scene.CycleCamera(); ResetActiveController();  break;
+            case Key.C:  _scene.Cameras.Cycle(); ResetActiveController();  break;
 
             case Key.F1: _config.Debug.ToggleShowDebugView();     break;
             case Key.F2: _config.Debug.ToggleShowBoundingBoxes(); break;
@@ -134,7 +134,7 @@ public class InputSystem : IDisposable
     }
 
     private void ResetActiveController()
-        => GetController(_scene.GetActiveCamera()).BeginDrag();
+        => GetController(_scene.Cameras.Active).BeginDrag();
 
     public void Dispose()
     {

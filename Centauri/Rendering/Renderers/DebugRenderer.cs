@@ -57,7 +57,7 @@ public sealed class DebugRenderer : IDisposable
         AssertActive();
         if (!_config.Debug.ShowCameras) return;
 
-        var active = scene.GetActiveCamera();
+        var active = scene.Cameras.Active;
 
         foreach (var cam in scene.Cameras)
         {
