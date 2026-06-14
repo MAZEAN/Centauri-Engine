@@ -36,6 +36,7 @@ public class ImGuiManager : IDisposable
         });
 
         Font = font;
+        Theme.ApplyBlenderDark();
     }
 
     public void Update(float deltaTime)

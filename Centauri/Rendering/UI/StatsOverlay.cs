@@ -9,18 +9,14 @@ using Config;
 
 public class StatsOverlay
 {
+    private const int   Width   = 350;
+    private const float Padding = 10f;
+    private const float BgAlpha = 0.85f;
+    
     private const ImGuiWindowFlags Flags = ImGuiWindowFlags.NoMove                |
                                            ImGuiWindowFlags.NoSavedSettings       |
                                            ImGuiWindowFlags.NoBringToFrontOnFocus |
                                            ImGuiWindowFlags.AlwaysAutoResize;
-                                           
-
-    private const ImGuiTableFlags TableFlags = ImGuiTableFlags.SizingStretchSame |
-                                               ImGuiTableFlags.BordersInnerV;
-
-    private const int   Width   = 350;
-    private const float Padding = 10f;
-    private const float BgAlpha = 0.85f;
 
     private readonly ImFontPtr _font;
     private readonly AppConfig _config;
@@ -111,39 +107,17 @@ public class StatsOverlay
 
     private static void Section(string title, Vector4 accent, Action rows)
     {
-       GUI.SectionTitle(title, accent);
-
-        if (ImGui.BeginTable($"##{title}", 2, TableFlags))
-        {
-            ImGui.TableSetupColumn("Label", ImGuiTableColumnFlags.WidthFixed, 120f);
-            ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthStretch);
-            rows();
-            ImGui.EndTable();
-        }
-
-        ImGui.Spacing();
+        bool open = GUI.BeginPanel(title, accent);   // colored, collapsible header
+        if (open) rows();
+        GUI.EndPanel(open);
     }
 
-    private static void Row(string label, string value)
-    {
-        ImGui.TableNextRow();
-        ImGui.TableNextColumn();
-        ImGui.TextUnformatted(label);
-        ImGui.TableNextColumn();
-        ImGui.TextUnformatted(value);
-    }
+    private static void Row(string label, string value) =>
+        GUI.TextRow(label, value);
 
-    private static void RowColored(string label, string value, Vector4 color)
-    {
-        ImGui.TableNextRow();
-        ImGui.TableNextColumn();
-        ImGui.TextUnformatted(label);
-        ImGui.TableNextColumn();
-        ImGui.PushStyleColor(ImGuiCol.Text, color);
-        ImGui.TextUnformatted(value);
-        ImGui.PopStyleColor();
-    }
+    private static void RowColored(string label, string value, Vector4 color) =>
+        GUI.TextRow(label, value, color);
 
     private static void ConfigRow(string label, bool value) =>
-        RowColored(label, value.ToString(),GUI.Bool(value));
+        GUI.TextRow(label, value.ToString(), GUI.Bool(value));
 }
