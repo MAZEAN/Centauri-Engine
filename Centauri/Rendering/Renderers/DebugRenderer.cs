@@ -6,12 +6,13 @@ using System.Runtime.CompilerServices;
 
 using World;
 using Config;
+using Graphics.Geometry;
 
 public sealed class DebugRenderer : IDisposable
 {
     private readonly AppConfig _config;
     private readonly DebugDraw _draw;
-    private readonly Geometry.Mesh _cameraMesh;
+    private readonly Mesh _cameraMesh;
 
     private bool _active;
 

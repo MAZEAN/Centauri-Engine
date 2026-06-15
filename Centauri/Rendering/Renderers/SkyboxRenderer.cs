@@ -4,9 +4,9 @@ using Silk.NET.OpenGL;
 using System.Numerics;
 
 using World;
-using Resources;
+using Graphics.Resources;
 using Utils.Misc;
-using Geometry;
+using Graphics.Geometry;
 
 public class SkyboxRenderer : IDisposable
 {

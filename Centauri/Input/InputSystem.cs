@@ -7,7 +7,7 @@ using System.Numerics;
 
 using Config;
 using World;
-using Rendering.Systems;
+using Rendering;
 
 public class InputSystem : IDisposable
 {

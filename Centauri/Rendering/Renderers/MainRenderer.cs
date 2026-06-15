@@ -5,17 +5,19 @@ using System.Numerics;
 
 using Config;
 using World;
-using Resources;
+using Graphics.Resources;
+using Graphics.Geometry;
+using World.Collections;
 using Utils.Misc;
-using Geometry;
 
 public class MainRenderer : IDisposable
 {
     private readonly GL _gl;
     private readonly AppConfig _config;
     
-    private const int MaxPointLights = 16;
-    private const int MaxSpotLights  = 16;
+    private const float SpotConstant  = 1.0f;
+    private const float SpotLinear    = 0.09f;
+    private const float SpotQuadratic = 0.032f;
 
     private uint[] _boundTextures = null!;
 
@@ -49,7 +51,7 @@ public class MainRenderer : IDisposable
         ResetFrameStats(ref stats);
 
         scene.Lighting.Collect(scene.Entities);
-        _lightBuffer.Update(scene.Lighting);
+        UploadLights(scene.Lighting);
 
         foreach (var (shader, entities) in GetGroups(scene))
         {
@@ -217,6 +219,30 @@ public class MainRenderer : IDisposable
     // -----------------------------
     // Lighting
     // -----------------------------
+    
+    private void UploadLights(LightingSystem lights)
+    {
+        _lightBuffer.Begin();
+
+        if (lights.DirectionalLights.Count > 0)
+        {
+            var d = lights.DirectionalLights[0];
+            _lightBuffer.SetDirectional(d.Direction, d.Color, d.Intensity);
+        }
+
+        foreach (var p in lights.PointLights)
+            _lightBuffer.AddPoint(
+                p.Position, p.Light.Color, p.Light.Intensity,
+                p.Light.Constant, p.Light.Linear, p.Light.Quadratic);
+
+        foreach (var s in lights.SpotLights)
+            _lightBuffer.AddSpot(
+                s.Position, s.Light.Direction, s.Light.Color, s.Light.Intensity,
+                SpotConstant, SpotLinear, SpotQuadratic,
+                s.Light.InnerCutoff, s.Light.OuterCutoff);
+
+        _lightBuffer.Upload();
+    }
 
     private void InitializeTextureCache()
     {

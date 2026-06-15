@@ -1,6 +1,5 @@
 namespace Centauri.World;
 
-using Rendering.Systems;
 using Utils.Geometry;
 using Collections;
 

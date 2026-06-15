@@ -2,9 +2,9 @@ namespace Centauri.World;
 
 using System.Numerics;
 
-using Rendering.Resources;
+using Graphics.Resources;
 using Utils.Geometry;
-using Rendering.Geometry;
+using Graphics.Geometry;
 
 public readonly record struct TransformSnapshot(Vector3 Position, Vector3 Euler, Vector3 Scale);
 

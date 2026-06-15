@@ -1,4 +1,4 @@
-namespace Centauri.Rendering.UI;
+namespace Centauri.UI;
 
 using Silk.NET.OpenGL;
 using Silk.NET.OpenGL.Extensions.ImGui;

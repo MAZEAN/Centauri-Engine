@@ -1,4 +1,4 @@
-namespace Centauri.Rendering.Geometry;
+namespace Centauri.Graphics.Geometry;
 
 using Silk.NET.Assimp;
 using Silk.NET.OpenGL;

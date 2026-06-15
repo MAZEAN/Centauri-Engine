@@ -3,7 +3,7 @@ namespace Centauri.Rendering.Renderers;
 using Silk.NET.OpenGL;
 using System.Numerics;
 
-using Geometry;
+using Graphics.Geometry;
 
 // Pure geometry/data for debug visuals — no GL state, no drawing.
 internal static class DebugShapes

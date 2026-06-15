@@ -3,9 +3,9 @@ namespace Centauri.Rendering.Renderers;
 using Silk.NET.OpenGL;
 using System.Numerics;
 
-using Resources;
+using Graphics.Resources;
 using Utils.Misc;
-using Geometry;
+using Graphics.Geometry;
 
 // Immediate-mode primitive drawer for the debug pass: owns the debug shader and a
 // single growable dynamic buffer, and issues line/triangle/mesh draws. Knows nothing

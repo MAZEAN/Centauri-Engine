@@ -3,9 +3,9 @@ namespace Centauri.Rendering.Renderers;
 using Silk.NET.OpenGL;
 
 using World;
-using Resources;
+using Graphics.Resources;
 using Utils.Misc;
-using Geometry;
+using Graphics.Geometry;
 
 public class GridRenderer : IDisposable
 {

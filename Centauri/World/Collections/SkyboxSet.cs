@@ -1,6 +1,6 @@
 namespace Centauri.World.Collections;
 
-using Rendering.Resources;
+using Graphics.Resources;
 
 public sealed class SkyboxSet
 {

@@ -1,4 +1,4 @@
-namespace Centauri.Rendering.Resources;
+namespace Centauri.Graphics.Resources;
 
 using Silk.NET.OpenGL;
 using SixLabors.ImageSharp;

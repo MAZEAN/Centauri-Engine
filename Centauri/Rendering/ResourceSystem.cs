@@ -1,12 +1,12 @@
-namespace Centauri.Rendering.Systems;
+namespace Centauri.Rendering;
 
 using Silk.NET.OpenGL;
 
 using Utils.Caching;
-using Resources;
+using Graphics.Resources;
 using Config;
 using Utils.Misc;
-using Geometry;
+using Graphics.Geometry;
 
 public class ResourceSystem : IDisposable
 {

@@ -6,7 +6,7 @@ using Silk.NET.Maths;
 
 using Config;
 using World;
-using Rendering.Systems;
+using Rendering;
 using Input;
 using Loading;
 using Windowing;
@@ -67,7 +67,7 @@ public class Engine : IWindowCallbacks
     {
         _inputSystem = new InputSystem(_window, _scene, _config, _renderingSystem);
 
-        _renderingSystem.InitializeImGui(_window, _inputSystem.InputContext);
+        _renderingSystem.InitializeUI(_window, _inputSystem.InputContext);
     }
 
     private void InitializeOpenGL()

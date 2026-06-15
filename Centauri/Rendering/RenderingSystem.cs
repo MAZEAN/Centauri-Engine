@@ -1,4 +1,4 @@
-namespace Centauri.Rendering.Systems;
+namespace Centauri.Rendering;
 
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
@@ -19,17 +19,15 @@ public class RenderingSystem : IDisposable
     private readonly DebugRenderer _debugRenderer;
     private readonly SkyboxRenderer _skyboxRenderer;
 
-    private StatsOverlay _statsOverlay = null!;
-    private ImGuiManager? _imGui;
-    private InspectorPanel _inspector = null!;
+    private UISystem _ui;
 
     private FrameStats _stats;
     
     private float _fpsTimer;
     private int   _frameCount;
     
-    public bool ImGuiWantsMouse    => _imGui?.WantsMouseCapture    ?? false;
-    public bool ImGuiWantsKeyboard => _imGui?.WantsKeyboardCapture ?? false;
+    public bool ImGuiWantsMouse    => _ui.WantsMouse;
+    public bool ImGuiWantsKeyboard => _ui.WantsKeyboard;
 
     public RenderingSystem(GL gl, AppConfig config)
     {
@@ -43,18 +41,16 @@ public class RenderingSystem : IDisposable
     }
 
     // called after GL and input are both ready
-    public void InitializeImGui(IWindow window, IInputContext input)
+    public void InitializeUI(IWindow window, IInputContext input)
     {
-        _imGui         = new ImGuiManager(_gl, _config.ImGui, window, input);
-        _statsOverlay  = new StatsOverlay(_imGui.Font, _config);
-        _inspector     = new InspectorPanel(_imGui.Font);
+        _ui = new UISystem(_gl, _config, window, input);
     }
 
     public void ToggleStatsOverlay() => _config.Debug.ToggleShowStatsOverlay();
 
     public void Update(float deltaTime)
     {
-        _imGui?.Update(deltaTime);
+        _ui.Update(deltaTime);
         UpdateFPSCounter(deltaTime);
     }
 
@@ -83,13 +79,7 @@ public class RenderingSystem : IDisposable
             _debugRenderer.End();
         }
         
-        if (_config.Debug.ShowStatsOverlay)
-            _statsOverlay.Render(scene, _stats);
-        
-        if (_config.Input.Mode == ViewMode.Edit)
-            _inspector.Render(scene);
-        
-        _imGui?.Render();
+        _ui.Render(scene, in _stats);
     }
     
     private void UpdateFPSCounter(float deltaTime)
@@ -109,7 +99,7 @@ public class RenderingSystem : IDisposable
 
     public void Dispose()
     {
-        _imGui?.Dispose();
+        _ui.Dispose();
         _gridRenderer.Dispose();
         _mainRenderer.Dispose();
         _debugRenderer.Dispose();
