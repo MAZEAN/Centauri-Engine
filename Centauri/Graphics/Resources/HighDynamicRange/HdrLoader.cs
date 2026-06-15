@@ -1,6 +1,5 @@
 namespace Centauri.Graphics.Resources.HighDynamicRange;
 
-
 // Loads high-dynamic-range panoramas straight to linear float RGB, skipping
 // the lossy "convert to PNG first" step. Radiance <c>.hdr</c> is decoded
 // in-house; OpenEXR <c>.exr</c> is decoded through the pure-managed
@@ -16,6 +15,7 @@ public static class HdrLoader
     {
         if (HasExt(path, ".hdr")) return RadianceHdrDecoder.Decode(path);
         if (HasExt(path, ".exr")) return LoadExr(path);
+        
         throw new NotSupportedException($"'{path}' is not a supported HDR image.");
     }
 
@@ -23,7 +23,7 @@ public static class HdrLoader
     {
         // TinyEXR returns interleaved RGBA, top-to-bottom. We strip alpha and
         // flip vertically to land in the engine's bottom-up RGB layout.
-        var result = TinyEXR.Exr.LoadEXR(path, out float[] rgba, out int width, out int height);
+        var result = TinyEXR.Exr.LoadEXR(path, out var rgba, out var width, out var height);
         if (result != TinyEXR.ResultCode.Success)
             throw new InvalidDataException($"Failed to decode EXR '{path}': {result}.");
 

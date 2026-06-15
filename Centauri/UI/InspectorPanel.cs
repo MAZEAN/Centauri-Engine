@@ -34,6 +34,28 @@ public class InspectorPanel
 
         ImGui.PushFont(_font);
 
+        DrawInspectorElements(scene);
+        DrawSkybox(scene);
+
+        ImGui.PopFont();
+        
+        ImGui.End();
+    }
+
+    private static void SetupWindow()
+    {
+        var viewport = ImGui.GetMainViewport();
+        var anchor = new Vector2(viewport.WorkPos.X + viewport.WorkSize.X - Padding, viewport.WorkPos.Y + Padding);
+        
+        ImGui.SetNextWindowPos(anchor, ImGuiCond.Always, new Vector2(1f, 0f)); 
+        ImGui.SetNextWindowSizeConstraints(
+            new Vector2(Width, 0),
+            new Vector2(Width, float.MaxValue));
+        ImGui.SetNextWindowBgAlpha(BgAlpha);
+    }
+
+    private void DrawInspectorElements(Scene scene)
+    {
         if (scene.Selected is not { } entity)
         {
             ImGui.TextDisabled("No entity selected");
@@ -48,21 +70,6 @@ public class InspectorPanel
             DrawMaterial(entity);
             DrawLight(entity);
         }
-
-        ImGui.PopFont();
-        ImGui.End();
-    }
-
-    private static void SetupWindow()
-    {
-        var viewport = ImGui.GetMainViewport();
-        var anchor = new Vector2(viewport.WorkPos.X + viewport.WorkSize.X - Padding, viewport.WorkPos.Y + Padding);
-        
-        ImGui.SetNextWindowPos(anchor, ImGuiCond.Always, new Vector2(1f, 0f)); 
-        ImGui.SetNextWindowSizeConstraints(
-            new Vector2(Width, 0),
-            new Vector2(Width, float.MaxValue));
-        ImGui.SetNextWindowBgAlpha(BgAlpha);
     }
     
     private static void DrawHeader(Entity e)
@@ -156,6 +163,29 @@ public class InspectorPanel
                     GUI.DragRow("Quadratic", p.Quadratic, v => p.Quadratic = v, 0.001f, 0f, 1f, "%.3f", 0.032f);
                     break;
             }
+        }
+
+        ImGui.PopID();
+        GUI.EndPanel(open);
+    }
+    
+    private static void DrawSkybox(Scene scene)
+    {
+        if (scene.Skyboxes.Active is not { } sky) return;   // no skybox loaded
+
+        var open = GUI.BeginPanel("Skybox");
+        if (!open) { GUI.EndPanel(open); return; }
+
+        ImGui.PushID("Skybox");
+
+        if (sky.Texture.IsHdr)
+        {
+            GUI.DragRow("Exposure",    sky.Exposure,   v => sky.Exposure   = v, 0.01f,  0f, 16f, "%.2f", sky.AuthoredExposure);
+            GUI.DragRow("Black Level", sky.BlackLevel, v => sky.BlackLevel = v, 0.001f, 0f, 1f,  "%.3f", sky.AuthoredBlackLevel);
+        }
+        else
+        {
+            ImGui.TextDisabled("LDR skybox — no HDR controls");
         }
 
         ImGui.PopID();

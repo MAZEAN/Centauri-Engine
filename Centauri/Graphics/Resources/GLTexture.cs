@@ -95,10 +95,12 @@ public class GLTexture : IDisposable
     {
         // Horizontal axis always wraps (the 360° seam); equirect panoramas clamp
         // the vertical axis so the poles don't bleed into each other.
-        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)GLEnum.Repeat);
+        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS,
+            (int)GLEnum.Repeat);
         _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT,
             (int)(hdr ? GLEnum.ClampToEdge : GLEnum.Repeat));
-        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
+        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, 
+            (int)GLEnum.Linear);
 
         if (hdr)
         {

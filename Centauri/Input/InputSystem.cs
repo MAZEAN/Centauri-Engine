@@ -97,6 +97,7 @@ public class InputSystem : IDisposable
         {
             case Key.M:  _config.Debug.ToggleShowStatsOverlay();  break;
             case Key.C:  _scene.Cameras.Cycle(); ResetActiveController();  break;
+            case Key.B:  _scene.Skyboxes.Cycle(); break;
 
             case Key.F1: _config.Debug.ToggleShowDebugView();     break;
             case Key.F2: _config.Debug.ToggleShowBoundingBoxes(); break;
@@ -124,11 +125,10 @@ public class InputSystem : IDisposable
 
     private CameraController GetController(Camera cam)
     {
-        if (!_controllers.TryGetValue(cam, out var controller))
-        {
-            controller = new CameraController(cam, _config.Camera);
-            _controllers[cam] = controller;
-        }
+        if (_controllers.TryGetValue(cam, out var controller)) return controller;
+        
+        controller = new CameraController(cam, _config.Camera);
+        _controllers[cam] = controller;
         return controller;
     }
 

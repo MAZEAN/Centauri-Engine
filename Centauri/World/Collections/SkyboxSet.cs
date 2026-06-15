@@ -2,11 +2,21 @@ namespace Centauri.World.Collections;
 
 using Graphics.Resources;
 
-// A loaded skybox: its panorama texture plus an exposure multiplier
-// applied before tonemapping (only meaningful for HDR panoramas).
-public readonly record struct Skybox(GLTexture Texture, float Exposure, float BlackLevel);
+// A loaded skybox: its panorama texture plus the tonemapping controls applied
+// in the skybox shader. Exposure and black level are only meaningful for HDR
+// panoramas. Mutable (a class, not a record struct) so the inspector can tune
+// the live instance and the renderer picks it up the same frame.
+public class Skybox(GLTexture texture, float exposure, float blackLevel)
+{
+    public GLTexture Texture    { get; }      = texture;
+    public float     Exposure   { get; set; } = exposure;
+    public float     BlackLevel { get; set; } = blackLevel;
+    
+    public float AuthoredExposure   { get; } = exposure;
+    public float AuthoredBlackLevel { get; } = blackLevel;
+}
 
-public sealed class SkyboxSet
+public class SkyboxSet
 {
     private readonly List<Skybox> _items = new();
     private readonly Dictionary<string, Skybox> _byName = new();
