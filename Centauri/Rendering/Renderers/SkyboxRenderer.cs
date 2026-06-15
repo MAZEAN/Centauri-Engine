@@ -27,7 +27,7 @@ public class SkyboxRenderer : IDisposable
 
     public void Render(Scene scene)
     {
-        if (scene.Skyboxes.Active is not { } panorama) return;   // no skybox — nothing to draw
+        if (scene.Skyboxes.Active is not { } sky) return;   // no skybox — nothing to draw
 
         var camera = scene.Cameras.Active;
 
@@ -40,9 +40,13 @@ public class SkyboxRenderer : IDisposable
         _shader.SetUniform("uView",       view);
         _shader.SetUniform("uProjection", camera.GetProjectionMatrix());
         _shader.SetUniform("uPanorama",   0);
+        // HDR panoramas carry linear radiance and need exposure + tonemapping;
+        // LDR (sRGB PNG) skyboxes are already display-ready and pass through.
+        _shader.SetUniform("uHdr",        sky.Texture.IsHdr ? 1 : 0);
+        _shader.SetUniform("uExposure",   sky.Exposure);
 
         _gl.ActiveTexture(TextureUnit.Texture0);
-        _gl.BindTexture(TextureTarget.Texture2D, panorama.Handle);
+        _gl.BindTexture(TextureTarget.Texture2D, sky.Texture.Handle);
 
         _cube.Bind();
         unsafe
