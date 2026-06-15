@@ -5,7 +5,7 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 
-using Hdr;
+using HighDynamicRange;
 
 public class GLTexture : IDisposable
 {

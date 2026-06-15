@@ -1,4 +1,4 @@
-namespace Centauri.Graphics.Resources.Hdr;
+namespace Centauri.Graphics.Resources.HighDynamicRange;
 
 using System.Text;
 

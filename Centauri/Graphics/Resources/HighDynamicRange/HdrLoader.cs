@@ -1,4 +1,4 @@
-namespace Centauri.Graphics.Resources.Hdr;
+namespace Centauri.Graphics.Resources.HighDynamicRange;
 
 
 // Loads high-dynamic-range panoramas straight to linear float RGB, skipping
@@ -8,7 +8,7 @@ namespace Centauri.Graphics.Resources.Hdr;
 
 public static class HdrLoader
 {
-    /// <summary>True when the path carries an extension this loader handles.</summary>
+    // True when the path carries an extension this loader handles.
     public static bool IsHdrPath(string path)
         => HasExt(path, ".hdr") || HasExt(path, ".exr");
 

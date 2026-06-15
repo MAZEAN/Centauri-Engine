@@ -44,6 +44,7 @@ public class SkyboxRenderer : IDisposable
         // LDR (sRGB PNG) skyboxes are already display-ready and pass through.
         _shader.SetUniform("uHdr",        sky.Texture.IsHdr ? 1 : 0);
         _shader.SetUniform("uExposure",   sky.Exposure);
+        _shader.SetUniform("uBlackLevel", sky.BlackLevel);
 
         _gl.ActiveTexture(TextureUnit.Texture0);
         _gl.BindTexture(TextureTarget.Texture2D, sky.Texture.Handle);

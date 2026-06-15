@@ -3,15 +3,13 @@
 const vec2 invAtan = vec2(0.1591549, 0.3183099); // 1/(2π), 1/π
 
 uniform sampler2D uPanorama;
-uniform int   uHdr;        // 1 = linear HDR radiance, 0 = display-ready sRGB LDR
-uniform float uExposure;   // pre-tonemap multiplier (HDR only)
+uniform int   uHdr;         // 1 = linear HDR radiance, 0 = display-ready sRGB LDR
+uniform float uExposure;    // pre-tonemap multiplier (HDR only)
+uniform float uBlackLevel;  // crush radiance below this to black (HDR only)
 
 in  vec3 vDir;
 out vec4 FragColor;
 
-// Narkowicz 2015 ACES filmic approximation — keeps bright highlights (moon,
-// stars, sun) from clipping while preserving the deep, smooth shadow gradients
-// that 8-bit PNGs band so badly on night skies.
 vec3 ACESFilm(vec3 x)
 {
     const float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;
@@ -26,7 +24,19 @@ void main()
 
     if (uHdr == 1)
     {
-        color = ACESFilm(color * uExposure);           // tonemap linear radiance
+        // Bright sun texels overflow the RGB16F texture to +Inf; ACES then
+        // yields NaN, which clamps to black — the black square at the sun.
+        // Clamping to a finite ceiling first keeps everything well-defined.
+        color = clamp(color, vec3(0.0), vec3(65504.0));
+
+        color *= uExposure;
+
+        // Black level (à la GIMP Levels): lift the floor so faint sky-glow and
+        // the soft bilinear halos around stars crush to true black — which also
+        // makes stars read as small crisp points instead of fat blobs.
+        color = max(color - uBlackLevel, vec3(0.0));
+
+        color = ACESFilm(color);
         color = pow(color, vec3(1.0 / 2.2));           // → sRGB, matching the PBR pass
     }
 

@@ -4,7 +4,7 @@ using Graphics.Resources;
 
 // A loaded skybox: its panorama texture plus an exposure multiplier
 // applied before tonemapping (only meaningful for HDR panoramas).
-public readonly record struct Skybox(GLTexture Texture, float Exposure);
+public readonly record struct Skybox(GLTexture Texture, float Exposure, float BlackLevel);
 
 public sealed class SkyboxSet
 {
@@ -15,12 +15,12 @@ public sealed class SkyboxSet
     public IReadOnlyDictionary<string, Skybox> ByName => _byName;
     public int Count => _items.Count;
 
-    public void Add(string name, GLTexture panorama, float exposure = 1.0f)
+    public void Add(string name, GLTexture panorama, float exposure = 1.0f, float blackLevel = 0.0f)
     {
-        var sky = new Skybox(panorama, exposure);
+        var sky = new Skybox(panorama, exposure, blackLevel);
         _byName[name] = sky;
         _items.Add(sky);
-        Active ??= sky;                               // first added becomes active
+        Active ??= sky;
     }
 
     public void SetActive(string name)
