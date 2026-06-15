@@ -1,5 +1,5 @@
 {
-  "shader":    "Assets/Shaders/shaderPBR",
+  "shader":    "Assets/Shaders/PBR/shaderPBR",
   "albedo":    "Assets/Textures/ShinyMetal/shiny_metal_diff_1k.jpg",
   "normal":    "Assets/Textures/ShinyMetal/shiny_metal_nor_gl_1k.jpg",
   "roughness": "Assets/Textures/ShinyMetal/shiny_metal_rough_1k.jpg",

@@ -17,8 +17,8 @@ public class GridRenderer : IDisposable
     {
         _gl     = gl;
         _shader = new GLShader(gl,
-            PathResolver.Resolve("Assets/Shaders/grid.vert"),
-            PathResolver.Resolve("Assets/Shaders/grid.frag"));
+            PathResolver.Resolve("Assets/Shaders/Grid/grid.vert"),
+            PathResolver.Resolve("Assets/Shaders/Grid/grid.frag"));
 
         // fullscreen quad in NDC space (-1 to 1)
         // stride is 11 floats to match updated Mesh layout

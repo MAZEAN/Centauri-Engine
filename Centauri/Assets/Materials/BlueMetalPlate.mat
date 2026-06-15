@@ -1,5 +1,5 @@
 {
-  "shader":    "Assets/Shaders/shaderPBR",
+  "shader":    "Assets/Shaders/PBR/shaderPBR",
   "albedo":    "Assets/Textures/BlueMetalPlate/blue_metal_plate_diff_1k.jpg",
   "normal":    "Assets/Textures/BlueMetalPlate/blue_metal_plate_nor_gl_1k.jpg",
   "roughness": "Assets/Textures/BlueMetalPlate/blue_metal_plate_rough_1k.jpg",
