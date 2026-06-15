@@ -172,13 +172,14 @@ public class InspectorPanel
     private static void DrawSkybox(Scene scene)
     {
         if (scene.Skyboxes.Active is not { } sky) return;   // no skybox loaded
-
+        
+        ImGui.SetNextItemOpen(false, ImGuiCond.FirstUseEver);
         var open = GUI.BeginPanel("Skybox");
         if (!open) { GUI.EndPanel(open); return; }
 
         ImGui.PushID("Skybox");
 
-        if (sky.Texture.IsHdr)
+        if (sky.Texture.IsHDR)
         {
             GUI.DragRow("Exposure",    sky.Exposure,   v => sky.Exposure   = v, 0.01f,  0f, 16f, "%.2f", sky.AuthoredExposure);
             GUI.DragRow("Black Level", sky.BlackLevel, v => sky.BlackLevel = v, 0.001f, 0f, 1f,  "%.3f", sky.AuthoredBlackLevel);

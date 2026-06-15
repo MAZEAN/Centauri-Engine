@@ -16,7 +16,7 @@ public class GLTexture : IDisposable
     // True when the texture holds linear floating-point radiance (loaded from
     // a <c>.hdr</c> / <c>.exr</c> panorama) rather than 8-bit sRGB data.
     // Consumers such as the skybox use this to decide whether to tonemap.
-    public bool IsHdr { get; }
+    public bool IsHDR { get; }
 
     // Loads from disk: .hdr / .exr decode to a linear float panorama, everything
     // else to 8-bit sRGB.
@@ -28,17 +28,17 @@ public class GLTexture : IDisposable
         Handle = _gl.GenTexture();
         _gl.BindTexture(TextureTarget.Texture2D, Handle);
 
-        if (HdrLoader.IsHdrPath(fullPath))
+        if (HDRLoader.IsHDRPath(fullPath))
         {
-            LoadHdr(fullPath);
-            IsHdr = true;
+            LoadHDR(fullPath);
+            IsHDR = true;
         }
         else
         {
             LoadLdr(fullPath);
         }
 
-        SetParameters(IsHdr);
+        SetParameters(IsHDR);
     }
 
     // Wraps an in-memory 8-bit RGBA buffer (e.g. the 1×1 default texture).
@@ -78,9 +78,9 @@ public class GLTexture : IDisposable
 
     // Float panorama uploaded as RGB16F so the full dynamic range is kept on the
     // GPU; tonemapping/exposure happens later in the skybox shader.
-    private unsafe void LoadHdr(string fullPath)
+    private unsafe void LoadHDR(string fullPath)
     {
-        var image = HdrLoader.Load(fullPath);
+        var image = HDRLoader.Load(fullPath);
 
         fixed (void* data = image.Pixels)
         {

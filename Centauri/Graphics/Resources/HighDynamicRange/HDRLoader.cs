@@ -5,21 +5,21 @@ namespace Centauri.Graphics.Resources.HighDynamicRange;
 // in-house; OpenEXR <c>.exr</c> is decoded through the pure-managed
 // TinyEXR.NET library (all compressions supported).
 
-public static class HdrLoader
+public static class HDRLoader
 {
     // True when the path carries an extension this loader handles.
-    public static bool IsHdrPath(string path)
+    public static bool IsHDRPath(string path)
         => HasExt(path, ".hdr") || HasExt(path, ".exr");
 
-    public static HdrImage Load(string path)
+    public static HDRImage Load(string path)
     {
-        if (HasExt(path, ".hdr")) return RadianceHdrDecoder.Decode(path);
+        if (HasExt(path, ".hdr")) return RadianceHDRDecoder.Decode(path);
         if (HasExt(path, ".exr")) return LoadExr(path);
         
         throw new NotSupportedException($"'{path}' is not a supported HDR image.");
     }
 
-    private static HdrImage LoadExr(string path)
+    private static HDRImage LoadExr(string path)
     {
         // TinyEXR returns interleaved RGBA, top-to-bottom. We strip alpha and
         // flip vertically to land in the engine's bottom-up RGB layout.
@@ -40,7 +40,7 @@ public static class HdrLoader
             }
         }
 
-        return new HdrImage(rgb, width, height);
+        return new HDRImage(rgb, width, height);
     }
 
     private static bool HasExt(string path, string ext)

@@ -4,7 +4,7 @@ const vec2 invAtan = vec2(0.1591549, 0.3183099); // 1/(2π), 1/π
 const float maxVal = 65504.0;
 
 uniform sampler2D uPanorama;
-uniform int   uHdr;         // 1 = linear HDR radiance, 0 = display-ready sRGB LDR
+uniform int   uHDR;         // 1 = linear HDR radiance, 0 = display-ready sRGB LDR
 uniform float uExposure;    // pre-tonemap multiplier (HDR only)
 uniform float uBlackLevel;  // crush radiance below this to black (HDR only)
 
@@ -23,7 +23,7 @@ void main()
     vec2 uv = vec2(atan(d.z, d.x), asin(clamp(d.y, -1.0, 1.0))) * invAtan + 0.5;
     vec3 color = texture(uPanorama, uv).rgb;   // mip 0 → no blurry wrap-seam
 
-    if (uHdr == 1)
+    if (uHDR == 1)
     {
         // Bright sun texels overflow the RGB16F texture to +Inf; ACES then
         // yields NaN, which clamps to black — the black square at the sun.

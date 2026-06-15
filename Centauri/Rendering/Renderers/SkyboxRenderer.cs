@@ -42,7 +42,7 @@ public class SkyboxRenderer : IDisposable
         _shader.SetUniform("uPanorama",   0);
         // HDR panoramas carry linear radiance and need exposure + tonemapping;
         // LDR (sRGB PNG) skyboxes are already display-ready and pass through.
-        _shader.SetUniform("uHdr",        sky.Texture.IsHdr ? 1 : 0);
+        _shader.SetUniform("uHDR",        sky.Texture.IsHDR ? 1 : 0);
         _shader.SetUniform("uExposure",   sky.Exposure);
         _shader.SetUniform("uBlackLevel", sky.BlackLevel);
 

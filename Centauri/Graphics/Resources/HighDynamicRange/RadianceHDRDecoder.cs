@@ -7,11 +7,11 @@ using System.Text;
 // range reaches the GPU. Handles the new-style adaptive RLE used by virtually
 // every modern export, plus flat (uncompressed) and old-style RLE scanlines.
 
-public readonly record struct HdrImage(float[] Pixels, int Width, int Height);
+public readonly record struct HDRImage(float[] Pixels, int Width, int Height);
 
-public static class RadianceHdrDecoder
+public static class RadianceHDRDecoder
 {
-    public static HdrImage Decode(string path)
+    public static HDRImage Decode(string path)
     {
         var bytes = File.ReadAllBytes(path);
         var pos = 0;
@@ -64,7 +64,7 @@ public static class RadianceHdrDecoder
             }
         }
 
-        return new HdrImage(rgb, width, height);
+        return new HDRImage(rgb, width, height);
     }
 
     private static void ReadScanline(byte[] src, ref int pos, byte[] dst, int width)
