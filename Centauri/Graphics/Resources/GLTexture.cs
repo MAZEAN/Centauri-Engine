@@ -10,13 +10,16 @@ using HighDynamicRange;
 public class GLTexture : IDisposable
 {
     private readonly GL _gl;
+
     public uint Handle { get; }
-    
-    public bool IsHdr { get; }
     
     // True when the texture holds linear floating-point radiance (loaded from
     // a <c>.hdr</c> / <c>.exr</c> panorama) rather than 8-bit sRGB data.
     // Consumers such as the skybox use this to decide whether to tonemap.
+    public bool IsHdr { get; }
+
+    // Loads from disk: .hdr / .exr decode to a linear float panorama, everything
+    // else to 8-bit sRGB.
     public GLTexture(GL gl, string path)
     {
         _gl = gl;
@@ -35,56 +38,10 @@ public class GLTexture : IDisposable
             LoadLdr(fullPath);
         }
 
-        SetParameters();
+        SetParameters(IsHdr);
     }
 
-    private unsafe void LoadLdr(string fullPath)
-    {
-        using var img = Image.Load<Rgba32>(fullPath);
-
-        img.Mutate(x => x.Flip(FlipMode.Vertical));
-
-        Span<byte> pixels = new byte[img.Width * img.Height * 4];
-        img.CopyPixelDataTo(pixels);
-
-        fixed (void* data = pixels)
-        {
-            _gl.TexImage2D(
-                TextureTarget.Texture2D,
-                0,
-                InternalFormat.Rgba8,
-                (uint)img.Width,
-                (uint)img.Height,
-                0,
-                PixelFormat.Rgba,
-                PixelType.UnsignedByte,
-                data
-            );
-        }
-    }
-
-    // Float panorama uploaded as RGB16F so the full dynamic range is kept on
-    // the GPU; tonemapping/exposure happens later in the skybox shader.
-    private unsafe void LoadHdr(string fullPath)
-    {
-        var image = HdrLoader.Load(fullPath);
-
-        fixed (void* data = image.Pixels)
-        {
-            _gl.TexImage2D(
-                TextureTarget.Texture2D,
-                0,
-                InternalFormat.Rgb16f,
-                (uint)image.Width,
-                (uint)image.Height,
-                0,
-                PixelFormat.Rgb,
-                PixelType.Float,
-                data
-            );
-        }
-    }
-
+    // Wraps an in-memory 8-bit RGBA buffer (e.g. the 1×1 default texture).
     public unsafe GLTexture(GL gl, Span<byte> data, uint width, uint height)
     {
         _gl = gl;
@@ -94,32 +51,66 @@ public class GLTexture : IDisposable
         fixed (void* d = &data[0])
         {
             _gl.TexImage2D(
-                TextureTarget.Texture2D,
-                0,
-                InternalFormat.Rgba8,
-                width,
-                height,
-                0,
-                PixelFormat.Rgba,
-                PixelType.UnsignedByte,
-                d
-            );
+                TextureTarget.Texture2D, 0, InternalFormat.Rgba8,
+                width, height, 0,
+                PixelFormat.Rgba, PixelType.UnsignedByte, d);
         }
 
-        SetParameters();
+        SetParameters(hdr: false);
     }
 
-    private void SetParameters()
+    private unsafe void LoadLdr(string fullPath)
     {
-        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS,     (int)GLEnum.Repeat);
-        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT,     (int)GLEnum.Repeat);
-        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.LinearMipmapLinear);
+        using var img = Image.Load<Rgba32>(fullPath);
+        img.Mutate(x => x.Flip(FlipMode.Vertical));
+
+        Span<byte> pixels = new byte[img.Width * img.Height * 4];
+        img.CopyPixelDataTo(pixels);
+
+        fixed (void* data = pixels)
+        {
+            _gl.TexImage2D(
+                TextureTarget.Texture2D, 0, InternalFormat.Rgba8,
+                (uint)img.Width, (uint)img.Height, 0,
+                PixelFormat.Rgba, PixelType.UnsignedByte, data);
+        }
+    }
+
+    // Float panorama uploaded as RGB16F so the full dynamic range is kept on the
+    // GPU; tonemapping/exposure happens later in the skybox shader.
+    private unsafe void LoadHdr(string fullPath)
+    {
+        var image = HdrLoader.Load(fullPath);
+
+        fixed (void* data = image.Pixels)
+        {
+            _gl.TexImage2D(
+                TextureTarget.Texture2D, 0, InternalFormat.Rgb16f,
+                (uint)image.Width, (uint)image.Height, 0,
+                PixelFormat.Rgb, PixelType.Float, data);
+        }
+    }
+
+    private void SetParameters(bool hdr)
+    {
+        // Horizontal axis always wraps (the 360° seam); equirect panoramas clamp
+        // the vertical axis so the poles don't bleed into each other.
+        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)GLEnum.Repeat);
+        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT,
+            (int)(hdr ? GLEnum.ClampToEdge : GLEnum.Repeat));
         _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
-        _gl.GenerateMipmap(TextureTarget.Texture2D);
+
+        if (hdr)
+        {
+            // Skybox samples mip 0 only — no mip chain needed.
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Linear);
+        }
+        else
+        {
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.LinearMipmapLinear);
+            _gl.GenerateMipmap(TextureTarget.Texture2D);
+        }
     }
 
-    public void Dispose()
-    {
-        _gl.DeleteTexture(Handle);
-    }
+    public void Dispose() => _gl.DeleteTexture(Handle);
 }
