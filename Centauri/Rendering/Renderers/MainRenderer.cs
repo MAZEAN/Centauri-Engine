@@ -40,6 +40,9 @@ public class MainRenderer : IDisposable
 
     public void Render(Scene scene, float deltaTime, ref FrameStats stats)
     {
+        ResetFrameStats(ref stats);
+        Array.Fill(_boundTextures, uint.MaxValue);
+        
         var viewCamera    = scene.Cameras.Active;
         var cullingCamera = scene.Cameras.Primary;
         
@@ -47,8 +50,6 @@ public class MainRenderer : IDisposable
 
         var view          = viewCamera.GetViewMatrix();
         var cameraPosition = viewCamera.Position;
-
-        ResetFrameStats(ref stats);
 
         scene.Lighting.Collect(scene.Entities);
         UploadLights(scene.Lighting);

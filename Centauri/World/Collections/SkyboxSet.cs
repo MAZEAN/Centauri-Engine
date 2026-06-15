@@ -4,18 +4,18 @@ using Graphics.Resources;
 
 public sealed class SkyboxSet
 {
-    private readonly List<GLCubemap> _items = new();
-    private readonly Dictionary<string, GLCubemap> _byName = new();
+    private readonly List<GLTexture> _items = new();
+    private readonly Dictionary<string, GLTexture> _byName = new();
 
-    public GLCubemap? Active { get; private set; }
-    public IReadOnlyDictionary<string, GLCubemap> ByName => _byName;
+    public GLTexture? Active { get; private set; }
+    public IReadOnlyDictionary<string, GLTexture> ByName => _byName;
     public int Count => _items.Count;
 
-    public void Add(string name, GLCubemap cubemap)
+    public void Add(string name, GLTexture panorama)
     {
-        _byName[name] = cubemap;
-        _items.Add(cubemap);
-        Active ??= cubemap;                          // first added becomes active
+        _byName[name] = panorama;
+        _items.Add(panorama);
+        Active ??= panorama;                          // first added becomes active
     }
 
     public void SetActive(string name)

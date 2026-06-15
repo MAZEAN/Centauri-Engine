@@ -27,7 +27,7 @@ public class SkyboxRenderer : IDisposable
 
     public void Render(Scene scene)
     {
-        if (scene.Skyboxes.Active is not { } cubemap) return;   // scene has no skybox — nothing to draw
+        if (scene.Skyboxes.Active is not { } panorama) return;   // no skybox — nothing to draw
 
         var camera = scene.Cameras.Active;
 
@@ -39,9 +39,11 @@ public class SkyboxRenderer : IDisposable
         _shader.Use();
         _shader.SetUniform("uView",       view);
         _shader.SetUniform("uProjection", camera.GetProjectionMatrix());
-        _shader.SetUniform("uSkybox",     0);
+        _shader.SetUniform("uPanorama",   0);
 
-        cubemap.Bind(TextureUnit.Texture0);
+        _gl.ActiveTexture(TextureUnit.Texture0);
+        _gl.BindTexture(TextureTarget.Texture2D, panorama.Handle);
+
         _cube.Bind();
         unsafe
         {

@@ -114,6 +114,7 @@
     }
   ],
   "skybox": [
-    { "name": "Night", "panorama": "Assets/Textures/Skybox/NightSky.jpg", "active": true }
+    { "name": "Day", "panorama": "Assets/Textures/Skybox/DaySky.png", "active": false },
+    { "name": "Night", "panorama": "Assets/Textures/Skybox/NightSky.png", "active": true }
   ]
 }
