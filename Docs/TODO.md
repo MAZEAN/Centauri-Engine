@@ -12,6 +12,7 @@
 * [ ] Physics engine integration (BEPUphysics2)
 * [ ] Terrain rendering
 * [ ] Water simulation (Sea of Thieves algorithm)
+* [ ] Maybe IBL (foundation would be there)
 
 ### Enhancements
 

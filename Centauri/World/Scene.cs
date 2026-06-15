@@ -51,6 +51,5 @@ public class Scene
         Selected = null;
         foreach (var entity in _entities) entity.Dispose();
         _entities.Clear();
-        // cameras have no unmanaged state; cubeMaps are owned/disposed by ResourceSystem
     }
 }
