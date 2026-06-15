@@ -46,8 +46,6 @@ public class RenderingSystem : IDisposable
         _ui = new UISystem(_gl, _config, window, input);
     }
 
-    public void ToggleStatsOverlay() => _config.Debug.ToggleShowStatsOverlay();
-
     public void Update(float deltaTime)
     {
         _ui.Update(deltaTime);

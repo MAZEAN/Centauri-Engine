@@ -10,16 +10,20 @@ using Graphics.Geometry;
 
 public class ResourceSystem : IDisposable
 {
+    private const int SkyboxResolution = 1024;
+    
     private readonly AppConfig _config;
     public AssetCache<GLTexture> Textures { get; }
     public AssetCache<GLShader> Shaders { get; }
     public AssetCache<Model> Models { get; }
     public AssetCache<GLCubemap> CubeMaps { get; }
+    
     public GLTexture DefaultTexture { get; private set; }
 
     public ResourceSystem(GL gl, AppConfig config)
     {
         _config = config;
+        var baker = new CubemapBaker(gl);
         
         Textures = new AssetCache<GLTexture>(
             path => new GLTexture(gl, PathResolver.Resolve(path))
@@ -32,9 +36,12 @@ public class ResourceSystem : IDisposable
 
         Models = new AssetCache<Model>(
             path => new Model(gl, PathResolver.Resolve(path)));
-        
-        CubeMaps = new AssetCache<GLCubemap>(
-            folder => GLCubemap.FromCross(gl, PathResolver.Resolve(folder)));
+
+        CubeMaps = new AssetCache<GLCubemap>(panorama =>
+        {
+            using var equirect = new GLTexture(gl, PathResolver.Resolve(panorama)); // staging — disposed after bake
+            return baker.Bake(equirect, SkyboxResolution);
+        });
 
         DefaultTexture = CreateDefaultTexture(gl);
     }

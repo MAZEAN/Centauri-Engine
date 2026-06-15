@@ -93,10 +93,9 @@ public class InputSystem : IDisposable
         if (key == _config.Input.ToggleModeKey) { ToggleMode(); _scene.ClearSelection(); return; }
 
         if (_renderingSystem.ImGuiWantsKeyboard) return;
-
         switch (key)
         {
-            case Key.M:  _renderingSystem.ToggleStatsOverlay();          break;
+            case Key.M:  _config.Debug.ToggleShowStatsOverlay();  break;
             case Key.C:  _scene.Cameras.Cycle(); ResetActiveController();  break;
 
             case Key.F1: _config.Debug.ToggleShowDebugView();     break;

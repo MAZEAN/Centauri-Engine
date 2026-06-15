@@ -160,8 +160,8 @@ public class SceneLoader
     private void LoadSkyboxes(SceneDefinition def)
     {
         foreach (var s in def.Skyboxes)
-            if (s.Cubemap.Length > 0)
-                _scene.Skyboxes.Add(s.Name, _resourceSystem.CubeMaps.Get(s.Cubemap));
+            if (s.Panorama.Length > 0)
+                _scene.Skyboxes.Add(s.Name, _resourceSystem.CubeMaps.Get(s.Panorama));
 
         // honor an `active` flag like cameras do; otherwise the first stays active
         var active = def.Skyboxes.FirstOrDefault(s => s.Active);

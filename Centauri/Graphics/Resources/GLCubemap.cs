@@ -8,7 +8,7 @@ using SixLabors.ImageSharp.Processing;
 public class GLCubemap : IDisposable
 {
     private readonly GL _gl;
-    private uint Handle { get; }
+    public uint Handle { get; }
 
     // 6 face images in GL order: +X, -X, +Y, -Y, +Z, -Z
     private GLCubemap(GL gl, IReadOnlyList<Image<Rgba32>> faces)
@@ -24,6 +24,40 @@ public class GLCubemap : IDisposable
             Upload(i, faces[i]);
 
         Configure();
+    }
+
+    private GLCubemap(GL gl, uint handle)
+    {
+        _gl = gl;
+        Handle = handle;
+    }
+
+    public static GLCubemap CreateEmpty(GL gl, int size)
+    {
+        var handle = gl.GenTexture();
+        gl.BindTexture(TextureTarget.TextureCubeMap, handle);
+
+        unsafe
+        {
+            for (var i = 0; i < 6; i++)
+                gl.TexImage2D(TextureTarget.TextureCubeMapPositiveX + i, 0,
+                    InternalFormat.Rgba8, (uint)size, (uint)size, 0,
+                    PixelFormat.Rgba, PixelType.UnsignedByte, null);
+        }
+
+        gl.TexParameter(TextureTarget.TextureCubeMap, TextureParameterName.TextureMinFilter, (int)GLEnum.LinearMipmapLinear);
+        gl.TexParameter(TextureTarget.TextureCubeMap, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
+        gl.TexParameter(TextureTarget.TextureCubeMap, TextureParameterName.TextureWrapS,     (int)GLEnum.ClampToEdge);
+        gl.TexParameter(TextureTarget.TextureCubeMap, TextureParameterName.TextureWrapT,     (int)GLEnum.ClampToEdge);
+        gl.TexParameter(TextureTarget.TextureCubeMap, TextureParameterName.TextureWrapR,     (int)GLEnum.ClampToEdge);
+
+        return new GLCubemap(gl, handle);
+    }
+
+    public void GenerateMipmaps()
+    {
+        _gl.BindTexture(TextureTarget.TextureCubeMap, Handle);
+        _gl.GenerateMipmap(TextureTarget.TextureCubeMap);
     }
 
     private unsafe void Upload(int index, Image<Rgba32> img)
