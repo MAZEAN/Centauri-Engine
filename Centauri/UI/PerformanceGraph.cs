@@ -3,7 +3,7 @@ namespace Centauri.UI;
 using ImGuiNET;
 using System.Numerics;
 
-// Rolling FPS history drawn as a labelled line graph. Samples are averaged over
+// Rolling FPS history drawn as a labeled line graph. Samples are averaged over
 // a fixed time interval (not per-frame) so the window stays steady whether the
 // engine runs at 30 FPS or 2500+. The Y axis auto-scales to a tidy ceiling above
 // the visible peak, so very high frame rates still fit on a clean axis.
@@ -116,12 +116,12 @@ internal sealed class PerformanceGraph
     private static float NiceCeil(float v)
     {
         if (v <= 60f) return 60f;
+        
         var mag  = MathF.Pow(10f, MathF.Floor(MathF.Log10(v)));
         var n    = v / mag;
         var nice = n <= 1f ? 1f : n <= 2f ? 2f : n <= 2.5f ? 2.5f : n <= 5f ? 5f : 10f;
         return nice * mag;
     }
 
-    private static string FormatTick(float v)
-        => v >= 1000f ? $"{v / 1000f:0.#}k" : $"{v:0}";
+    private static string FormatTick(float v) => v >= 1000f ? $"{v / 1000f:0.#}k" : $"{v:0}";
 }
