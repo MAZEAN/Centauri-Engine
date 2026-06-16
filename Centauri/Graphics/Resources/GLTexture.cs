@@ -16,7 +16,7 @@ public class GLTexture : IDisposable
     // True when the texture holds linear floating-point radiance (loaded from
     // a <c>.hdr</c> / <c>.exr</c> panorama) rather than 8-bit sRGB data.
     // Consumers such as the skybox use this to decide whether to tonemap.
-    public bool IsHDR { get; }
+    public bool IsHdr { get; }
 
     // Loads from disk: .hdr / .exr decode to a linear float panorama, everything
     // else to 8-bit sRGB.
@@ -31,14 +31,14 @@ public class GLTexture : IDisposable
         if (HDRLoader.IsHDRPath(fullPath))
         {
             LoadHDR(fullPath);
-            IsHDR = true;
+            IsHdr = true;
         }
         else
         {
             LoadLdr(fullPath);
         }
 
-        SetParameters(IsHDR);
+        SetParameters(IsHdr);
     }
 
     // Wraps an in-memory 8-bit RGBA buffer (e.g. the 1×1 default texture).

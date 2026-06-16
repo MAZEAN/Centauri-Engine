@@ -7,17 +7,18 @@ using Utils.Misc;
 public sealed class PostProcessor : IDisposable
 {
     private readonly GL _gl;
-    private readonly HdrFramebuffer _hdr;
+    private readonly HDRFramebuffer _hdr;
     private readonly GLShader _tonemap;
     private readonly uint _emptyVao;   // core profile needs a bound VAO for attribute-less draws
 
-    public ColorGrading Grading { get; }
+    private readonly ColorGrading _grading;
 
-    public PostProcessor(GL gl, uint width, uint height, uint samples, ColorGrading grading)
+    public PostProcessor(GL gl, HDRFramebuffer hdr, ColorGrading grading)
     {
         _gl = gl;
-        Grading = grading;
-        _hdr = new HdrFramebuffer(gl, width, height, samples);
+        _hdr = hdr;
+        _grading = grading;
+        
         _tonemap = new GLShader(gl,
             PathResolver.Resolve("Assets/Shaders/Post/post.vert"),
             PathResolver.Resolve("Assets/Shaders/Post/post.frag"));
@@ -37,10 +38,10 @@ public sealed class PostProcessor : IDisposable
         _gl.ActiveTexture(TextureUnit.Texture0);
         _gl.BindTexture(TextureTarget.Texture2D, _hdr.ResolvedTexture);
         _tonemap.SetUniform("uHdr",        0);
-        _tonemap.SetUniform("uExposure",   Grading.Exposure);
-        _tonemap.SetUniform("uBlackLevel", Grading.BlackLevel);
-        _tonemap.SetUniform("uContrast",   Grading.Contrast);
-        _tonemap.SetUniform("uSaturation", Grading.Saturation);
+        _tonemap.SetUniform("uExposure",   _grading.Exposure);
+        _tonemap.SetUniform("uBlackLevel", _grading.BlackLevel);
+        _tonemap.SetUniform("uContrast",   _grading.Contrast);
+        _tonemap.SetUniform("uSaturation", _grading.Saturation);
 
         _gl.BindVertexArray(_emptyVao);
         _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);

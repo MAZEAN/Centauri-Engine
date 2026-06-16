@@ -22,9 +22,11 @@ public class Engine : IWindowCallbacks
     private ResourceSystem _resourceSystem = null!;
     private SceneLoader _sceneLoader = null!;
 
+    private const string ConfigPath = "Config/config.json";
+
     public void Run()
     {
-        _config = ConfigLoader.Load("Config/JSON/config.json");
+        _config = ConfigLoader.Load(ConfigPath);
         _scene  = new Scene();
 
         using var window = WindowManager.CreateWindow(_config, this);
@@ -66,7 +68,7 @@ public class Engine : IWindowCallbacks
     {
         _inputSystem = new InputSystem(_window, _scene, _config, _renderingSystem);
 
-        _renderingSystem.InitializeUI(_window, _inputSystem.InputContext);
+        _renderingSystem.InitializeComponents(_window, _inputSystem.InputContext);
         
         var fb = _window.FramebufferSize;
         _renderingSystem.Resize((uint)fb.X, (uint)fb.Y);

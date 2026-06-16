@@ -8,7 +8,8 @@
 
 * [x] Entity inspector / modifier
 * [x] Skybox
-* [ ] Raytracing with BVH (Sebastian Lague)
+* [ ] Raytracing with BVH (inspired by Sebastian Lague)
+* [ ] Cascaded shadow maps (CSM)
 * [ ] Physics engine integration (BEPUphysics2)
 * [ ] Terrain rendering
 * [ ] Water simulation (Sea of Thieves algorithm)

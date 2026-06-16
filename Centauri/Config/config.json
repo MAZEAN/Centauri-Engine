@@ -22,7 +22,7 @@
     "textureCacheSize": 128,
     "modelCacheSize": 64,
     "shaderCacheSize": 32,
-    "scenePath": "Config/JSON/scene.json",
+    "scenePath": "Loading/scene.json",
     "defaultShader": "Assets/Shaders/PBR/shaderPBR"
   },
   "imGui": {
@@ -38,9 +38,9 @@
     "toggleModeKey": "Tab"
   },
   "grading": {
-    "exposure": 1.5,
+    "exposure": 1.0,
     "blackLevel": 0.0,
     "contrast": 1.0,
-    "saturation": 1.0
+    "saturation": 0.95
   }
 }

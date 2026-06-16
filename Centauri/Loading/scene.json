@@ -114,7 +114,7 @@
     }
   ],
   "skybox": [
-    { "name": "Day", "panorama": "Assets/Textures/Skybox/DaySky.hdr", "exposure": 0.4, "active": true },
-    { "name": "Night", "panorama": "Assets/Textures/Skybox/NightSky.exr", "exposure": 0.5, "active": false }
+    { "name": "Day", "panorama": "Assets/Textures/Skybox/DaySky.hdr", "exposure": 0.4, "blackLevel": 0.05, "active": true },
+    { "name": "Night", "panorama": "Assets/Textures/Skybox/NightSky.exr", "exposure": 0.5, "blackLevel": 0.01, "active": false }
   ]
 }

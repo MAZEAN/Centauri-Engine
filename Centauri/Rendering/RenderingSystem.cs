@@ -40,15 +40,18 @@ public class RenderingSystem : IDisposable
         _debugRenderer  = new DebugRenderer(gl, config);
         _skyboxRenderer = new SkyboxRenderer(gl);
     }
-
-    // called after GL and input are both ready
-    public void InitializeUI(IWindow window, IInputContext input)
+    
+    public void InitializeComponents(IWindow window, IInputContext input)
     {
-        var g = _config.Grading;
-        var grading = new ColorGrading(g.Exposure, g.BlackLevel, g.Contrast, g.Saturation);
+        var conf = _config.Grading;
+        var grading = new ColorGrading(conf.Exposure, conf.BlackLevel, conf.Contrast, conf.Saturation);
 
-        var fb = window.FramebufferSize;
-        _post = new PostProcessor(_gl, (uint)fb.X, (uint)fb.Y, (uint)_config.Window.Samples, grading);
+        var framebufferSize = window.FramebufferSize;
+        var hdr = new HDRFramebuffer(
+            _gl, (uint)framebufferSize.X, (uint)framebufferSize.Y, (uint)_config.Window.Samples
+        );
+        
+        _post = new PostProcessor(_gl, hdr, grading);
         _ui   = new UISystem(_gl, _config, window, input, grading);   // shares the same instance
     }
 

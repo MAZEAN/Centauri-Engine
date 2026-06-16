@@ -41,8 +41,9 @@ public class SkyboxRenderer : IDisposable
         _shader.SetUniform("uProjection", camera.GetProjectionMatrix());
         _shader.SetUniform("uPanorama",   0);
         
-        _shader.SetUniform("uHDR",        sky.Texture.IsHDR ? 1 : 0);
+        _shader.SetUniform("uHdr",        sky.Texture.IsHdr ? 1 : 0);
         _shader.SetUniform("uExposure",   sky.Exposure);
+        _shader.SetUniform("uBlackLevel", sky.BlackLevel);
 
         _gl.ActiveTexture(TextureUnit.Texture0);
         _gl.BindTexture(TextureTarget.Texture2D, sky.Texture.Handle);

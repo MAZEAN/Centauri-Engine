@@ -204,9 +204,10 @@ public class InspectorPanel
 
         ImGui.PushID("Skybox");
 
-        if (sky.Texture.IsHDR)
+        if (sky.Texture.IsHdr)
         {
             GUI.DragRow("Exposure",    sky.Exposure,   v => sky.Exposure   = v, 0.01f,  0f, 16f, "%.2f", sky.AuthoredExposure);
+            GUI.DragRow("Black Level", sky.BlackLevel, v => sky.BlackLevel = v, 0.001f, 0f, 0.5f, "%.3f", sky.AuthoredBlackLevel);
         }
         else
         {
