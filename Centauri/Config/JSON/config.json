@@ -22,7 +22,7 @@
     "textureCacheSize": 128,
     "modelCacheSize": 64,
     "shaderCacheSize": 32,
-    "scenePath": "Config/scene.json",
+    "scenePath": "Config/JSON/scene.json",
     "defaultShader": "Assets/Shaders/PBR/shaderPBR"
   },
   "imGui": {

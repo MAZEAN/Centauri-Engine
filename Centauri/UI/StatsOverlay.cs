@@ -18,6 +18,7 @@ public class StatsOverlay
 
     private readonly ImFontPtr _font;
     private readonly AppConfig _config;
+    private readonly PerformanceGraph _perfGraph = new();
 
     public StatsOverlay(ImFontPtr font, AppConfig config)
     {
@@ -27,6 +28,7 @@ public class StatsOverlay
 
     public void Render(Scene scene, FrameStats stats)
     {
+        _perfGraph.Push(stats.FPS, stats.FrameTime);
         SetupWindow();
 
         if (!ImGui.Begin("StatsOverlay", GetModeDependentFlags(_config.Input.Mode)))
@@ -49,6 +51,7 @@ public class StatsOverlay
         {
             Row("FPS", GUI.Float(stats.FPS));
             Row("Frame Time", $"{GUI.Float(stats.FrameTime)} ms");
+            _perfGraph.Draw();
         });
 
         Section("Culling",GUI.Green, () =>
