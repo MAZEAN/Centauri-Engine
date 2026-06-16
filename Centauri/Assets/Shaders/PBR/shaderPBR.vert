@@ -1,5 +1,10 @@
 #version 330 core
 
+out vec2 fUv;       // UV after scale/offset applied
+out vec3 fNormal;   // world space normal
+out vec3 fFragPos;  // world space position of this fragment
+out mat3 fTBN;      // tangent space to world space matrix
+
 layout (location = 0) in vec3 vPos;      // world position of vertex
 layout (location = 1) in vec3 vNormal;   // surface direction at vertex
 layout (location = 2) in vec2 vUv;       // texture coordinate
@@ -11,11 +16,6 @@ uniform mat4 uProjection;   // perspective — makes far things smaller
 uniform vec2 uUvScale;      // texture tiling
 uniform vec2 uUvOffset;     // texture offset
 uniform mat3 uNormalMatrix; // transposed inverse of uModel
-
-out vec2 fUv;       // UV after scale/offset applied
-out vec3 fNormal;   // world space normal
-out vec3 fFragPos;  // world space position of this fragment
-out mat3 fTBN;      // tangent space to world space matrix
 
 void main()
 {

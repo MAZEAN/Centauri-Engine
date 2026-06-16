@@ -10,9 +10,9 @@ using System.Numerics;
 internal sealed class PerformanceGraph
 {
     private const float GraphHeight = 150f;
-    private const float LeftPad = 40f;   // Y tick-label gutter
-    private const float BotPad  = 16f;   // X label gutter
-    private const float TopPad  = 4f;
+    private const float LeftPad = 30f;   // Y tick-label gutter
+    private const float BotPad  = 20f;   // X label gutter
+    private const float TopPad  = 20f;
     
     private const int   Capacity         = 200;    // samples retained
     private const float SampleIntervalMs = 50f;    // one plotted point per 50 ms

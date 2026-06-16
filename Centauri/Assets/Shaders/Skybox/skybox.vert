@@ -1,11 +1,11 @@
 #version 330 core
 
+out vec3 vDir;
+
 layout (location = 0) in vec3 aPos;   // Mesh stride is 11 floats; only position is used
 
 uniform mat4 uView;        // rotation only — translation stripped on the CPU
 uniform mat4 uProjection;
-
-out vec3 vDir;
 
 void main()
 {

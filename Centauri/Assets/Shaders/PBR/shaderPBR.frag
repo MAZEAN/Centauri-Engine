@@ -1,12 +1,16 @@
 #version 330 core
 
+in vec2 fUv;
+in vec3 fNormal;
+in vec3 fFragPos;
+in mat3 fTBN;
+
+out vec4 FragColor;
+
 //  ─── constants ───────────────────────────────────────────────────────────────
 const float PI               = 3.14159265359;
 const int   MAX_POINT_LIGHTS = 16;
 const int   MAX_SPOT_LIGHTS  = 16;
-
-// ACES constants
-const float ACES_a = 2.51, ACES_b = 0.03, ACES_c = 2.43, ACES_d = 0.59, ACES_e = 0.14;
 
 // ─── light structs (std140 — every member padded to vec4) ───────────────────────
 struct DirLight {
@@ -56,21 +60,6 @@ layout(std140) uniform Lights {
     SpotLight  uSpots[MAX_SPOT_LIGHTS];
     ivec4      uCounts; // x = pointCount, y = spotCount, z = hasDir
 };
-
-// ─── inputs ───────────────────────────────────────────────────────────────────
-in vec2 fUv;
-in vec3 fNormal;
-in vec3 fFragPos;
-in mat3 fTBN;
-
-out vec4 FragColor;
-
-// Narkowicz 2015 ACES filmic approximation — the same operator the skybox uses,
-// so lit surfaces and the sky share one tone curve.
-vec3 ACESFilm(vec3 x)
-{
-    return clamp((x * (ACES_a * x + ACES_b)) / (x * (ACES_c * x + ACES_d) + ACES_e), 0.0, 1.0);
-}
 
 // ─── PBR functions ────────────────────────────────────────────────────────────
 

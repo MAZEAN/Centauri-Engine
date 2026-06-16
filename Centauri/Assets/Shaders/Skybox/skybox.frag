@@ -1,15 +1,15 @@
 #version 330 core
 
+in  vec3 vDir;
+
+out vec4 FragColor;
+
 const vec2 invAtan = vec2(0.1591549, 0.3183099); // 1/(2π), 1/π
-const float maxVal = 65504.0;
 
 uniform sampler2D uPanorama;
 uniform int   uHdr;         // 1 = linear HDR radiance, 0 = display-ready sRGB LDR
 uniform float uExposure;    // pre-tonemap multiplier (HDR only)
 uniform float uBlackLevel;  // crush radiance below this to black (HDR only)
-
-in  vec3 vDir;
-out vec4 FragColor;
 
 void main()
 {

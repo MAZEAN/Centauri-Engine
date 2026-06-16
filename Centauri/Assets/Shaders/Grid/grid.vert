@@ -1,11 +1,12 @@
 #version 330 core
+
+out vec3 fNearPoint;
+out vec3 fFarPoint;
+
 layout (location = 0) in vec3 vPos;
 
 uniform mat4 uView;
 uniform mat4 uProjection;
-
-out vec3 fNearPoint;
-out vec3 fFarPoint;
 
 vec3 UnprojectPoint(float x, float y, float z, mat4 view, mat4 projection)
 {

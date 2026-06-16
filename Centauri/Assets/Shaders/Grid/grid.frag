@@ -1,5 +1,10 @@
 #version 330 core
 
+in vec3 fNearPoint;
+in vec3 fFarPoint;
+
+out vec4 FragColor;
+
 // ─────────────────────────────────────────────────────────────────────────────
 const vec3  GRID_COLOR_COARSE = vec3(0.5);
 const vec3  GRID_COLOR_FINE   = vec3(0.3);
@@ -18,15 +23,10 @@ const float FOG_END           = 200.0;
 const float BIAS              = 1e-7;
 // ─────────────────────────────────────────────────────────────────────────────
 
-in vec3 fNearPoint;
-in vec3 fFarPoint;
-
 uniform mat4 uView;
 uniform mat4 uProjection;
 uniform vec3 uCameraPos;
 uniform vec4 background;
-
-out vec4 FragColor;
 
 float log10(float x)
 {

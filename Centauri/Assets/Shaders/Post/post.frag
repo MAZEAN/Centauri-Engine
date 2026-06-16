@@ -1,7 +1,10 @@
 #version 330 core
 
 in  vec2 vUv;
+
 out vec4 FragColor;
+
+const float maxVal = 65504.0;
 
 uniform sampler2D uHdr;
 uniform float uExposure;     // pre-tonemap linear multiplier
