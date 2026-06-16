@@ -7,19 +7,21 @@
 ## Features
 
 * [x] Entity inspector / modifier
-* [ ] Skybox
+* [x] Skybox
 * [ ] Raytracing with BVH (Sebastian Lague)
 * [ ] Physics engine integration (BEPUphysics2)
 * [ ] Terrain rendering
 * [ ] Water simulation (Sea of Thieves algorithm)
-* [ ] Maybe IBL (foundation would be there)
+* [ ] Foliage rendering
+* [ ] IBL?
 
 ### Enhancements
 
 * [ ] Instancing & LOD system
-* [ ] Performance graphs
+* [x] Performance graphs
 * [ ] Keybindings
 * [ ] UI improvements (DPI-scaling etc.)
+* [ ] Multithreading
 
 ---
 
