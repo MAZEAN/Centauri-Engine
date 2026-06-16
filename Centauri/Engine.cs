@@ -59,7 +59,6 @@ public class Engine : IWindowCallbacks
     {
         _sceneLoader = new SceneLoader(_resourceSystem, _scene, _config);
         _sceneLoader.Load();
-
         _scene.Cameras.InitializeAspect(_window);
     }
 
@@ -68,6 +67,9 @@ public class Engine : IWindowCallbacks
         _inputSystem = new InputSystem(_window, _scene, _config, _renderingSystem);
 
         _renderingSystem.InitializeUI(_window, _inputSystem.InputContext);
+        
+        var fb = _window.FramebufferSize;
+        _renderingSystem.Resize((uint)fb.X, (uint)fb.Y);
     }
 
     private void InitializeOpenGL()
@@ -124,14 +126,14 @@ public class Engine : IWindowCallbacks
 
     public void OnRender(double deltaTime)
     {
-        _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-        
         _renderingSystem.Render(_scene, deltaTime);
     }
     
     public void OnResize(Vector2D<int> size)
     {
         _gl.Viewport(size);
+        
+        _renderingSystem.Resize((uint)size.X, (uint)size.Y);
         
         foreach (var cam in _scene.Cameras)
             cam.SetAspectRatio(size);

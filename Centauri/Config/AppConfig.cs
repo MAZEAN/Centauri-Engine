@@ -12,6 +12,7 @@ public class AppConfig
     [JsonPropertyName("imGui")]  public ImGuiConfig  ImGui  { get; init; } = new();
     [JsonPropertyName("input")]  public InputConfig  Input  { get; init; } = new();
     [JsonPropertyName("debug")]  public DebugConfig  Debug  { get; init; } = new();
+    [JsonPropertyName("grading")] public GradingConfig Grading { get; init; } = new();
 }
 
 public class RenderConfig
@@ -92,4 +93,12 @@ public class InputConfig
     {
         Mode = Mode == ViewMode.Fly ? ViewMode.Edit : ViewMode.Fly;
     }
+}
+
+public class GradingConfig
+{
+    [JsonPropertyName("exposure")]   public float Exposure   { get; init; } = 1.0f;
+    [JsonPropertyName("blackLevel")] public float BlackLevel { get; init; } = 0.0f;
+    [JsonPropertyName("contrast")]   public float Contrast   { get; init; } = 1.0f;
+    [JsonPropertyName("saturation")] public float Saturation { get; init; } = 1.0f;
 }

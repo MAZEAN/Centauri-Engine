@@ -4,6 +4,7 @@ using ImGuiNET;
 using System.Numerics;
 
 using World;
+using Rendering;
 
 public class InspectorPanel
 {
@@ -14,13 +15,18 @@ public class InspectorPanel
     private static readonly string[] LightTypes = ["None", "Directional", "Point", "Spot"];
 
     private readonly ImFontPtr _font;
+    private readonly ColorGrading _grading;
     
     private Vector3 _euler;            // cached working rotation (deg) for the selected entity
     private bool    _editingRotation;  // true while a rotation axis is being dragged
 
     private const ImGuiWindowFlags Flags = GUI.PanelBase;
 
-    public InspectorPanel(ImFontPtr font) => _font = font;
+    public InspectorPanel(ImFontPtr font, ColorGrading grading)
+    {
+        _font    = font;
+        _grading = grading;
+    }
 
     public void Render(Scene scene)
     {
@@ -36,6 +42,7 @@ public class InspectorPanel
 
         DrawInspectorElements(scene);
         DrawSkybox(scene);
+        DrawColorGrading();
 
         ImGui.PopFont();
         
@@ -169,30 +176,6 @@ public class InspectorPanel
         GUI.EndPanel(open);
     }
     
-    private static void DrawSkybox(Scene scene)
-    {
-        if (scene.Skyboxes.Active is not { } sky) return;   // no skybox loaded
-        
-        ImGui.SetNextItemOpen(false, ImGuiCond.FirstUseEver);
-        var open = GUI.BeginPanel("Skybox");
-        if (!open) { GUI.EndPanel(open); return; }
-
-        ImGui.PushID("Skybox");
-
-        if (sky.Texture.IsHDR)
-        {
-            GUI.DragRow("Exposure",    sky.Exposure,   v => sky.Exposure   = v, 0.01f,  0f, 16f, "%.2f", sky.AuthoredExposure);
-            GUI.DragRow("Black Level", sky.BlackLevel, v => sky.BlackLevel = v, 0.001f, 0f, 1f,  "%.3f", sky.AuthoredBlackLevel);
-        }
-        else
-        {
-            ImGui.TextDisabled("LDR skybox — no HDR controls");
-        }
-
-        ImGui.PopID();
-        GUI.EndPanel(open);
-    }
-
     private static Light CreateLight(int typeIndex, Light? from)
     {
         Light light = typeIndex switch
@@ -209,5 +192,44 @@ public class InspectorPanel
         light.Intensity = from.Intensity;
         light.Enabled   = from.Enabled;
         return light;
+    }
+    
+    private static void DrawSkybox(Scene scene)
+    {
+        if (scene.Skyboxes.Active is not { } sky) return;   // no skybox loaded
+        
+        ImGui.SetNextItemOpen(false, ImGuiCond.FirstUseEver);
+        var open = GUI.BeginPanel("Skybox");
+        if (!open) { GUI.EndPanel(open); return; }
+
+        ImGui.PushID("Skybox");
+
+        if (sky.Texture.IsHDR)
+        {
+            GUI.DragRow("Exposure",    sky.Exposure,   v => sky.Exposure   = v, 0.01f,  0f, 16f, "%.2f", sky.AuthoredExposure);
+        }
+        else
+        {
+            ImGui.TextDisabled("LDR skybox — no HDR controls");
+        }
+
+        ImGui.PopID();
+        GUI.EndPanel(open);
+    }
+    
+    private void DrawColorGrading()
+    {
+        var open = GUI.BeginPanel("Color Grading");
+        if (!open) { GUI.EndPanel(open); return; }
+
+        ImGui.PushID("Grading");
+        // Right-click → Reset returns to the config-authored value (like Transform/Skybox).
+        GUI.DragRow("Exposure",    _grading.Exposure,   v => _grading.Exposure   = v, 0.01f,  0f, 16f,  "%.2f", _grading.AuthoredExposure);
+        GUI.DragRow("Black Level", _grading.BlackLevel, v => _grading.BlackLevel = v, 0.001f, 0f, 0.5f, "%.3f", _grading.AuthoredBlackLevel);
+        GUI.DragRow("Contrast",    _grading.Contrast,   v => _grading.Contrast   = v, 0.01f,  0f, 2f,   "%.2f", _grading.AuthoredContrast);
+        GUI.DragRow("Saturation",  _grading.Saturation, v => _grading.Saturation = v, 0.01f,  0f, 2f,   "%.2f", _grading.AuthoredSaturation);
+        ImGui.PopID();
+
+        GUI.EndPanel(open);
     }
 }

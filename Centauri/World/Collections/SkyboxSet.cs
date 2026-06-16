@@ -20,10 +20,7 @@ public class SkyboxSet
 {
     private readonly List<Skybox> _items = new();
     private readonly Dictionary<string, Skybox> _byName = new();
-
     public Skybox? Active { get; private set; }
-    public IReadOnlyDictionary<string, Skybox> ByName => _byName;
-    public int Count => _items.Count;
 
     public void Add(string name, GLTexture panorama, float exposure = 1.0f, float blackLevel = 0.0f)
     {

@@ -18,8 +18,9 @@ public class RenderingSystem : IDisposable
     private readonly GridRenderer  _gridRenderer;
     private readonly DebugRenderer _debugRenderer;
     private readonly SkyboxRenderer _skyboxRenderer;
-
-    private UISystem _ui;
+    
+    private UISystem _ui = null!;
+    private PostProcessor _post = null!;
 
     private FrameStats _stats;
     
@@ -43,7 +44,12 @@ public class RenderingSystem : IDisposable
     // called after GL and input are both ready
     public void InitializeUI(IWindow window, IInputContext input)
     {
-        _ui = new UISystem(_gl, _config, window, input);
+        var g = _config.Grading;
+        var grading = new ColorGrading(g.Exposure, g.BlackLevel, g.Contrast, g.Saturation);
+
+        var fb = window.FramebufferSize;
+        _post = new PostProcessor(_gl, (uint)fb.X, (uint)fb.Y, (uint)_config.Window.Samples, grading);
+        _ui   = new UISystem(_gl, _config, window, input, grading);   // shares the same instance
     }
 
     public void Update(float deltaTime)
@@ -54,10 +60,11 @@ public class RenderingSystem : IDisposable
 
     public void Render(Scene scene, double deltaTime)
     {
-        if (_config.Debug.ShowSkybox)
+        _post.BeginScene();
+
+        if (_config.Debug.ShowSkybox) 
             _skyboxRenderer.Render(scene);
-        
-        if (_config.Debug.ShowGrid)
+        if (_config.Debug.ShowGrid)   
             _gridRenderer.Render(scene);
         
         _mainRenderer.Render(scene, (float)deltaTime, ref _stats);
@@ -66,18 +73,17 @@ public class RenderingSystem : IDisposable
         {
             var active = scene.Cameras.Active;
             _debugRenderer.Begin(active);
-
             if (_config.Debug.ShowDebugView)
             {
                 _debugRenderer.DrawCameras(scene);
                 _debugRenderer.DrawAllAABBs(scene, scene.Cameras.Primary.Frustum);
             }
-
             _debugRenderer.DrawSelection(scene);
             _debugRenderer.End();
         }
-        
-        _ui.Render(scene, in _stats);
+
+        _post.Composite();              // resolve + tonemap to backbuffer
+        _ui.Render(scene, in _stats);   // UI on top, ungraded
     }
     
     private void UpdateFPSCounter(float deltaTime)
@@ -94,13 +100,16 @@ public class RenderingSystem : IDisposable
             _fpsTimer        = 0f;
         }
     }
+    
+    public void Resize(uint width, uint height) => _post.Resize(width, height);
 
     public void Dispose()
     {
-        _ui.Dispose();
         _gridRenderer.Dispose();
         _mainRenderer.Dispose();
         _debugRenderer.Dispose();
         _skyboxRenderer.Dispose();
+        _ui.Dispose();
+        _post.Dispose();
     }
 }

@@ -36,5 +36,11 @@
   "input": {
     "mode": "Fly",
     "toggleModeKey": "Tab"
+  },
+  "grading": {
+    "exposure": 1.5,
+    "blackLevel": 0.0,
+    "contrast": 1.0,
+    "saturation": 1.0
   }
 }

@@ -30,7 +30,6 @@ public class WindowManager
         options.Position = monitor.Bounds.Origin;
         options.Title = config.Window.Title;
         options.VSync = config.Window.EnableVSync;
-        options.Samples = config.Window.Samples;
         return options;
     }
 

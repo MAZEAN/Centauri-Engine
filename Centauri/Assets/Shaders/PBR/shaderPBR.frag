@@ -5,6 +5,9 @@ const float PI               = 3.14159265359;
 const int   MAX_POINT_LIGHTS = 16;
 const int   MAX_SPOT_LIGHTS  = 16;
 
+// ACES constants
+const float ACES_a = 2.51, ACES_b = 0.03, ACES_c = 2.43, ACES_d = 0.59, ACES_e = 0.14;
+
 // ─── light structs (std140 — every member padded to vec4) ───────────────────────
 struct DirLight {
     vec4 direction; // xyz
@@ -61,6 +64,13 @@ in vec3 fFragPos;
 in mat3 fTBN;
 
 out vec4 FragColor;
+
+// Narkowicz 2015 ACES filmic approximation — the same operator the skybox uses,
+// so lit surfaces and the sky share one tone curve.
+vec3 ACESFilm(vec3 x)
+{
+    return clamp((x * (ACES_a * x + ACES_b)) / (x * (ACES_c * x + ACES_d) + ACES_e), 0.0, 1.0);
+}
 
 // ─── PBR functions ────────────────────────────────────────────────────────────
 
@@ -192,9 +202,6 @@ void main()
     vec3 F0      = mix(vec3(0.04), albedo, metallic);
     vec3 ambient = vec3(0.03) * mix(albedo, F0, metallic) * ao;
     vec3 color   = ambient + Lo;
-
-    color = color / (color + vec3(1.0));
-    color = pow(color, vec3(1.0 / 2.2));
     
     FragColor = vec4(color, albedoSample.a);
     
