@@ -24,7 +24,11 @@ void main() {
         vec3 t = vec3(sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta));
         vec3 s = t.x * right + t.y * up + t.z * N;
 
-        irradiance += min(texture(uEnv, s).rgb, vec3(uMaxRadiance)) * cos(theta) * sin(theta);
+        vec3 c = texture(uEnv, s).rgb;
+        float peak = max(max(c.r, c.g), c.b);
+        c *= uMaxRadiance / (uMaxRadiance + peak);   // smooth rolloff — caps brights, no hard edge
+        irradiance += c * cos(theta) * sin(theta);
+        
         samples++;
     }
     FragColor = vec4(PI * irradiance / samples, 1.0);

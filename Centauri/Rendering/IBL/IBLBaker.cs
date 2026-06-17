@@ -10,7 +10,8 @@ using Utils.Misc;
 // global BRDF LUT. Standard split-sum / LearnOpenGL flow.
 public sealed class IBLBaker : IDisposable
 {
-    private const int EnvSize = 512, IrradianceSize = 32, PrefilterSize = 128, PrefilterMips = 5, BrdfSize = 512;
+    private const int EnvSize = 512, IrradianceSize = 64, PrefilterSize = 128, PrefilterMips = 5, BrdfSize = 512;
+    private const float MaxRadiance = 10f;
 
     private readonly GL _gl;
     private readonly uint _fbo, _rbo, _cubeVao, _cubeVbo, _quadVao;
@@ -19,7 +20,7 @@ public sealed class IBLBaker : IDisposable
     private readonly Matrix4x4[] _views;
 
     public uint BrdfLut { get; }
-    public int  MaxReflectionLod => PrefilterMips - 1;
+    public int MaxReflectionLod => PrefilterMips - 1;
 
     public IBLBaker(GL gl)
     {
@@ -42,54 +43,6 @@ public sealed class IBLBaker : IDisposable
 
         BrdfLut = BakeBrdf();
     }
-
-    // public unsafe (uint irradiance, uint prefiltered) Bake(GLTexture equirect, float exposure)
-    // {
-    //     // 1) equirect → env cubemap (+ mips, used by the prefilter pass)
-    //     var env = CreateCubemap(EnvSize, mips: true);
-    //     _toCube.Use();
-    //     _toCube.SetUniform("uProjection", _proj);
-    //     _toCube.SetUniform("uEquirect", 0);
-    //     _toCube.SetUniform("uExposure", exposure); 
-    //     _gl.ActiveTexture(TextureUnit.Texture0);
-    //     _gl.BindTexture(TextureTarget.Texture2D, equirect.Handle);
-    //
-    //     RenderToCube(env, EnvSize, 0, _toCube);
-    //     _gl.BindTexture(TextureTarget.TextureCubeMap, env);
-    //     _gl.GenerateMipmap(TextureTarget.TextureCubeMap);
-    //
-    //     // 2) irradiance
-    //     var irr = CreateCubemap(IrradianceSize, mips: false);
-    //     _irradiance.Use();
-    //     _irradiance.SetUniform("uProjection", _proj);
-    //     _irradiance.SetUniform("uEnv", 0);
-    //     _irradiance.SetUniform("uMaxRadiance", 10.0f); 
-    //
-    //     _gl.ActiveTexture(TextureUnit.Texture0);
-    //     _gl.BindTexture(TextureTarget.TextureCubeMap, env);
-    //     RenderToCube(irr, IrradianceSize, 0, _irradiance);
-    //
-    //     // 3) prefilter (one render per mip / roughness)
-    //     var pre = CreateCubemap(PrefilterSize, mips: true);
-    //     _prefilter.Use();
-    //     _prefilter.SetUniform("uProjection", _proj);
-    //     _prefilter.SetUniform("uEnv", 0);
-    //     _prefilter.SetUniform("uResolution", (float)EnvSize);
-    //
-    //     _gl.ActiveTexture(TextureUnit.Texture0);
-    //     _gl.BindTexture(TextureTarget.TextureCubeMap, env);
-    //
-    //     for (var mip = 0; mip < PrefilterMips; mip++)
-    //     {
-    //         var size = (uint)(PrefilterSize * MathF.Pow(0.5f, mip));
-    //         _prefilter.SetUniform("uRoughness", mip / (float)(PrefilterMips - 1));
-    //         RenderToCube(pre, size, mip, _prefilter);
-    //     }
-    //
-    //     _gl.DeleteTexture(env);                       // env cubemap no longer needed
-    //     _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-    //     return (irr, pre);
-    // }
     
     public unsafe (uint irradiance, uint prefiltered) Bake(GLTexture equirect, float exposure)
     {
@@ -114,7 +67,7 @@ public sealed class IBLBaker : IDisposable
             _irradiance.Use();
             _irradiance.SetUniform("uProjection", _proj);
             _irradiance.SetUniform("uEnv", 0);
-            _irradiance.SetUniform("uMaxRadiance", 10.0f); 
+            _irradiance.SetUniform("uMaxRadiance", MaxRadiance); 
         
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.BindTexture(TextureTarget.TextureCubeMap, env);
@@ -126,7 +79,7 @@ public sealed class IBLBaker : IDisposable
             _prefilter.SetUniform("uProjection", _proj);
             _prefilter.SetUniform("uEnv", 0);
             _prefilter.SetUniform("uResolution", (float)EnvSize);
-            _prefilter.SetUniform("uMaxRadiance", 10.0f);
+            _prefilter.SetUniform("uMaxRadiance", MaxRadiance);
         
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.BindTexture(TextureTarget.TextureCubeMap, env);
