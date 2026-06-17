@@ -166,7 +166,8 @@ void main()
     vec3 albedo = pow(albedoSample.rgb, vec3(2.2));
     if (albedoSample.a < 0.1) discard;
 
-    vec3 N = uHasNormal == 1
+    vec3 T = fTBN[0];
+    vec3 N = (uHasNormal == 1 && dot(T, T) > 1e-5)
         ? normalize(fTBN * (texture(uNormalMap, fUv).rgb * 2.0 - 1.0))
         : normalize(fNormal);
 

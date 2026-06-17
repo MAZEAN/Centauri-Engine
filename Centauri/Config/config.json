@@ -24,7 +24,7 @@
     "shaderCacheSize": 32,
     "scenePath": "Loading/scene.json",
     "defaultShader": "Assets/Shaders/PBR/shaderPBR",
-    "iblIntensity": 0.1
+    "iblIntensity": 0.3
   },
   "imGui": {
     "font": "Assets/Fonts/IosevkaCharon-Regular.ttf",
