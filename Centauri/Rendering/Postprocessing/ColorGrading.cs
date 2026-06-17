@@ -1,4 +1,4 @@
-namespace Centauri.Rendering;
+namespace Centauri.Rendering.Postprocessing;
 
 // Global tone / color-grading applied once in the tonemap pass. Live values are
 // edited from the inspector; the Authored* values (seeded from config) are the

@@ -9,11 +9,13 @@ using Graphics.Resources;
 using Graphics.Geometry;
 using World.Collections;
 using Utils.Misc;
+using IBL;
 
 public class MainRenderer : IDisposable
 {
     private readonly GL _gl;
     private readonly AppConfig _config;
+    private readonly IBLBaker _ibl; 
     
     private const float SpotConstant  = 1.0f;
     private const float SpotLinear    = 0.09f;
@@ -28,11 +30,14 @@ public class MainRenderer : IDisposable
     // all lights live in one std140 UBO shared by every lit shader  (#3)
     private readonly LightBuffer _lightBuffer;
     private readonly HashSet<GLShader> _lightBlockBound = new();
+    
+    private bool _iblActive;
 
-    public MainRenderer(GL gl, AppConfig config)
+    public MainRenderer(GL gl, AppConfig config, IBLBaker ibl)
     {
         _gl = gl;
         _config = config;
+        _ibl = ibl;
 
         _lightBuffer = new LightBuffer(gl);
         InitializeTextureCache();
@@ -53,6 +58,8 @@ public class MainRenderer : IDisposable
 
         scene.Lighting.Collect(scene.Entities);
         UploadLights(scene.Lighting);
+        
+        BindIbl(scene);
 
         foreach (var (shader, entities) in GetGroups(scene))
         {
@@ -168,7 +175,7 @@ public class MainRenderer : IDisposable
     // -----------------------------
     // Global uniforms
     // -----------------------------
-    private static void UploadGlobalUniforms(GLShader shader, Camera camera)
+    private void UploadGlobalUniforms(GLShader shader, Camera camera)
     {
         var projection = camera.GetProjectionMatrix();
 
@@ -180,6 +187,12 @@ public class MainRenderer : IDisposable
         shader.SetUniform("uRoughnessMap", 2);
         shader.SetUniform("uMetallicMap",  3);
         shader.SetUniform("uAOMap",        4);
+        
+        shader.SetUniform("uIrradianceMap", 5);
+        shader.SetUniform("uPrefilterMap",  6);
+        shader.SetUniform("uBrdfLUT",       7);
+        shader.SetUniform("uHasIBL", _iblActive ? 1 : 0);
+        shader.SetUniform("uMaxReflectionLod", (float)_ibl.MaxReflectionLod);
     }
     
     // -----------------------------
@@ -243,6 +256,20 @@ public class MainRenderer : IDisposable
                 s.Light.InnerCutoff, s.Light.OuterCutoff);
 
         _lightBuffer.Upload();
+    }
+    
+    private void BindIbl(Scene scene)
+    {
+        _iblActive = scene.Skyboxes.Active is { IblBaked: true };
+        if (!_iblActive) return;
+
+        var sky = scene.Skyboxes.Active!;
+        _gl.ActiveTexture(TextureUnit.Texture5);
+        _gl.BindTexture(TextureTarget.TextureCubeMap, sky.IrradianceMap);
+        _gl.ActiveTexture(TextureUnit.Texture6);
+        _gl.BindTexture(TextureTarget.TextureCubeMap, sky.PrefilteredMap);
+        _gl.ActiveTexture(TextureUnit.Texture7);
+        _gl.BindTexture(TextureTarget.Texture2D, _ibl.BrdfLut);
     }
 
     private void InitializeTextureCache()

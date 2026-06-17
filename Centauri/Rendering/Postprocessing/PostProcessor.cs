@@ -1,4 +1,4 @@
-namespace Centauri.Rendering;
+namespace Centauri.Rendering.Postprocessing;
 
 using Silk.NET.OpenGL;
 using Graphics.Resources;

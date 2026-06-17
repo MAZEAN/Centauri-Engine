@@ -9,6 +9,8 @@ using Renderers;
 using World;
 using Utils.Misc;
 using UI;
+using IBL;
+using Postprocessing;
 
 public class RenderingSystem : IDisposable
 {
@@ -18,6 +20,7 @@ public class RenderingSystem : IDisposable
     private readonly GridRenderer  _gridRenderer;
     private readonly DebugRenderer _debugRenderer;
     private readonly SkyboxRenderer _skyboxRenderer;
+    private readonly IBLBaker _ibl;
     
     private UISystem _ui = null!;
     private PostProcessor _post = null!;
@@ -35,7 +38,9 @@ public class RenderingSystem : IDisposable
         _gl            = gl;
         _config        = config;
         
-        _mainRenderer   = new MainRenderer(gl, config);
+        _ibl = new IBLBaker(gl);  
+        
+        _mainRenderer   = new MainRenderer(gl, config, _ibl);
         _gridRenderer   = new GridRenderer(gl);
         _debugRenderer  = new DebugRenderer(gl, config);
         _skyboxRenderer = new SkyboxRenderer(gl);
@@ -53,6 +58,15 @@ public class RenderingSystem : IDisposable
         
         _post = new PostProcessor(_gl, hdr, grading);
         _ui   = new UISystem(_gl, _config, window, input, grading);   // shares the same instance
+    }
+    
+    public void BakeEnvironments(Scene scene)
+    {
+        foreach (var sky in scene.Skyboxes.All)
+        {
+            if (!sky.IblBaked)
+                (sky.IrradianceMap, sky.PrefilteredMap) = _ibl.Bake(sky.Texture);
+        }
     }
 
     public void Update(float deltaTime)
@@ -114,5 +128,6 @@ public class RenderingSystem : IDisposable
         _skyboxRenderer.Dispose();
         _ui.Dispose();
         _post.Dispose();
+        _ibl.Dispose();
     }
 }

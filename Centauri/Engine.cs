@@ -62,6 +62,7 @@ public class Engine : IWindowCallbacks
         _sceneLoader = new SceneLoader(_resourceSystem, _scene, _config);
         _sceneLoader.Load();
         _scene.Cameras.InitializeAspect(_window);
+        _renderingSystem.BakeEnvironments(_scene);
     }
 
     private void InitializeInput()

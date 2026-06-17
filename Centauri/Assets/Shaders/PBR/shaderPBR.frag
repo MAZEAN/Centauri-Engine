@@ -51,6 +51,12 @@ uniform vec4  uColor;
 
 uniform vec3       uCameraPos;
 
+uniform samplerCube uIrradianceMap;   // unit 5
+uniform samplerCube uPrefilterMap;    // unit 6
+uniform sampler2D   uBrdfLUT;         // unit 7
+uniform int   uHasIBL;
+uniform float uMaxReflectionLod;
+
 
 // ─── lighting ──────────────────────────────────────────────────────────────────
 // shared lights UBO (binding 0) — uploaded once per frame for all lit shaders
@@ -97,6 +103,10 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
 vec3 FresnelSchlick(float cosTheta, vec3 F0)
 {
     return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+vec3 FresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness) {
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
 // ─── per-light PBR calculation ────────────────────────────────────────────────
@@ -181,16 +191,34 @@ void main()
 
         vec3 Lp        = normalize(lightDir);
         vec3 radianceP = uPoints[i].color.xyz * uPoints[i].params.x * attenuation;
+        
         Lo += CalcPBR(Lp, radianceP, N, V, albedo, roughness, metallic);
     }
 
     // spotlights
     for (int i = 0; i < uCounts.y; i++)
     Lo += CalcSpotLight(uSpots[i], N, V, albedo, roughness, metallic);
+    
+    // ambient lighting
+    vec3 F0 = mix(vec3(0.04), albedo, metallic);
+    vec3 ambient;
+    
+    if (uHasIBL == 1) {
+        vec3 kS = FresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
+        vec3 kD = (1.0 - kS) * (1.0 - metallic);
+        vec3 diffuse = texture(uIrradianceMap, N).rgb * albedo;
 
-    vec3 F0      = mix(vec3(0.04), albedo, metallic);
-    vec3 ambient = vec3(0.03) * mix(albedo, F0, metallic) * ao;
-    vec3 color   = ambient + Lo;
+        vec3 R = reflect(-V, N);
+        vec3 prefiltered = textureLod(uPrefilterMap, R, roughness * uMaxReflectionLod).rgb;
+        vec2 brdf = texture(uBrdfLUT, vec2(max(dot(N, V), 0.0), roughness)).rg;
+        vec3 specular = prefiltered * (kS * brdf.x + brdf.y);
+
+        ambient = (kD * diffuse + specular) * ao;
+    } else {
+        ambient = vec3(0.03) * mix(albedo, F0, metallic) * ao;   // fallback
+    }
+    
+    vec3 color = ambient + Lo;
     
     FragColor = vec4(color, albedoSample.a);
     

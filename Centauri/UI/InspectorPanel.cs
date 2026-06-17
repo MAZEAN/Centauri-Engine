@@ -4,7 +4,7 @@ using ImGuiNET;
 using System.Numerics;
 
 using World;
-using Rendering;
+using Rendering.Postprocessing;
 
 public class InspectorPanel
 {

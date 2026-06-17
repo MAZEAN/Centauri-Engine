@@ -14,6 +14,11 @@ public class Skybox(GLTexture texture, float exposure, float blackLevel)
     
     public float AuthoredExposure   { get; } = exposure;
     public float AuthoredBlackLevel { get; } = blackLevel;
+    
+    // baked IBL (0 until baked)
+    public uint IrradianceMap { get; set; }
+    public uint PrefilteredMap { get; set; }
+    public bool IblBaked => IrradianceMap != 0;
 }
 
 public class SkyboxSet
@@ -21,6 +26,8 @@ public class SkyboxSet
     private readonly List<Skybox> _items = new();
     private readonly Dictionary<string, Skybox> _byName = new();
     public Skybox? Active { get; private set; }
+    
+    public IReadOnlyList<Skybox> All => _items;
 
     public void Add(string name, GLTexture panorama, float exposure = 1.0f, float blackLevel = 0.0f)
     {

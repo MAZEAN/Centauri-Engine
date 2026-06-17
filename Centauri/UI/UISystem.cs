@@ -7,7 +7,7 @@ using Silk.NET.Input;
 using Config;
 using World;
 using Utils.Misc;
-using Rendering;
+using Rendering.Postprocessing;
 
 // Owns the whole ImGui surface — the controller plus every panel.
 // RenderingSystem holds one of these instead of juggling them individually.
