@@ -65,7 +65,7 @@ public class RenderingSystem : IDisposable
         foreach (var sky in scene.Skyboxes.All)
         {
             if (!sky.IblBaked)
-                (sky.IrradianceMap, sky.PrefilteredMap) = _ibl.Bake(sky.Texture);
+                (sky.IrradianceMap, sky.PrefilteredMap) = _ibl.Bake(sky.Texture, sky.Exposure);
         }
     }
 

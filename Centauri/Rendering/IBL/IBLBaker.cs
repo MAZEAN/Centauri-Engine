@@ -43,47 +43,108 @@ public sealed class IBLBaker : IDisposable
         BrdfLut = BakeBrdf();
     }
 
-    // equirect (2D RGB16F) → (irradiance cubemap, prefiltered cubemap)
-    public unsafe (uint irradiance, uint prefiltered) Bake(GLTexture equirect)
+    // public unsafe (uint irradiance, uint prefiltered) Bake(GLTexture equirect, float exposure)
+    // {
+    //     // 1) equirect → env cubemap (+ mips, used by the prefilter pass)
+    //     var env = CreateCubemap(EnvSize, mips: true);
+    //     _toCube.Use();
+    //     _toCube.SetUniform("uProjection", _proj);
+    //     _toCube.SetUniform("uEquirect", 0);
+    //     _toCube.SetUniform("uExposure", exposure); 
+    //     _gl.ActiveTexture(TextureUnit.Texture0);
+    //     _gl.BindTexture(TextureTarget.Texture2D, equirect.Handle);
+    //
+    //     RenderToCube(env, EnvSize, 0, _toCube);
+    //     _gl.BindTexture(TextureTarget.TextureCubeMap, env);
+    //     _gl.GenerateMipmap(TextureTarget.TextureCubeMap);
+    //
+    //     // 2) irradiance
+    //     var irr = CreateCubemap(IrradianceSize, mips: false);
+    //     _irradiance.Use();
+    //     _irradiance.SetUniform("uProjection", _proj);
+    //     _irradiance.SetUniform("uEnv", 0);
+    //     _irradiance.SetUniform("uMaxRadiance", 10.0f); 
+    //
+    //     _gl.ActiveTexture(TextureUnit.Texture0);
+    //     _gl.BindTexture(TextureTarget.TextureCubeMap, env);
+    //     RenderToCube(irr, IrradianceSize, 0, _irradiance);
+    //
+    //     // 3) prefilter (one render per mip / roughness)
+    //     var pre = CreateCubemap(PrefilterSize, mips: true);
+    //     _prefilter.Use();
+    //     _prefilter.SetUniform("uProjection", _proj);
+    //     _prefilter.SetUniform("uEnv", 0);
+    //     _prefilter.SetUniform("uResolution", (float)EnvSize);
+    //
+    //     _gl.ActiveTexture(TextureUnit.Texture0);
+    //     _gl.BindTexture(TextureTarget.TextureCubeMap, env);
+    //
+    //     for (var mip = 0; mip < PrefilterMips; mip++)
+    //     {
+    //         var size = (uint)(PrefilterSize * MathF.Pow(0.5f, mip));
+    //         _prefilter.SetUniform("uRoughness", mip / (float)(PrefilterMips - 1));
+    //         RenderToCube(pre, size, mip, _prefilter);
+    //     }
+    //
+    //     _gl.DeleteTexture(env);                       // env cubemap no longer needed
+    //     _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+    //     return (irr, pre);
+    // }
+    
+    public unsafe (uint irradiance, uint prefiltered) Bake(GLTexture equirect, float exposure)
     {
-        // 1) equirect → env cubemap (+ mips, used by the prefilter pass)
-        var env = CreateCubemap(EnvSize, mips: true);
-        _toCube.Use();
-        _toCube.SetUniform("uProjection", _proj);
-        _toCube.SetUniform("uEquirect", 0);
-        _gl.ActiveTexture(TextureUnit.Texture0);
-        _gl.BindTexture(TextureTarget.Texture2D, equirect.Handle);
-        RenderToCube(env, EnvSize, 0, _toCube);
-        _gl.BindTexture(TextureTarget.TextureCubeMap, env);
-        _gl.GenerateMipmap(TextureTarget.TextureCubeMap);
-
-        // 2) irradiance
-        var irr = CreateCubemap(IrradianceSize, mips: false);
-        _irradiance.Use();
-        _irradiance.SetUniform("uProjection", _proj);
-        _irradiance.SetUniform("uEnv", 0);
-        _gl.ActiveTexture(TextureUnit.Texture0);
-        _gl.BindTexture(TextureTarget.TextureCubeMap, env);
-        RenderToCube(irr, IrradianceSize, 0, _irradiance);
-
-        // 3) prefilter (one render per mip / roughness)
-        var pre = CreateCubemap(PrefilterSize, mips: true);
-        _prefilter.Use();
-        _prefilter.SetUniform("uProjection", _proj);
-        _prefilter.SetUniform("uEnv", 0);
-        _prefilter.SetUniform("uResolution", (float)EnvSize);
-        _gl.ActiveTexture(TextureUnit.Texture0);
-        _gl.BindTexture(TextureTarget.TextureCubeMap, env);
-        for (var mip = 0; mip < PrefilterMips; mip++)
+        _gl.Disable(EnableCap.CullFace);
+        try
         {
-            var size = (uint)(PrefilterSize * MathF.Pow(0.5f, mip));
-            _prefilter.SetUniform("uRoughness", mip / (float)(PrefilterMips - 1));
-            RenderToCube(pre, size, mip, _prefilter);
+            // 1) equirect → env cubemap (+ mips, used by the prefilter pass)
+            var env = CreateCubemap(EnvSize, mips: true);
+            _toCube.Use();
+            _toCube.SetUniform("uProjection", _proj);
+            _toCube.SetUniform("uEquirect", 0);
+            _toCube.SetUniform("uExposure", exposure); 
+            _gl.ActiveTexture(TextureUnit.Texture0);
+            _gl.BindTexture(TextureTarget.Texture2D, equirect.Handle);
+        
+            RenderToCube(env, EnvSize, 0, _toCube);
+            _gl.BindTexture(TextureTarget.TextureCubeMap, env);
+            _gl.GenerateMipmap(TextureTarget.TextureCubeMap);
+    
+            // 2) irradiance
+            var irr = CreateCubemap(IrradianceSize, mips: false);
+            _irradiance.Use();
+            _irradiance.SetUniform("uProjection", _proj);
+            _irradiance.SetUniform("uEnv", 0);
+            _irradiance.SetUniform("uMaxRadiance", 10.0f); 
+        
+            _gl.ActiveTexture(TextureUnit.Texture0);
+            _gl.BindTexture(TextureTarget.TextureCubeMap, env);
+            RenderToCube(irr, IrradianceSize, 0, _irradiance);
+    
+            // 3) prefilter (one render per mip / roughness)
+            var pre = CreateCubemap(PrefilterSize, mips: true);
+            _prefilter.Use();
+            _prefilter.SetUniform("uProjection", _proj);
+            _prefilter.SetUniform("uEnv", 0);
+            _prefilter.SetUniform("uResolution", (float)EnvSize);
+        
+            _gl.ActiveTexture(TextureUnit.Texture0);
+            _gl.BindTexture(TextureTarget.TextureCubeMap, env);
+        
+            for (var mip = 0; mip < PrefilterMips; mip++)
+            {
+                var size = (uint)(PrefilterSize * MathF.Pow(0.5f, mip));
+                _prefilter.SetUniform("uRoughness", mip / (float)(PrefilterMips - 1));
+                RenderToCube(pre, size, mip, _prefilter);
+            }
+    
+            _gl.DeleteTexture(env);                       // env cubemap no longer needed
+            _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+            return (irr, pre);
         }
-
-        _gl.DeleteTexture(env);                       // env cubemap no longer needed
-        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-        return (irr, pre);
+        finally
+        {
+            _gl.Enable(EnableCap.CullFace);
+        }
     }
 
     private unsafe void RenderToCube(uint cubemap, uint size, int mip, GLShader shader)
@@ -117,7 +178,8 @@ public sealed class IBLBaker : IDisposable
 
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, _fbo);
         _gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, _rbo);
-        _gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer, InternalFormat.DepthComponent24, BrdfSize, BrdfSize);
+        _gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer,
+            InternalFormat.DepthComponent24, BrdfSize, BrdfSize);
         _gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
             TextureTarget.Texture2D, lut, 0);
         _gl.Viewport(0, 0, BrdfSize, BrdfSize);
@@ -185,9 +247,11 @@ public sealed class IBLBaker : IDisposable
             -1,-1,-1, -1, 1,-1,  1, 1,-1,  1, 1,-1,  1,-1,-1, -1,-1,-1,
             -1,-1, 1,  1,-1, 1,  1, 1, 1,  1, 1, 1, -1, 1, 1, -1,-1, 1,
         };
+        
         var vao = _gl.GenVertexArray(); var vbo = _gl.GenBuffer();
         _gl.BindVertexArray(vao);
         _gl.BindBuffer(BufferTargetARB.ArrayBuffer, vbo);
+        
         fixed (float* p = v) _gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(v.Length*sizeof(float)), p, BufferUsageARB.StaticDraw);
         _gl.EnableVertexAttribArray(0);
         _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 3*sizeof(float), (void*)0);
@@ -200,6 +264,9 @@ public sealed class IBLBaker : IDisposable
         _gl.DeleteFramebuffer(_fbo); _gl.DeleteRenderbuffer(_rbo);
         _gl.DeleteVertexArray(_cubeVao); _gl.DeleteBuffer(_cubeVbo); _gl.DeleteVertexArray(_quadVao);
         _gl.DeleteTexture(BrdfLut);
-        _toCube.Dispose(); _irradiance.Dispose(); _prefilter.Dispose(); _brdf.Dispose();
+        _toCube.Dispose(); 
+        _irradiance.Dispose(); 
+        _prefilter.Dispose(); 
+        _brdf.Dispose();
     }
 }

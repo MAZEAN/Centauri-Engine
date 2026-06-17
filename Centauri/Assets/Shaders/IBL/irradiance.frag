@@ -6,6 +6,7 @@ out vec4 FragColor;
 const float PI = 3.14159265359;
 
 uniform samplerCube uEnv;
+uniform float uMaxRadiance;
 
 void main() {
     vec3 N = normalize(vLocalPos);
@@ -22,8 +23,8 @@ void main() {
     for (float theta = 0.0; theta < 0.5 * PI; theta += 0.025) {
         vec3 t = vec3(sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta));
         vec3 s = t.x * right + t.y * up + t.z * N;
-        
-        irradiance += texture(uEnv, s).rgb * cos(theta) * sin(theta);
+
+        irradiance += min(texture(uEnv, s).rgb, vec3(uMaxRadiance)) * cos(theta) * sin(theta);
         samples++;
     }
     FragColor = vec4(PI * irradiance / samples, 1.0);
