@@ -23,6 +23,7 @@ public class RenderConfig
     [JsonPropertyName("shaderCacheSize")]  public int    ShaderCacheSize  { get; init; } = 32;
     [JsonPropertyName("scenePath")]        public string ScenePath        { get; init; } = "Loading/scene.json";
     [JsonPropertyName("defaultShader")]    public string DefaultShader    { get; init; } = "Assets/Shaders/shaderPBR";
+    [JsonPropertyName("iblIntensity")]     public float IblIntensity { get; init; } = 0.3f;
 }
 
 public class CameraConfig

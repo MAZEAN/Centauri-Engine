@@ -56,6 +56,7 @@ uniform samplerCube uPrefilterMap;    // unit 6
 uniform sampler2D   uBrdfLUT;         // unit 7
 uniform int   uHasIBL;
 uniform float uMaxReflectionLod;
+uniform float uIblIntensity;
 
 
 // ─── lighting ──────────────────────────────────────────────────────────────────
@@ -213,7 +214,7 @@ void main()
         vec2 brdf = texture(uBrdfLUT, vec2(max(dot(N, V), 0.0), roughness)).rg;
         vec3 specular = prefiltered * (kS * brdf.x + brdf.y);
 
-        ambient = (kD * diffuse + specular) * ao;
+        ambient = (kD * diffuse + specular) * ao * uIblIntensity;
     } else {
         ambient = vec3(0.03) * mix(albedo, F0, metallic) * ao;   // fallback
     }
