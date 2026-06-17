@@ -126,6 +126,7 @@ public sealed class IBLBaker : IDisposable
             _prefilter.SetUniform("uProjection", _proj);
             _prefilter.SetUniform("uEnv", 0);
             _prefilter.SetUniform("uResolution", (float)EnvSize);
+            _prefilter.SetUniform("uMaxRadiance", 10.0f);
         
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.BindTexture(TextureTarget.TextureCubeMap, env);

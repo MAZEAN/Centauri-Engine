@@ -8,6 +8,7 @@ const float PI = 3.14159265359;
 uniform samplerCube uEnv;
 uniform float uRoughness;
 uniform float uResolution;     // env face size, for mip selection
+uniform float uMaxRadiance;
 
 float RadicalInverse_VdC(uint bits) {
     bits = (bits<<16u) | (bits>>16u);
@@ -72,9 +73,9 @@ void main() {
             float saS = 1.0 / (float(S) * pdf + 0.0001);
             
             float mip = uRoughness == 0.0 ? 0.0 : 0.5 * log2(saS / saT);
-            
-            acc += textureLod(uEnv, L, mip).rgb * nl;
-            w+=nl;
+
+            acc += min(textureLod(uEnv, L, mip).rgb, vec3(uMaxRadiance)) * nl;
+            w += nl;
         }
     }
     FragColor = vec4(acc/ w, 1.0);

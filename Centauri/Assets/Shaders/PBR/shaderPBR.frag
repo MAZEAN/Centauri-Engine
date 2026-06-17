@@ -222,6 +222,6 @@ void main()
     vec3 color = ambient + Lo;
     
     FragColor = vec4(color, albedoSample.a);
-    
-    //FragColor = vec4(1, 0, 0, 1);
+
+    //FragColor = vec4(ambient, 1.0);
 }
