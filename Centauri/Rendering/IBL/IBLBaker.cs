@@ -18,6 +18,8 @@ public sealed class IBLBaker : IDisposable
     private readonly GLShader _toCube, _irradiance, _prefilter, _brdf;
     private readonly Matrix4x4 _proj;
     private readonly Matrix4x4[] _views;
+    
+    private readonly List<uint> _baked = new();
 
     public uint BrdfLut { get; }
     public int MaxReflectionLod => PrefilterMips - 1;
@@ -93,6 +95,10 @@ public sealed class IBLBaker : IDisposable
     
             _gl.DeleteTexture(env);                       // env cubemap no longer needed
             _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+            
+            _baked.Add(irr);
+            _baked.Add(pre);
+            
             return (irr, pre);
         }
         finally
@@ -215,12 +221,21 @@ public sealed class IBLBaker : IDisposable
 
     public void Dispose()
     {
-        _gl.DeleteFramebuffer(_fbo); _gl.DeleteRenderbuffer(_rbo);
-        _gl.DeleteVertexArray(_cubeVao); _gl.DeleteBuffer(_cubeVbo); _gl.DeleteVertexArray(_quadVao);
+        _gl.DeleteFramebuffer(_fbo); 
+        _gl.DeleteRenderbuffer(_rbo);
+        _gl.DeleteVertexArray(_cubeVao); 
+        
+        _gl.DeleteBuffer(_cubeVbo); 
+        _gl.DeleteVertexArray(_quadVao);
         _gl.DeleteTexture(BrdfLut);
+        
         _toCube.Dispose(); 
         _irradiance.Dispose(); 
         _prefilter.Dispose(); 
         _brdf.Dispose();
+        
+        foreach (var t in _baked) 
+            _gl.DeleteTexture(t);
+        _baked.Clear();
     }
 }

@@ -74,7 +74,10 @@ void main() {
             
             float mip = uRoughness == 0.0 ? 0.0 : 0.5 * log2(saS / saT);
 
-            acc += min(textureLod(uEnv, L, mip).rgb, vec3(uMaxRadiance)) * nl;
+            vec3 c = textureLod(uEnv, L, mip).rgb;
+            float peak = max(max(c.r, c.g), c.b);
+            c *= uMaxRadiance / (uMaxRadiance + peak);   // soft rolloff — consistent with irradiance, no hard cap
+            acc += c * nl;
             w += nl;
         }
     }

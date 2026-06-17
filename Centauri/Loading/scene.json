@@ -42,14 +42,6 @@
     {
       "name":     "Sphere3",
       "model":    "Assets/Objects/sphere.glb",
-      "material": "Assets/Materials/ShinyMetal.mat",
-      "position": [-2, 0, -2],
-      "scale":    [0.5, 0.5, 0.5],
-      "uvScale":  [0.5, 0.5]
-    },
-    {
-      "name":     "Sphere4",
-      "model":    "Assets/Objects/sphere.glb",
       "material": "Assets/Materials/CorrugatedIron.mat",
       "position": [3, 0, 0]
     },

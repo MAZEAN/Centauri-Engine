@@ -13,10 +13,13 @@ public static class HDRLoader
 
     public static HDRImage Load(string path)
     {
-        if (HasExt(path, ".hdr")) return RadianceHDRDecoder.Decode(path);
-        if (HasExt(path, ".exr")) return LoadExr(path);
+        var image =
+            HasExt(path, ".hdr") ? RadianceHDRDecoder.Decode(path) :
+            HasExt(path, ".exr") ? LoadExr(path) :
+            throw new NotSupportedException($"'{path}' is not a supported HDR image.");
         
-        throw new NotSupportedException($"'{path}' is not a supported HDR image.");
+        ClampToHalfRange(image.Pixels);   // keep values finite so the RGB16F upload never yields +Inf
+        return image;
     }
 
     private static HDRImage LoadExr(string path)
@@ -41,6 +44,13 @@ public static class HDRLoader
         }
 
         return new HDRImage(rgb, width, height);
+    }
+    
+    private static void ClampToHalfRange(float[] pixels)
+    {
+        const float halfMax = 65504f;
+        for (var i = 0; i < pixels.Length; i++)
+            pixels[i] = Math.Clamp(pixels[i], 0f, halfMax);   // also drops stray negatives from EXR
     }
 
     private static bool HasExt(string path, string ext)
