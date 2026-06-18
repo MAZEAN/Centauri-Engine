@@ -6,7 +6,7 @@ using System.Numerics;
 using World;
 using Rendering.Postprocessing;
 
-public class InspectorPanel
+public class ConfigurationPanel
 {
     private const float Width   = 300f;
     private const float Padding = 10f;
@@ -22,7 +22,7 @@ public class InspectorPanel
 
     private const ImGuiWindowFlags Flags = GUI.PanelBase;
 
-    public InspectorPanel(ImFontPtr font, ColorGrading grading)
+    public ConfigurationPanel(ImFontPtr font, ColorGrading grading)
     {
         _font    = font;
         _grading = grading;
@@ -32,7 +32,7 @@ public class InspectorPanel
     {
         SetupWindow();
 
-        if (!ImGui.Begin("Inspector", Flags))
+        if (!ImGui.Begin("Configuration", Flags))
         {
             ImGui.End();
             return;
@@ -78,24 +78,18 @@ public class InspectorPanel
             DrawLight(entity);
         }
     }
-    
-    private static void DrawHeader(Entity e)
-    {
-        var name = e.Name;
-        
-        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
-        if (ImGui.InputText("##name", ref name, 64))
-            e.Name = name;
-        
-        ImGui.Spacing();
-    }
 
     private void DrawTransform(Entity e)
     {
         var open = GUI.BeginPanel("Transform");
-        if (!open) { GUI.EndPanel(open); return; }
+        if (!open)
+        {
+            GUI.EndPanel(open); 
+            return;
+        }
         
         ImGui.PushID("Transform");
+        
         var t = e.Transform;
         var a = e.Authored;
 
@@ -103,13 +97,16 @@ public class InspectorPanel
         var rotReset   = a?.Euler    ?? Vector3.Zero;
         var scaleReset = a?.Scale    ?? Vector3.One;
 
-        GUI.Vec3Rows("Location", t.Position, v => t.Position = v, 0.05f, "%.3f m", posReset);
+        GUI.Vec3Rows("Location", t.Position, v => t.Position = v,
+            0.05f, "%.3f m", posReset);
 
         if (!_editingRotation) _euler = t.EulerAngles;
+        
         if (GUI.Vec3Rows("Rotation", ref _euler, 0.5f, "%.1f°", rotReset, out _editingRotation))
             t.SetEulerAngles(_euler.X, _euler.Y, _euler.Z);
 
-        GUI.Vec3Rows("Scale", t.Scale, v => t.Scale = v, 0.01f, "%.3f", scaleReset);
+        GUI.Vec3Rows("Scale", t.Scale, v => t.Scale = v,
+            0.01f, "%.3f", scaleReset);
         ImGui.PopID();
         
         GUI.EndPanel(open);
@@ -120,12 +117,20 @@ public class InspectorPanel
         if (e.Material is not { } mat) return;
 
         var open = GUI.BeginPanel("Material");
-        if (!open) { GUI.EndPanel(open); return; }
+        if (!open)
+        {
+            GUI.EndPanel(open); 
+            return;
+        }
         
         ImGui.PushID("Material");
+        
         GUI.ColorRow4("Base Color", mat.Color, v => mat.Color = v);
-        GUI.SliderRow("Roughness", mat.RoughnessValue, v => mat.RoughnessValue = v, 0f, 1f, 0.5f);
-        GUI.SliderRow("Metallic",  mat.MetallicValue,  v => mat.MetallicValue  = v, 0f, 1f, 0.1f);
+        GUI.SliderRow("Roughness", mat.RoughnessValue, v => mat.RoughnessValue = v,
+            0f, 1f, 0.5f);
+        GUI.SliderRow("Metallic",  mat.MetallicValue,  v => mat.MetallicValue  = v,
+            0f, 1f, 0.1f);
+        
         ImGui.PopID();
         
         GUI.EndPanel(open);
@@ -153,26 +158,34 @@ public class InspectorPanel
         {
             GUI.CheckRow("Light Enabled", light.Enabled, v => light.Enabled = v);
             GUI.ColorRow3("Color", light.Color, v => light.Color = v);            // ## hack no longer needed
-            GUI.DragRow("Intensity", light.Intensity, v => light.Intensity = v, 0.05f, 0f, 100f, "%.3f", 1f);
+            GUI.DragRow("Intensity", light.Intensity, v => light.Intensity = v,
+                0.05f, 0f, 100f, "%.3f", 1f);
 
             switch (light)
             {
                 case DirectionalLight d:
-                    GUI.Vec3Rows("Direction", d.Direction, v => d.Direction = v, 0.01f, "%.3f", new Vector3(0f, -1f, 0f));
+                    GUI.Vec3Rows("Direction", d.Direction, v => d.Direction = v,
+                        0.01f, "%.3f", new Vector3(0f, -1f, 0f));
                     break;
                 case SpotLight s:
-                    GUI.Vec3Rows("Direction", s.Direction, v => s.Direction = v, 0.01f, "%.3f", new Vector3(0f, -1f, 0f));
-                    GUI.DragRow("Inner Cutoff", s.InnerCutoff, v => s.InnerCutoff = v, 0.5f, 0f, 90f, "%.1f°", 12.5f);
-                    GUI.DragRow("Outer Cutoff", s.OuterCutoff, v => s.OuterCutoff = v, 0.5f, 0f, 90f, "%.1f°", 17.5f);
+                    GUI.Vec3Rows("Direction", s.Direction, v => s.Direction    = v,
+                        0.01f, "%.3f", new Vector3(0f, -1f, 0f));
+                    GUI.DragRow("Inner Cutoff", s.InnerCutoff, v => s.InnerCutoff = v,
+                        0.5f, 0f, 90f, "%.1f°", 12.5f);
+                    GUI.DragRow("Outer Cutoff", s.OuterCutoff, v => s.OuterCutoff = v,
+                        0.5f, 0f, 90f, "%.1f°", 17.5f);
                     break;
                 case PointLight p:
-                    GUI.DragRow("Linear",    p.Linear,    v => p.Linear    = v, 0.001f, 0f, 1f, "%.3f", 0.09f);
-                    GUI.DragRow("Quadratic", p.Quadratic, v => p.Quadratic = v, 0.001f, 0f, 1f, "%.3f", 0.032f);
+                    GUI.DragRow("Linear",    p.Linear,    v => p.Linear    = v,
+                        0.001f, 0f, 1f, "%.3f", 0.09f);
+                    GUI.DragRow("Quadratic", p.Quadratic, v => p.Quadratic = v,
+                        0.001f, 0f, 1f, "%.3f", 0.032f);
                     break;
             }
         }
 
         ImGui.PopID();
+        
         GUI.EndPanel(open);
     }
     
@@ -191,6 +204,7 @@ public class InspectorPanel
         light.Color     = from.Color;
         light.Intensity = from.Intensity;
         light.Enabled   = from.Enabled;
+        
         return light;
     }
     
@@ -199,15 +213,22 @@ public class InspectorPanel
         if (scene.Skyboxes.Active is not { } sky) return;   // no skybox loaded
         
         ImGui.SetNextItemOpen(false, ImGuiCond.FirstUseEver);
+        
         var open = GUI.BeginPanel("Skybox");
-        if (!open) { GUI.EndPanel(open); return; }
+        if (!open)
+        {
+            GUI.EndPanel(open);
+            return;
+        }
 
         ImGui.PushID("Skybox");
 
         if (sky.Texture.IsHdr)
         {
-            GUI.DragRow("Exposure",    sky.Exposure,   v => sky.Exposure   = v, 0.01f,  0f, 16f, "%.2f", sky.AuthoredExposure);
-            GUI.DragRow("Black Level", sky.BlackLevel, v => sky.BlackLevel = v, 0.001f, 0f, 0.5f, "%.3f", sky.AuthoredBlackLevel);
+            GUI.DragRow("Exposure",    sky.Exposure,   v => sky.Exposure   = v,
+                0.01f,  0f, 16f, "%.2f", sky.AuthoredExposure);
+            GUI.DragRow("Black Level", sky.BlackLevel, v => sky.BlackLevel = v,
+                0.001f, 0f, 0.5f, "%.3f", sky.AuthoredBlackLevel);
         }
         else
         {
@@ -215,22 +236,45 @@ public class InspectorPanel
         }
 
         ImGui.PopID();
+        
         GUI.EndPanel(open);
     }
     
     private void DrawColorGrading()
     {
         var open = GUI.BeginPanel("Color Grading");
-        if (!open) { GUI.EndPanel(open); return; }
+        if (!open)
+        {
+            GUI.EndPanel(open); 
+            return;
+        }
+        
+        ImGui.SetNextItemOpen(false, ImGuiCond.FirstUseEver);
 
         ImGui.PushID("Grading");
-        // Right-click → Reset returns to the config-authored value (like Transform/Skybox).
-        GUI.DragRow("Exposure",    _grading.Exposure,   v => _grading.Exposure   = v, 0.01f,  0f, 16f,  "%.2f", _grading.AuthoredExposure);
-        GUI.DragRow("Black Level", _grading.BlackLevel, v => _grading.BlackLevel = v, 0.001f, 0f, 0.5f, "%.3f", _grading.AuthoredBlackLevel);
-        GUI.DragRow("Contrast",    _grading.Contrast,   v => _grading.Contrast   = v, 0.01f,  0f, 2f,   "%.2f", _grading.AuthoredContrast);
-        GUI.DragRow("Saturation",  _grading.Saturation, v => _grading.Saturation = v, 0.01f,  0f, 2f,   "%.2f", _grading.AuthoredSaturation);
+        
+        GUI.DragRow("Exposure",    _grading.Exposure,   v => _grading.Exposure   = v,
+            0.01f,  0f, 16f,  "%.2f", _grading.AuthoredExposure);
+        GUI.DragRow("Black Level", _grading.BlackLevel, v => _grading.BlackLevel = v,
+            0.001f, 0f, 0.5f, "%.3f", _grading.AuthoredBlackLevel);
+        GUI.DragRow("Contrast",    _grading.Contrast,   v => _grading.Contrast   = v,
+            0.01f,  0f, 2f,   "%.2f", _grading.AuthoredContrast);
+        GUI.DragRow("Saturation",  _grading.Saturation, v => _grading.Saturation = v, 
+            0.01f,  0f, 2f,   "%.2f", _grading.AuthoredSaturation);
+        
         ImGui.PopID();
 
         GUI.EndPanel(open);
+    }
+    
+    private static void DrawHeader(Entity e)
+    {
+        var name = e.Name;
+        
+        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
+        if (ImGui.InputText("##name", ref name, 64))
+            e.Name = name;
+        
+        ImGui.Spacing();
     }
 }
