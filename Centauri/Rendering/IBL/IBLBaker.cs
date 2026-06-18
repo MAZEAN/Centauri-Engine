@@ -30,7 +30,9 @@ public sealed class IBLBaker : IDisposable
 
         _fbo = gl.GenFramebuffer();
         _rbo = gl.GenRenderbuffer();
+        
         (_cubeVao, _cubeVbo) = CreateCube();
+        
         _quadVao = gl.GenVertexArray();   // empty VAO for the fullscreen-triangle draws
 
         _toCube     = Load("equirect_to_cubemap");
@@ -49,6 +51,7 @@ public sealed class IBLBaker : IDisposable
     public unsafe (uint irradiance, uint prefiltered) Bake(GLTexture equirect, float exposure)
     {
         _gl.Disable(EnableCap.CullFace);
+        
         try
         {
             // 1) equirect → env cubemap (+ mips, used by the prefilter pass)
@@ -57,6 +60,7 @@ public sealed class IBLBaker : IDisposable
             _toCube.SetUniform("uProjection", _proj);
             _toCube.SetUniform("uEquirect", 0);
             _toCube.SetUniform("uExposure", exposure); 
+            
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.BindTexture(TextureTarget.Texture2D, equirect.Handle);
         
@@ -111,7 +115,9 @@ public sealed class IBLBaker : IDisposable
     {
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, _fbo);
         _gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, _rbo);
-        _gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer, InternalFormat.DepthComponent24, size, size);
+        
+        _gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer, InternalFormat.DepthComponent24,
+            size, size);
         _gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment,
             RenderbufferTarget.Renderbuffer, _rbo);
         _gl.Viewport(0, 0, size, size);
@@ -123,6 +129,7 @@ public sealed class IBLBaker : IDisposable
             _gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
                 (TextureTarget)((int)TextureTarget.TextureCubeMapPositiveX + i), cubemap, mip);
             _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+            
             _gl.DrawArrays(PrimitiveType.Triangles, 0, 36);
         }
         _gl.BindVertexArray(0);
@@ -132,24 +139,30 @@ public sealed class IBLBaker : IDisposable
     {
         var lut = _gl.GenTexture();
         _gl.BindTexture(TextureTarget.Texture2D, lut);
-        _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.RG16f, BrdfSize, BrdfSize, 0,
-            PixelFormat.RG, PixelType.Float, null);
+        _gl.TexImage2D(TextureTarget.Texture2D, 0,
+            InternalFormat.RG16f, BrdfSize, BrdfSize, 0, PixelFormat.RG, PixelType.Float, null);
+        
         foreach (var (k, v) in ClampLinear()) _gl.TexParameter(TextureTarget.Texture2D, k, v);
 
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, _fbo);
         _gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, _rbo);
+        
         _gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer,
             InternalFormat.DepthComponent24, BrdfSize, BrdfSize);
-        _gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
+        _gl.FramebufferTexture2D(FramebufferTarget.Framebuffer,
+            FramebufferAttachment.ColorAttachment0,
             TextureTarget.Texture2D, lut, 0);
+        
         _gl.Viewport(0, 0, BrdfSize, BrdfSize);
         _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
         _brdf.Use();
+        
         _gl.BindVertexArray(_quadVao);
         _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
         _gl.BindVertexArray(0);
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        
         return lut;
     }
 
@@ -157,17 +170,23 @@ public sealed class IBLBaker : IDisposable
     {
         var id = _gl.GenTexture();
         _gl.BindTexture(TextureTarget.TextureCubeMap, id);
+        
         for (var i = 0; i < 6; i++)
             _gl.TexImage2D((TextureTarget)((int)TextureTarget.TextureCubeMapPositiveX + i), 0,
                 InternalFormat.Rgb16f, (uint)size, (uint)size, 0, PixelFormat.Rgb, PixelType.Float, null);
 
-        _gl.TexParameter(TextureTarget.TextureCubeMap, TextureParameterName.TextureWrapS, (int)GLEnum.ClampToEdge);
-        _gl.TexParameter(TextureTarget.TextureCubeMap, TextureParameterName.TextureWrapT, (int)GLEnum.ClampToEdge);
-        _gl.TexParameter(TextureTarget.TextureCubeMap, TextureParameterName.TextureWrapR, (int)GLEnum.ClampToEdge);
-        _gl.TexParameter(TextureTarget.TextureCubeMap, TextureParameterName.TextureMinFilter,
-            (int)(mips ? GLEnum.LinearMipmapLinear : GLEnum.Linear));
+        _gl.TexParameter(TextureTarget.TextureCubeMap,
+            TextureParameterName.TextureWrapS, (int)GLEnum.ClampToEdge);
+        _gl.TexParameter(TextureTarget.TextureCubeMap,
+            TextureParameterName.TextureWrapT, (int)GLEnum.ClampToEdge);
+        _gl.TexParameter(TextureTarget.TextureCubeMap,
+            TextureParameterName.TextureWrapR, (int)GLEnum.ClampToEdge);
+        _gl.TexParameter(TextureTarget.TextureCubeMap,
+            TextureParameterName.TextureMinFilter, (int)(mips ? GLEnum.LinearMipmapLinear : GLEnum.Linear));
         _gl.TexParameter(TextureTarget.TextureCubeMap, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
+        
         if (mips) _gl.GenerateMipmap(TextureTarget.TextureCubeMap);
+        
         return id;
     }
 
@@ -199,23 +218,28 @@ public sealed class IBLBaker : IDisposable
 
     private unsafe (uint vao, uint vbo) CreateCube()
     {
-        float[] v = { // 36 positions
+        float[] v =
+        [ // 36 positions
             -1,-1,-1, -1,-1, 1, -1, 1, 1, -1, 1, 1, -1, 1,-1, -1,-1,-1,
              1,-1,-1,  1, 1,-1,  1, 1, 1,  1, 1, 1,  1,-1, 1,  1,-1,-1,
             -1,-1,-1,  1,-1,-1,  1,-1, 1,  1,-1, 1, -1,-1, 1, -1,-1,-1,
             -1, 1,-1, -1, 1, 1,  1, 1, 1,  1, 1, 1,  1, 1,-1, -1, 1,-1,
             -1,-1,-1, -1, 1,-1,  1, 1,-1,  1, 1,-1,  1,-1,-1, -1,-1,-1,
-            -1,-1, 1,  1,-1, 1,  1, 1, 1,  1, 1, 1, -1, 1, 1, -1,-1, 1,
-        };
+            -1,-1, 1,  1,-1, 1,  1, 1, 1,  1, 1, 1, -1, 1, 1, -1,-1, 1
+        ];
         
         var vao = _gl.GenVertexArray(); var vbo = _gl.GenBuffer();
         _gl.BindVertexArray(vao);
         _gl.BindBuffer(BufferTargetARB.ArrayBuffer, vbo);
         
-        fixed (float* p = v) _gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(v.Length*sizeof(float)), p, BufferUsageARB.StaticDraw);
+        fixed (float* p = v) _gl.BufferData(BufferTargetARB.ArrayBuffer,
+            (nuint)(v.Length * sizeof(float)), p, BufferUsageARB.StaticDraw);
+        
         _gl.EnableVertexAttribArray(0);
-        _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 3*sizeof(float), (void*)0);
+        _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float,
+            false, 3 * sizeof(float), (void*)0);
         _gl.BindVertexArray(0);
+        
         return (vao, vbo);
     }
 

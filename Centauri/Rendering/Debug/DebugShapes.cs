@@ -1,4 +1,4 @@
-namespace Centauri.Rendering.Renderers;
+namespace Centauri.Rendering.Debug;
 
 using Silk.NET.OpenGL;
 using System.Numerics;
@@ -6,7 +6,7 @@ using System.Numerics;
 using Graphics.Geometry;
 
 // Pure geometry/data for debug visuals — no GL state, no drawing.
-internal static class DebugShapes
+internal static class Shapes
 {
     public const float CameraScale     =  0.5f;
     public const float CameraModelBase = -0.4f;

@@ -8,13 +8,15 @@
 
 * [x] Entity inspector / modifier
 * [x] Skybox
+* [x] IBL
 * [ ] Raytracing with BVH (inspired by Sebastian Lague)
 * [ ] Cascaded shadow maps (CSM)
 * [ ] Physics engine integration (BEPUphysics2)
 * [ ] Terrain rendering
 * [ ] Water simulation (Sea of Thieves algorithm)
 * [ ] Foliage rendering
-* [ ] IBL?
+* [ ] Screen Space Reflections (SSR) (with ray tracing or PBR Accumulation)
+* [ ] Reflection Probes
 
 ### Enhancements
 

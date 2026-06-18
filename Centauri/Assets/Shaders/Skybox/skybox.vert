@@ -11,5 +11,6 @@ void main()
 {
     vDir = aPos;                                  // sample direction = cube position
     vec4 pos = uProjection * uView * vec4(aPos, 1.0);
+    
     gl_Position = pos.xyww;                       // force z = w → depth = 1.0 (far plane)
 }

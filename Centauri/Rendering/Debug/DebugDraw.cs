@@ -1,4 +1,4 @@
-namespace Centauri.Rendering.Renderers;
+namespace Centauri.Rendering.Debug;
 
 using Silk.NET.OpenGL;
 using System.Numerics;
@@ -10,7 +10,7 @@ using Graphics.Geometry;
 // Immediate-mode primitive drawer for the debug pass: owns the debug shader and a
 // single growable dynamic buffer, and issues line/triangle/mesh draws. Knows nothing
 // about cameras or bounding boxes.
-public sealed class DebugDraw : IDisposable
+public sealed class Draw : IDisposable
 {
     private readonly GL       _gl;
     private readonly GLShader _shader;
@@ -21,7 +21,7 @@ public sealed class DebugDraw : IDisposable
     // current GPU buffer capacity in bytes — grows as needed, never shrinks
     private nuint _capacity;
 
-    public DebugDraw(GL gl)
+    public Draw(GL gl)
     {
         _gl = gl;
         _shader = new GLShader(gl,

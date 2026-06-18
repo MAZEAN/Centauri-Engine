@@ -15,7 +15,7 @@ void main()
 {
     vec3 d  = normalize(vDir);
     vec2 uv = vec2(atan(d.z, d.x), asin(clamp(d.y, -1.0, 1.0))) * invAtan + 0.5;
-    vec3 color = textureLod(uPanorama, uv, 0.0).rgb;
+    vec3 color = texture(uPanorama, uv).rgb;
 
     if (uHdr == 1)
         color *= uExposure;             // HDR: linear radiance, normalize brightness
