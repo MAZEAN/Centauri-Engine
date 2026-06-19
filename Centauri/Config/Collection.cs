@@ -82,6 +82,18 @@ public class InputConfig
     }
 }
 
+public class ShadowConfig
+{
+    [JsonPropertyName("enabled")]    public bool  Enabled    { get; init; } = true;
+    [JsonPropertyName("size")]       public uint  Size       { get; init; } = 2048;   // depth map resolution
+    [JsonPropertyName("distance")]   public float Distance   { get; init; } = 50f;    // half-extent of the ortho box (world units)
+    [JsonPropertyName("near")]       public float Near       { get; init; } = 1f;
+    [JsonPropertyName("far")]        public float Far        { get; init; } = 200f;   // light-view depth range
+    [JsonPropertyName("depthBias")]  public float DepthBias  { get; init; } = 0.0015f;
+    [JsonPropertyName("normalBias")] public float NormalBias { get; init; } = 0.02f;
+    [JsonPropertyName("pcfRadius")]  public int   PcfRadius  { get; init; } = 1;      // 1 => 3x3 PCF
+}
+
 public sealed class ColorGrading
 {
     [JsonPropertyName("exposure")]   public float Exposure   { get; set; }

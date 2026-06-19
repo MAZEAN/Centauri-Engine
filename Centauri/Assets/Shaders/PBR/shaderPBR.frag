@@ -34,6 +34,9 @@ struct SpotLight {
 };
 
 // ─── uniforms ─────────────────────────────────────────────────────────────────
+uniform vec3 uCameraPos;
+
+// Materials
 uniform sampler2D uAlbedoMap;    // slot 0 — base color
 uniform sampler2D uNormalMap;    // slot 1 — surface detail
 uniform sampler2D uRoughnessMap; // slot 2 — how rough/smooth
@@ -49,8 +52,7 @@ uniform float uRoughnessValue;
 uniform float uMetallicValue;
 uniform vec4  uColor;
 
-uniform vec3       uCameraPos;
-
+// IBL
 uniform samplerCube uIrradianceMap;   // unit 5
 uniform samplerCube uPrefilterMap;    // unit 6
 uniform sampler2D   uBrdfLUT;         // unit 7
@@ -58,6 +60,37 @@ uniform int   uHasIBL;
 uniform float uMaxReflectionLod;
 uniform float uIblIntensity;
 
+// Shadows
+uniform sampler2D uShadowMap;        // unit 8
+uniform mat4  uLightView;
+uniform mat4  uLightProjection;
+uniform int   uHasShadow;
+uniform float uShadowBias;
+uniform float uNormalBias;
+uniform int   uPcfRadius;
+
+float ShadowFactor(vec3 N, vec3 L)
+{
+    // normal-offset the sample position to fight acne on slopes
+    vec4 lightSpace = uLightProjection * uLightView * vec4(fFragPos + N * uNormalBias, 1.0);
+    vec3 proj = lightSpace.xyz / lightSpace.w;
+    proj = proj * 0.5 + 0.5;                 // NDC [-1,1] -> [0,1]
+    if (proj.z > 1.0) return 0.0;            // beyond the light's far plane: lit
+
+    float bias    = max(uShadowBias * (1.0 - dot(N, L)), uShadowBias * 0.1);
+    float current = proj.z - bias;
+
+    float shadow = 0.0;
+    vec2  texel  = 1.0 / vec2(textureSize(uShadowMap, 0));
+    for (int x = -uPcfRadius; x <= uPcfRadius; ++x)
+    for (int y = -uPcfRadius; y <= uPcfRadius; ++y)
+    {
+        float closest = texture(uShadowMap, proj.xy + vec2(x, y) * texel).r;
+        shadow += current > closest ? 1.0 : 0.0;
+    }
+    float samples = float((2 * uPcfRadius + 1) * (2 * uPcfRadius + 1));
+    return shadow / samples;
+}
 
 // ─── lighting ──────────────────────────────────────────────────────────────────
 // shared lights UBO (binding 0) — uploaded once per frame for all lit shaders
@@ -179,7 +212,8 @@ void main()
     {
         vec3 L        = normalize(-uDir.direction.xyz);
         vec3 radiance = uDir.color.xyz * uDir.params.x;
-        Lo += CalcPBR(L, radiance, N, V, albedo, roughness, metallic);
+        float shadow  = uHasShadow == 1 ? ShadowFactor(N, L) : 0.0;
+        Lo += CalcPBR(L, radiance, N, V, albedo, roughness, metallic) * (1.0 - shadow);
     }
 
     // point lights

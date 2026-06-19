@@ -10,12 +10,14 @@ using Graphics.Geometry;
 using World.Collections;
 using Utils.Misc;
 using IBL;
+using Shadows;
 
 public class MainRenderer : IDisposable
 {
     private readonly GL _gl;
     private readonly AppConfig _config;
     private readonly IBLBaker _ibl; 
+    private readonly ShadowMapper _shadows;
     
     private const float SpotConstant  = 1.0f;
     private const float SpotLinear    = 0.09f;
@@ -33,11 +35,12 @@ public class MainRenderer : IDisposable
     
     private bool _iblActive;
 
-    public MainRenderer(GL gl, AppConfig config, IBLBaker ibl)
+    public MainRenderer(GL gl, AppConfig config, IBLBaker ibl, ShadowMapper shadows)
     {
         _gl = gl;
         _config = config;
         _ibl = ibl;
+        _shadows = shadows;
 
         _lightBuffer = new LightBuffer(gl);
         InitializeTextureCache();
@@ -56,10 +59,10 @@ public class MainRenderer : IDisposable
         var view          = viewCamera.GetViewMatrix();
         var cameraPosition = viewCamera.Position;
 
-        scene.Lighting.Collect(scene.Entities);
         UploadLights(scene.Lighting);
         
         BindIbl(scene);
+        BindShadows();
 
         foreach (var (shader, entities) in GetGroups(scene))
         {
@@ -194,6 +197,17 @@ public class MainRenderer : IDisposable
         shader.SetUniform("uHasIBL", _iblActive ? 1 : 0);
         shader.SetUniform("uMaxReflectionLod", (float)_ibl.MaxReflectionLod);
         shader.SetUniform("uIblIntensity", _config.IBLConfig.IblIntensity);
+        
+        shader.SetUniform("uShadowMap", 8);
+        shader.SetUniform("uHasShadow", _shadows.Active ? 1 : 0);
+        if (_shadows.Active)
+        {
+            shader.SetUniform("uLightView",       _shadows.LightView);
+            shader.SetUniform("uLightProjection", _shadows.LightProjection);
+            shader.SetUniform("uShadowBias",  _shadows.Config.DepthBias);
+            shader.SetUniform("uNormalBias",  _shadows.Config.NormalBias);
+            shader.SetUniform("uPcfRadius",   _shadows.Config.PcfRadius);
+        }
     }
     
     // -----------------------------
@@ -271,6 +285,13 @@ public class MainRenderer : IDisposable
         _gl.BindTexture(TextureTarget.TextureCubeMap, sky.PrefilteredMap);
         _gl.ActiveTexture(TextureUnit.Texture7);
         _gl.BindTexture(TextureTarget.Texture2D, _ibl.BrdfLut);
+    }
+    
+    private void BindShadows()
+    {
+        if (!_shadows.Active) return;
+        _gl.ActiveTexture(TextureUnit.Texture8);
+        _gl.BindTexture(TextureTarget.Texture2D, _shadows.DepthTexture);
     }
 
     private void InitializeTextureCache()

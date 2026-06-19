@@ -11,6 +11,7 @@ using Utils.Misc;
 using UI;
 using IBL;
 using Postprocessing;
+using Shadows;
 
 public class RenderingSystem : IDisposable
 {
@@ -20,6 +21,7 @@ public class RenderingSystem : IDisposable
     private readonly GridRenderer  _gridRenderer;
     private readonly DebugRenderer _debugRenderer;
     private readonly SkyboxRenderer _skyboxRenderer;
+    private readonly ShadowMapper _shadows;
     private readonly IBLBaker _ibl;
     
     private UISystem _ui = null!;
@@ -39,8 +41,9 @@ public class RenderingSystem : IDisposable
         _config        = config;
         
         _ibl = new IBLBaker(gl, _config.IBLConfig);  
+        _shadows = new ShadowMapper(gl, _config.Shadows);
         
-        _mainRenderer   = new MainRenderer(gl, config, _ibl);
+        _mainRenderer   = new MainRenderer(gl, config, _ibl, _shadows);
         _gridRenderer   = new GridRenderer(gl);
         _debugRenderer  = new DebugRenderer(gl, config);
         _skyboxRenderer = new SkyboxRenderer(gl);
@@ -74,6 +77,10 @@ public class RenderingSystem : IDisposable
 
     public void Render(Scene scene, double deltaTime)
     {
+        scene.Lighting.Collect(scene.Entities);
+        
+        _shadows.Render(scene);
+        
         _post.BeginScene();
 
         if (_config.Debug.ShowSkybox) 
@@ -126,5 +133,6 @@ public class RenderingSystem : IDisposable
         _ui.Dispose();
         _post.Dispose();
         _ibl.Dispose();
+        _shadows.Dispose();
     }
 }
