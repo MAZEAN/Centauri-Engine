@@ -5,6 +5,7 @@ using System.Numerics;
 
 using World;
 using Rendering.Postprocessing;
+using Config;
 
 public class ConfigurationPanel
 {
@@ -15,6 +16,7 @@ public class ConfigurationPanel
     private static readonly string[] LightTypes = ["None", "Directional", "Point", "Spot"];
 
     private readonly ImFontPtr _font;
+    private AppConfig _config;
     private readonly ColorGrading _grading;
     
     private Vector3 _euler;            // cached working rotation (deg) for the selected entity
@@ -22,9 +24,10 @@ public class ConfigurationPanel
 
     private const ImGuiWindowFlags Flags = GUI.PanelBase;
 
-    public ConfigurationPanel(ImFontPtr font, ColorGrading grading)
+    public ConfigurationPanel(ImFontPtr font, AppConfig config, ColorGrading grading)
     {
         _font    = font;
+        _config = config;
         _grading = grading;
     }
 
@@ -43,6 +46,7 @@ public class ConfigurationPanel
         DrawInspectorElements(scene);
         DrawSkybox(scene);
         DrawColorGrading();
+        DrawIBLConfig();
 
         ImGui.PopFont();
         
@@ -242,6 +246,8 @@ public class ConfigurationPanel
     
     private void DrawColorGrading()
     {
+        ImGui.SetNextItemOpen(false, ImGuiCond.FirstUseEver);
+        
         var open = GUI.BeginPanel("Color Grading");
         if (!open)
         {
@@ -262,6 +268,30 @@ public class ConfigurationPanel
         GUI.DragRow("Saturation",  _grading.Saturation, v => _grading.Saturation = v, 
             0.01f,  0f, 2f,   "%.2f", _grading.AuthoredSaturation);
         
+        ImGui.PopID();
+
+        GUI.EndPanel(open);
+    }
+    
+    private void DrawIBLConfig()
+    {
+        ImGui.SetNextItemOpen(false, ImGuiCond.FirstUseEver);
+        
+        var open = GUI.BeginPanel("IBL Config");
+        if (!open)
+        {
+            GUI.EndPanel(open); 
+            return;
+        }
+
+        var conf = _config.IBLConfig;
+        
+        ImGui.SetNextItemOpen(false, ImGuiCond.FirstUseEver);
+
+        ImGui.PushID("IBL");
+        
+        GUI.DragRow("IBLIntensity", conf.IblIntensity, v => conf.IblIntensity = v,
+            0.01f, 0f, 2.0f, "%.3f", 0.3f);
         ImGui.PopID();
 
         GUI.EndPanel(open);

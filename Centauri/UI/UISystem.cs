@@ -23,7 +23,7 @@ public sealed class UISystem : IDisposable
         _config       = config;
         _imGui        = new ImGuiManager(gl, config.ImGui, window, input);
         _statsOverlay = new StatsOverlay(_imGui.Font, config);
-        _inspector    = new ConfigurationPanel(_imGui.Font, grading);
+        _inspector    = new ConfigurationPanel(_imGui.Font, _config, grading);
     }
 
     public bool WantsMouse    => _imGui.WantsMouseCapture;

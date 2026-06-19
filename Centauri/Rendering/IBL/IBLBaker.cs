@@ -5,15 +5,15 @@ using System.Numerics;
 
 using Graphics.Resources;
 using Utils.Misc;
+using Config;
 
 // Precomputes IBL maps from an equirectangular HDR environment, plus a one-time
 // global BRDF LUT. Standard split-sum / LearnOpenGL flow.
 public sealed class IBLBaker : IDisposable
 {
-    private const int EnvSize = 512, IrradianceSize = 64, PrefilterSize = 128, PrefilterMips = 5, BrdfSize = 512;
-    private const float MaxRadiance = 10f;
-
     private readonly GL _gl;
+    private readonly IBLConfig _config;
+    
     private readonly uint _fbo, _rbo, _cubeVao, _cubeVbo, _quadVao;
     private readonly GLShader _toCube, _irradiance, _prefilter, _brdf;
     private readonly Matrix4x4 _proj;
@@ -22,11 +22,12 @@ public sealed class IBLBaker : IDisposable
     private readonly List<uint> _baked = new();
 
     public uint BrdfLut { get; }
-    public int MaxReflectionLod => PrefilterMips - 1;
+    public int MaxReflectionLod => _config.PrefilterMips - 1;
 
-    public IBLBaker(GL gl)
+    public IBLBaker(GL gl, IBLConfig config)
     {
         _gl = gl;
+        _config = config;
 
         _fbo = gl.GenFramebuffer();
         _rbo = gl.GenRenderbuffer();
@@ -55,7 +56,7 @@ public sealed class IBLBaker : IDisposable
         try
         {
             // 1) equirect → env cubemap (+ mips, used by the prefilter pass)
-            var env = CreateCubemap(EnvSize, mips: true);
+            var env = CreateCubemap(_config.EnvSize, mips: true);
             _toCube.Use();
             _toCube.SetUniform("uProjection", _proj);
             _toCube.SetUniform("uEquirect", 0);
@@ -64,36 +65,36 @@ public sealed class IBLBaker : IDisposable
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.BindTexture(TextureTarget.Texture2D, equirect.Handle);
         
-            RenderToCube(env, EnvSize, 0, _toCube);
+            RenderToCube(env, _config.EnvSize, 0, _toCube);
             _gl.BindTexture(TextureTarget.TextureCubeMap, env);
             _gl.GenerateMipmap(TextureTarget.TextureCubeMap);
     
             // 2) irradiance
-            var irr = CreateCubemap(IrradianceSize, mips: false);
+            var irr = CreateCubemap(_config.IrradianceSize, mips: false);
             _irradiance.Use();
             _irradiance.SetUniform("uProjection", _proj);
             _irradiance.SetUniform("uEnv", 0);
-            _irradiance.SetUniform("uMaxRadiance", MaxRadiance); 
+            _irradiance.SetUniform("uMaxRadiance", _config.MaxRadiance); 
         
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.BindTexture(TextureTarget.TextureCubeMap, env);
-            RenderToCube(irr, IrradianceSize, 0, _irradiance);
+            RenderToCube(irr, _config.IrradianceSize, 0, _irradiance);
     
             // 3) prefilter (one render per mip / roughness)
-            var pre = CreateCubemap(PrefilterSize, mips: true);
+            var pre = CreateCubemap(_config.PrefilterSize, mips: true);
             _prefilter.Use();
             _prefilter.SetUniform("uProjection", _proj);
             _prefilter.SetUniform("uEnv", 0);
-            _prefilter.SetUniform("uResolution", (float)EnvSize);
-            _prefilter.SetUniform("uMaxRadiance", MaxRadiance);
+            _prefilter.SetUniform("uResolution", (float)_config.EnvSize);
+            _prefilter.SetUniform("uMaxRadiance", _config.MaxRadiance);
         
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.BindTexture(TextureTarget.TextureCubeMap, env);
         
-            for (var mip = 0; mip < PrefilterMips; mip++)
+            for (var mip = 0; mip < _config.PrefilterMips; mip++)
             {
-                var size = (uint)(PrefilterSize * MathF.Pow(0.5f, mip));
-                _prefilter.SetUniform("uRoughness", mip / (float)(PrefilterMips - 1));
+                var size = (uint)(_config.PrefilterSize * MathF.Pow(0.5f, mip));
+                _prefilter.SetUniform("uRoughness", mip / (float)(_config.PrefilterMips - 1));
                 RenderToCube(pre, size, mip, _prefilter);
             }
     
@@ -140,7 +141,7 @@ public sealed class IBLBaker : IDisposable
         var lut = _gl.GenTexture();
         _gl.BindTexture(TextureTarget.Texture2D, lut);
         _gl.TexImage2D(TextureTarget.Texture2D, 0,
-            InternalFormat.RG16f, BrdfSize, BrdfSize, 0, PixelFormat.RG, PixelType.Float, null);
+            InternalFormat.RG16f, _config.BrdfSize, _config.BrdfSize, 0, PixelFormat.RG, PixelType.Float, null);
         
         foreach (var (k, v) in ClampLinear()) _gl.TexParameter(TextureTarget.Texture2D, k, v);
 
@@ -148,12 +149,12 @@ public sealed class IBLBaker : IDisposable
         _gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, _rbo);
         
         _gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer,
-            InternalFormat.DepthComponent24, BrdfSize, BrdfSize);
+            InternalFormat.DepthComponent24, _config.BrdfSize, _config.BrdfSize);
         _gl.FramebufferTexture2D(FramebufferTarget.Framebuffer,
             FramebufferAttachment.ColorAttachment0,
             TextureTarget.Texture2D, lut, 0);
         
-        _gl.Viewport(0, 0, BrdfSize, BrdfSize);
+        _gl.Viewport(0, 0, _config.BrdfSize, _config.BrdfSize);
         _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
         _brdf.Use();
@@ -166,7 +167,7 @@ public sealed class IBLBaker : IDisposable
         return lut;
     }
 
-    private unsafe uint CreateCubemap(int size, bool mips)
+    private unsafe uint CreateCubemap(uint size, bool mips)
     {
         var id = _gl.GenTexture();
         _gl.BindTexture(TextureTarget.TextureCubeMap, id);
@@ -185,7 +186,8 @@ public sealed class IBLBaker : IDisposable
             TextureParameterName.TextureMinFilter, (int)(mips ? GLEnum.LinearMipmapLinear : GLEnum.Linear));
         _gl.TexParameter(TextureTarget.TextureCubeMap, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
         
-        if (mips) _gl.GenerateMipmap(TextureTarget.TextureCubeMap);
+        if (mips) 
+            _gl.GenerateMipmap(TextureTarget.TextureCubeMap);
         
         return id;
     }

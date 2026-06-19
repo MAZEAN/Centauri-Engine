@@ -13,7 +13,6 @@
     "sensitivityX": 0.1,
     "sensitivityY": 0.1,
     "zoomSensitivity": 1.5,
-    "panSensitivity": 0.01,
     "minZoom": 1.0,
     "maxZoom": 90.0,
     "moveSpeed": 4.0
@@ -23,8 +22,7 @@
     "modelCacheSize": 64,
     "shaderCacheSize": 32,
     "scenePath": "Loading/scene.json",
-    "defaultShader": "Assets/Shaders/PBR/shaderPBR",
-    "iblIntensity": 0.3
+    "defaultShader": "Assets/Shaders/PBR/shaderPBR"
   },
   "imGui": {
     "font": "Assets/Fonts/IosevkaCharon-Regular.ttf",
@@ -43,5 +41,14 @@
     "blackLevel": 0.0,
     "contrast": 1.0,
     "saturation": 0.95
+  },
+  "ibl": {
+    "iblIntensity": 0.3,
+    "maxRadiance": 10,
+    "envSize": 512,
+    "irradianceSize": 64,
+    "prefilterSize": 128,
+    "prefilterMips": 5,
+    "brdfSize": 512
   }
 }

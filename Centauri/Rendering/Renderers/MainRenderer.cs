@@ -193,7 +193,7 @@ public class MainRenderer : IDisposable
         shader.SetUniform("uBrdfLUT",       7);
         shader.SetUniform("uHasIBL", _iblActive ? 1 : 0);
         shader.SetUniform("uMaxReflectionLod", (float)_ibl.MaxReflectionLod);
-        shader.SetUniform("uIblIntensity", _config.Render.IblIntensity);
+        shader.SetUniform("uIblIntensity", _config.IBLConfig.IblIntensity);
     }
     
     // -----------------------------

@@ -38,7 +38,7 @@ public class RenderingSystem : IDisposable
         _gl            = gl;
         _config        = config;
         
-        _ibl = new IBLBaker(gl);  
+        _ibl = new IBLBaker(gl, _config.IBLConfig);  
         
         _mainRenderer   = new MainRenderer(gl, config, _ibl);
         _gridRenderer   = new GridRenderer(gl);
