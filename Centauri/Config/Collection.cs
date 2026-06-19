@@ -82,12 +82,25 @@ public class InputConfig
     }
 }
 
-public class GradingConfig
+public sealed class ColorGrading
 {
-    [JsonPropertyName("exposure")]   public float Exposure   { get; init; } = 1.0f;
-    [JsonPropertyName("blackLevel")] public float BlackLevel { get; init; } = 0.0f;
-    [JsonPropertyName("contrast")]   public float Contrast   { get; init; } = 1.0f;
-    [JsonPropertyName("saturation")] public float Saturation { get; init; } = 1.0f;
+    [JsonPropertyName("exposure")]   public float Exposure   { get; set; }
+    [JsonPropertyName("blackLevel")] public float BlackLevel { get; set; }
+    [JsonPropertyName("contrast")]   public float Contrast   { get; set; }
+    [JsonPropertyName("saturation")] public float Saturation { get; set; }
+
+    [JsonIgnore] public float AuthoredExposure   { get; }
+    [JsonIgnore] public float AuthoredBlackLevel { get; }
+    [JsonIgnore] public float AuthoredContrast   { get; }
+    [JsonIgnore] public float AuthoredSaturation { get; }
+
+    public ColorGrading(float exposure = 1f, float blackLevel = 0f, float contrast = 1f, float saturation = 1f)
+    {
+        Exposure   = AuthoredExposure   = exposure;
+        BlackLevel = AuthoredBlackLevel = blackLevel;
+        Contrast   = AuthoredContrast   = contrast;
+        Saturation = AuthoredSaturation = saturation;
+    }
 }
 
 public class IBLConfig
@@ -99,4 +112,11 @@ public class IBLConfig
     [JsonPropertyName("prefilterSize")]   public uint PrefilterSize { get; init; }  = 128;
     [JsonPropertyName("prefilterMips")]   public int PrefilterMips { get; init; }  = 5;
     [JsonPropertyName("brdfSize")]        public uint BrdfSize { get; init; }  = 512;
+    
+    [JsonIgnore] public float AuthoredIblIntensity { get; }
+    
+    public IBLConfig(float iblIntensity = 0.3f)
+    {
+        IblIntensity = AuthoredIblIntensity = iblIntensity;
+    }
 }

@@ -85,7 +85,7 @@ public sealed class IBLBaker : IDisposable
             _prefilter.Use();
             _prefilter.SetUniform("uProjection", _proj);
             _prefilter.SetUniform("uEnv", 0);
-            _prefilter.SetUniform("uResolution", (float)_config.EnvSize);
+            _prefilter.SetUniform("uResolution", _config.EnvSize);
             _prefilter.SetUniform("uMaxRadiance", _config.MaxRadiance);
         
             _gl.ActiveTexture(TextureUnit.Texture0);
@@ -98,7 +98,7 @@ public sealed class IBLBaker : IDisposable
                 RenderToCube(pre, size, mip, _prefilter);
             }
     
-            _gl.DeleteTexture(env);                       // env cubemap no longer needed
+            _gl.DeleteTexture(env);
             _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
             
             _baked.Add(irr);
@@ -174,7 +174,7 @@ public sealed class IBLBaker : IDisposable
         
         for (var i = 0; i < 6; i++)
             _gl.TexImage2D((TextureTarget)((int)TextureTarget.TextureCubeMapPositiveX + i), 0,
-                InternalFormat.Rgb16f, (uint)size, (uint)size, 0, PixelFormat.Rgb, PixelType.Float, null);
+                InternalFormat.Rgb16f, size, size, 0, PixelFormat.Rgb, PixelType.Float, null);
 
         _gl.TexParameter(TextureTarget.TextureCubeMap,
             TextureParameterName.TextureWrapS, (int)GLEnum.ClampToEdge);

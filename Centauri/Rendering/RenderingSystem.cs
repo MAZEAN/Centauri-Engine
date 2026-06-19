@@ -48,16 +48,13 @@ public class RenderingSystem : IDisposable
     
     public void InitializeComponents(IWindow window, IInputContext input)
     {
-        var conf = _config.Grading;
-        var grading = new ColorGrading(conf.Exposure, conf.BlackLevel, conf.Contrast, conf.Saturation);
-
         var framebufferSize = window.FramebufferSize;
         var hdr = new HDRFramebuffer(
             _gl, (uint)framebufferSize.X, (uint)framebufferSize.Y, (uint)_config.Window.Samples
         );
         
-        _post = new PostProcessor(_gl, hdr, grading);
-        _ui   = new UISystem(_gl, _config, window, input, grading);   // shares the same instance
+        _post = new PostProcessor(_gl, hdr, _config.ColorGrading);
+        _ui   = new UISystem(_gl, _config, window, input, _config.ColorGrading);   // shares the same instance
     }
     
     public void BakeEnvironments(Scene scene)

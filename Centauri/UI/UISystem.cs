@@ -16,14 +16,14 @@ public sealed class UISystem : IDisposable
     private readonly AppConfig      _config;
     private readonly ImGuiManager   _imGui;
     private readonly StatsOverlay   _statsOverlay;
-    private readonly ConfigurationPanel _inspector;
+    private readonly PropertiesPanel _inspector;
 
     public UISystem(GL gl, AppConfig config, IWindow window, IInputContext input, ColorGrading grading)
     {
         _config       = config;
         _imGui        = new ImGuiManager(gl, config.ImGui, window, input);
         _statsOverlay = new StatsOverlay(_imGui.Font, config);
-        _inspector    = new ConfigurationPanel(_imGui.Font, _config, grading);
+        _inspector    = new PropertiesPanel(_imGui.Font, _config, grading);
     }
 
     public bool WantsMouse    => _imGui.WantsMouseCapture;

@@ -10,6 +10,6 @@ public class AppConfig
     [JsonPropertyName("imGui")]   public ImGuiConfig  ImGui  { get; init; } = new();
     [JsonPropertyName("input")]   public InputConfig  Input  { get; init; } = new();
     [JsonPropertyName("debug")]   public DebugConfig  Debug  { get; init; } = new();
-    [JsonPropertyName("grading")] public GradingConfig Grading { get; init; } = new();
+    [JsonPropertyName("grading")] public ColorGrading ColorGrading { get; init; } = new();
     [JsonPropertyName("ibl")]     public IBLConfig IBLConfig { get; init; } = new();
 }

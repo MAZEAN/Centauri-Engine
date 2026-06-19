@@ -14,7 +14,7 @@ internal static class Theme
         // ── metrics ─────────────────────────────────────────────────────────────
         style.WindowRounding    = 4f;
         style.ChildRounding     = 4f;
-        style.FrameRounding     = 4f;   // Blender's number fields are gently rounded
+        style.FrameRounding     = 4f;
         style.PopupRounding     = 4f;
         style.GrabRounding      = 4f;
         style.TabRounding       = 4f;
@@ -45,7 +45,7 @@ internal static class Theme
         var fieldHi   = new Vector4(0.33f, 0.33f, 0.33f, 1.00f);
         var header    = new Vector4(0.30f, 0.30f, 0.30f, 1.00f);
         var headerHi  = new Vector4(0.36f, 0.36f, 0.36f, 1.00f);
-        var accent    = new Vector4(0.22f, 0.46f, 0.80f, 1.00f);   // Blender selection blue
+        var accent    = new Vector4(0.22f, 0.46f, 0.80f, 1.00f);
         var accentDim = new Vector4(0.20f, 0.39f, 0.66f, 1.00f);
         var line      = new Vector4(0.10f, 0.10f, 0.10f, 1.00f);
 
@@ -67,7 +67,7 @@ internal static class Theme
         c[(int)ImGuiCol.TitleBgActive]    = new Vector4(0.14f, 0.14f, 0.14f, 1.00f);
         c[(int)ImGuiCol.TitleBgCollapsed] = new Vector4(0.12f, 0.12f, 0.12f, 1.00f);
 
-        c[(int)ImGuiCol.Header]           = header;     // collapsing-header (panel) row
+        c[(int)ImGuiCol.Header]           = header;
         c[(int)ImGuiCol.HeaderHovered]    = headerHi;
         c[(int)ImGuiCol.HeaderActive]     = header;
 

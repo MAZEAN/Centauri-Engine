@@ -1,8 +1,10 @@
 namespace Centauri.Rendering.Postprocessing;
 
 using Silk.NET.OpenGL;
+
 using Graphics.Resources;
 using Utils.Misc;
+using Config;
 
 public sealed class PostProcessor : IDisposable
 {

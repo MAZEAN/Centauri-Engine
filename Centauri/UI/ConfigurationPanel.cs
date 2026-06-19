@@ -4,10 +4,9 @@ using ImGuiNET;
 using System.Numerics;
 
 using World;
-using Rendering.Postprocessing;
 using Config;
 
-public class ConfigurationPanel
+public class PropertiesPanel
 {
     private const float Width   = 300f;
     private const float Padding = 10f;
@@ -24,7 +23,7 @@ public class ConfigurationPanel
 
     private const ImGuiWindowFlags Flags = GUI.PanelBase;
 
-    public ConfigurationPanel(ImFontPtr font, AppConfig config, ColorGrading grading)
+    public PropertiesPanel(ImFontPtr font, AppConfig config, ColorGrading grading)
     {
         _font    = font;
         _config = config;
@@ -35,7 +34,7 @@ public class ConfigurationPanel
     {
         SetupWindow();
 
-        if (!ImGui.Begin("Configuration", Flags))
+        if (!ImGui.Begin("Properties", Flags))
         {
             ImGui.End();
             return;
@@ -291,7 +290,7 @@ public class ConfigurationPanel
         ImGui.PushID("IBL");
         
         GUI.DragRow("IBLIntensity", conf.IblIntensity, v => conf.IblIntensity = v,
-            0.01f, 0f, 2.0f, "%.3f", 0.3f);
+            0.01f, 0f, 2.0f, "%.3f", conf.AuthoredIblIntensity);
         ImGui.PopID();
 
         GUI.EndPanel(open);
