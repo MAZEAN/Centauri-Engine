@@ -1,19 +1,14 @@
-namespace Centauri.UI;
+namespace Centauri.UI.Common;
 
 using ImGuiNET;
 using System.Numerics;
 using System.Globalization;
 
-// Shared visual language + widget helpers for the engine's ImGui panels.
-internal static class GUI
+internal static class Widgets
 {
-    // ── palette ────────────────────────────────────────────────────────────────
-    public static readonly Vector4 Amber   = new(1.00f, 0.75f, 0.20f, 1f);
-    public static readonly Vector4 Green   = new(0.45f, 0.90f, 0.45f, 1f);
-    public static readonly Vector4 Blue    = new(0.40f, 0.70f, 1.00f, 1f);
-    public static readonly Vector4 Red     = new(1.00f, 0.35f, 0.35f, 1f);
-    public static readonly Vector4 Purple  = new(0.70f, 0.50f, 1.00f, 1f);
-    public static readonly Vector4 White   = Vector4.One;
+    private const float LabelFraction = 0.42f; 
+    private const float LabelGap      = 8f;
+    private const float PanelIndent   = 8f;
     
     public const ImGuiWindowFlags PanelBase = ImGuiWindowFlags.NoMove          |
                                               ImGuiWindowFlags.NoCollapse      |
@@ -22,15 +17,7 @@ internal static class GUI
     
     private const ImGuiColorEditFlags SwatchFlags = ImGuiColorEditFlags.NoInputs;
     
-    public static Vector4 Bool(bool value) => value ? Green : Red;
-    
-    // ── Blender-style property panels & rows ────────────────────────────────────
-    // A panel is a full-width collapsing header (with disclosure triangle); its
-    // body is indented, and each control sits on its own row with a right-aligned
-    // label in a fixed left column and the field filling the remainder.
-    private const float LabelFraction = 0.42f; // share of the row taken by the label
-    private const float LabelGap      = 8f;    // gap between label and field
-    private const float PanelIndent   = 8f;
+    public static Vector4 BooleanColor(bool value) => value ? ColorPalette.Green : ColorPalette.Red;
 
     public static bool BeginPanel(string label, bool defaultOpen = true)
         => BeginPanel(label, Vector4.Zero, defaultOpen);
@@ -39,19 +26,23 @@ internal static class GUI
     {
         var flags = defaultOpen ? ImGuiTreeNodeFlags.DefaultOpen : ImGuiTreeNodeFlags.None;
 
-        var tinted = accent.W > 0f;                       // colored header title
-        if (tinted) ImGui.PushStyleColor(ImGuiCol.Text, accent);
+        var tinted = accent.W > 0f;
+        if (tinted) 
+            ImGui.PushStyleColor(ImGuiCol.Text, accent);
         
         var open = ImGui.CollapsingHeader(label, flags);
-        if (tinted) ImGui.PopStyleColor();
+        if (tinted) 
+            ImGui.PopStyleColor();
 
-        if (open) ImGui.Indent(PanelIndent);
+        if (open) 
+            ImGui.Indent(PanelIndent);
         return open;
     }
 
     public static void EndPanel(bool open)
     {
-        if (open) ImGui.Unindent(PanelIndent);
+        if (open) 
+            ImGui.Unindent(PanelIndent);
         ImGui.Spacing();
     }
 
@@ -87,7 +78,8 @@ internal static class GUI
     // Write-back-via-setter convenience (for vectors where stale-caching isn't a concern).
     public static void Vec3Rows(string label, Vector3 v, Action<Vector3> set, float speed, string fmt, Vector3 reset)
     {
-        if (Vec3Rows(label, ref v, speed, fmt, reset, out _)) set(v);
+        if (Vec3Rows(label, ref v, speed, fmt, reset, out _)) 
+            set(v);
     }
 
     private static bool AxisRow(string label, string id, ref float v, float speed, string fmt, float reset, ref bool active)
@@ -107,8 +99,11 @@ internal static class GUI
         var id = "##" + label;
         var changed = ImGui.DragFloat(id, ref v, speed, min, max, fmt);
         
-        if (reset is { } r) changed |= ResetMenu(id, ref v, r);
-        if (changed) set(v);
+        if (reset is { } r) 
+            changed |= ResetMenu(id, ref v, r);
+        
+        if (changed) 
+            set(v);
     }
 
     public static void SliderRow(string label, float v, Action<float> set, float min, float max, float? reset = null)
@@ -118,26 +113,32 @@ internal static class GUI
         var id = "##" + label;
         var changed = ImGui.SliderFloat(id, ref v, min, max, "%.3f");
         
-        if (reset is { } r) changed |= ResetMenu(id, ref v, r);
-        if (changed) set(v);
+        if (reset is { } r) 
+            changed |= ResetMenu(id, ref v, r);
+        
+        if (changed) 
+            set(v);
     }
 
     public static void ColorRow4(string label, Vector4 v, Action<Vector4> set)
     {
         RowLabel(label);
-        if (ImGui.ColorEdit4("##" + label, ref v, SwatchFlags)) set(v);
+        if (ImGui.ColorEdit4("##" + label, ref v, SwatchFlags)) 
+            set(v);
     }
 
     public static void ColorRow3(string label, Vector3 v, Action<Vector3> set)
     {
         RowLabel(label);
-        if (ImGui.ColorEdit3("##" + label, ref v, SwatchFlags)) set(v);
+        if (ImGui.ColorEdit3("##" + label, ref v, SwatchFlags)) 
+            set(v);
     }
 
     public static void CheckRow(string label, bool v, Action<bool> set)
     {
         RowLabel(label);
-        if (ImGui.Checkbox("##" + label, ref v)) set(v);
+        if (ImGui.Checkbox("##" + label, ref v)) 
+            set(v);
     }
 
     public static bool ComboRow(string label, ref int index, string[] items)
@@ -148,10 +149,15 @@ internal static class GUI
     
     private static bool ResetMenu(string id, ref float v, float reset)
     {
-        if (!ImGui.BeginPopupContextItem(id)) return false;
-        bool hit = ImGui.MenuItem("Reset");
-        if (hit) v = reset;
+        if (!ImGui.BeginPopupContextItem(id)) 
+            return false;
+        
+        var hit = ImGui.MenuItem("Reset");
+        if (hit) 
+            v = reset;
+        
         ImGui.EndPopup();
+        
         return hit;
     }
 

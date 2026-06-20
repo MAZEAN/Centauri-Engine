@@ -77,6 +77,7 @@ public class InputSystem : IDisposable
 
     private void OnMouseWheel(IMouse mouse, ScrollWheel scroll)
     {
+        if (_config.Input.Mode == ViewMode.Edit && !_keyboard.IsKeyPressed(Key.ShiftLeft)) return;
         GetController(_scene.Cameras.Active).Zoom(scroll);
     }
 

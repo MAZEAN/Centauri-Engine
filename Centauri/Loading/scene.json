@@ -78,14 +78,13 @@
     {
       "name":     "Lamp",
       "position": [0, 2, 0],
-      "scale":    [0.01, 0.01, 0.01],
       "light": {
-        "type":      "point",
+        "type":      "spot",
+        "direction": [1.0, -1.0, 0.0],
         "color":     [1.0, 0.8, 0.6],
-        "intensity": 1.0,
-        "constant":  1.0,
-        "linear":    0.09,
-        "quadratic": 0.032,
+        "intensity": 10.0,
+        "innerCutoff": 12.5,
+        "OuterCutoff": 17.5,
         "enabled":   true
       }
     }

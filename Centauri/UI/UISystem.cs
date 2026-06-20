@@ -7,7 +7,7 @@ using Silk.NET.Input;
 using Config;
 using World;
 using Utils.Misc;
-using Rendering.Postprocessing;
+using Panels;
 
 // Owns the whole ImGui surface — the controller plus every panel.
 // RenderingSystem holds one of these instead of juggling them individually.
@@ -16,14 +16,16 @@ public sealed class UISystem : IDisposable
     private readonly AppConfig      _config;
     private readonly ImGuiManager   _imGui;
     private readonly StatsOverlay   _statsOverlay;
-    private readonly PropertiesPanel _inspector;
+    private readonly PropertiesPanel _properties;
+    private readonly OutlinerPanel _outliner;
 
     public UISystem(GL gl, AppConfig config, IWindow window, IInputContext input, ColorGrading grading)
     {
         _config       = config;
         _imGui        = new ImGuiManager(gl, config.ImGui, window, input);
         _statsOverlay = new StatsOverlay(_imGui.Font, config);
-        _inspector    = new PropertiesPanel(_imGui.Font, _config, grading);
+        _properties    = new PropertiesPanel(_imGui.Font, _config, grading);
+        _outliner = new OutlinerPanel(_imGui.Font);
     }
 
     public bool WantsMouse    => _imGui.WantsMouseCapture;
@@ -37,7 +39,10 @@ public sealed class UISystem : IDisposable
             _statsOverlay.Render(scene, stats);
 
         if (_config.Input.Mode == ViewMode.Edit)
-            _inspector.Render(scene);
+        {
+            _outliner.Render(scene);
+            _properties.Render(scene);
+        }
 
         _imGui.Render();   // ImGui draw pass — always last
     }

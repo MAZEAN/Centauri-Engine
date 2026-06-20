@@ -1,4 +1,4 @@
-namespace Centauri.UI;
+namespace Centauri.UI.Panels;
 
 using ImGuiNET;
 using System.Numerics;
@@ -6,6 +6,7 @@ using System.Numerics;
 using Utils.Misc;
 using World;
 using Config;
+using Common;
 
 public class StatsOverlay
 {
@@ -14,7 +15,7 @@ public class StatsOverlay
     private const float BgAlpha = 0.85f;
     private const float LabelWidth = 120f;
     
-    private const ImGuiWindowFlags Flags = GUI.PanelBase | ImGuiWindowFlags.NoBringToFrontOnFocus; 
+    private const ImGuiWindowFlags Flags = Widgets.PanelBase | ImGuiWindowFlags.NoBringToFrontOnFocus; 
 
     private readonly ImFontPtr _font;
     private readonly AppConfig _config;
@@ -47,27 +48,27 @@ public class StatsOverlay
 
     private void DrawSections(Scene scene, FrameStats stats)
     {
-        Section("Performance",GUI.Amber, () =>
+        Section("Performance", ColorPalette.Amber, () =>
         {
-            Row("FPS", GUI.Float(stats.FPS));
-            Row("Frame Time", $"{GUI.Float(stats.FrameTime)} ms");
+            Row("FPS", Widgets.Float(stats.FPS));
+            Row("Frame Time", $"{Widgets.Float(stats.FrameTime)} ms");
             _perfGraph.Draw();
         });
 
-        Section("Culling",GUI.Green, () =>
+        Section("Culling", ColorPalette.Green, () =>
         {
             Row("Total", stats.TotalEntities.ToString());
             RowColored("Drawn", stats.DrawnEntities.ToString(),
-                stats.CulledEntities > 0 ? GUI.Green : GUI.White);
-            RowColored("Culled", stats.CulledEntities.ToString(),GUI.Red);
+                stats.CulledEntities > 0 ? ColorPalette.Green : ColorPalette.White);
+            RowColored("Culled", stats.CulledEntities.ToString(), ColorPalette.Red);
 
             var ratio = stats.TotalEntities > 0
                 ? stats.CulledEntities / (float)stats.TotalEntities * 100f
                 : 0f;
-            Row("Ratio", $"{GUI.Float(ratio)} %");
+            Row("Ratio", $"{Widgets.Float(ratio)} %");
         });
 
-        Section("Renderer",GUI.Blue, () =>
+        Section("Renderer", ColorPalette.Blue, () =>
         {
             Row("Draw Calls",     stats.DrawCalls.ToString());
             Row("Texture Binds",  stats.TextureBinds.ToString());
@@ -76,19 +77,19 @@ public class StatsOverlay
         });
         
         var cam = scene.Cameras.Active;
-        Section("Camera",GUI.Red, () =>
+        Section("Camera", ColorPalette.Red, () =>
         {
-            RowColored("Active", cam.Name,GUI.Amber);
-            RowColored("Position", GUI.Vec3(cam.Position), GUI.Blue);
-            RowColored("Forward",  GUI.Vec3(cam.Forward),  GUI.Green);
-            Row("Yaw",   GUI.SignedFloat(cam.Yaw));
-            Row("Pitch", GUI.SignedFloat(cam.Pitch));
-            Row("Zoom",  GUI.Float(cam.Zoom));
+            RowColored("Active", cam.Name, ColorPalette.Amber);
+            RowColored("Position", Widgets.Vec3(cam.Position), ColorPalette.Blue);
+            RowColored("Forward",  Widgets.Vec3(cam.Forward),  ColorPalette.Green);
+            Row("Yaw",   Widgets.SignedFloat(cam.Yaw));
+            Row("Pitch", Widgets.SignedFloat(cam.Pitch));
+            Row("Zoom",  Widgets.Float(cam.Zoom));
         });
 
-        Section("Config",GUI.Purple, () =>
+        Section("Config", ColorPalette.Purple, () =>
         {
-            RowColored("ViewMode", _config.Input.Mode.ToString(),GUI.Amber);
+            RowColored("ViewMode", _config.Input.Mode.ToString(), ColorPalette.Amber);
             ConfigRow("VSync",         _config.Window.EnableVSync);
             ConfigRow("Culling",       _config.Debug.EnableCulling);
             ConfigRow("DebugView",     _config.Debug.ShowDebugView);
@@ -113,10 +114,10 @@ public class StatsOverlay
 
     private static void Section(string title, Vector4 accent, Action rows)
     {
-        var open = GUI.BeginPanel(title, accent);   // colored, collapsible header
+        var open = Widgets.BeginPanel(title, accent);   // colored, collapsible header
         if (open) rows();
         
-        GUI.EndPanel(open);
+        Widgets.EndPanel(open);
     }
 
     private static void Row(string label, string value) =>
@@ -126,7 +127,7 @@ public class StatsOverlay
         StatRow(label, value, color);
 
     private static void ConfigRow(string label, bool value) =>
-        StatRow(label, value.ToString(), GUI.Bool(value));
+        StatRow(label, value.ToString(), Widgets.BooleanColor(value));
 
     // Left-aligned label in a fixed column, value follows on the same line.
     private static void StatRow(string label, string value, Vector4 color)

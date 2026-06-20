@@ -1,7 +1,9 @@
-namespace Centauri.UI;
+namespace Centauri.UI.Panels;
 
 using ImGuiNET;
 using System.Numerics;
+
+using Common;
 
 // Rolling FPS history drawn as a labeled line graph. Samples are averaged over
 // a fixed time interval (not per-frame) so the window stays steady whether the
@@ -61,7 +63,7 @@ internal sealed class PerformanceGraph
         var edge = ImGui.GetColorU32(new Vector4(0.30f, 0.30f, 0.30f, 1f));
         var grid = ImGui.GetColorU32(new Vector4(1f, 1f, 1f, 0.07f));
         var tick = ImGui.GetColorU32(new Vector4(0.70f, 0.70f, 0.70f, 1f));
-        var line = ImGui.GetColorU32(GUI.Amber);
+        var line = ImGui.GetColorU32(ColorPalette.Amber);
 
         dl.AddRectFilled(p0, p1, bg);
         dl.AddRect(p0, p1, edge);
