@@ -2,6 +2,7 @@ namespace Centauri.UI;
 
 using ImGuiNET;
 using System.Numerics;
+using System.Globalization;
 
 using World;
 using Config;
@@ -13,6 +14,9 @@ public class PropertiesPanel
     private const float BgAlpha = 0.85f;
 
     private static readonly string[] LightTypes = ["None", "Directional", "Point", "Spot"];
+    private static readonly uint[] ShadowSizes = [512, 1024, 2048, 4096, 8192];
+    private static readonly string[] ShadowSizeLabels =
+        Array.ConvertAll(ShadowSizes, x => x.ToString(CultureInfo.InvariantCulture));
 
     private readonly ImFontPtr _font;
     private AppConfig _config;
@@ -46,6 +50,7 @@ public class PropertiesPanel
         DrawSkybox(scene);
         DrawColorGrading();
         DrawIBLConfig();
+        DrawShadowConfig();
 
         ImGui.PopFont();
         
@@ -291,6 +296,55 @@ public class PropertiesPanel
         
         GUI.DragRow("IBLIntensity", conf.IblIntensity, v => conf.IblIntensity = v,
             0.01f, 0f, 2.0f, "%.3f", conf.AuthoredIblIntensity);
+        ImGui.PopID();
+
+        GUI.EndPanel(open);
+    }
+    
+    private void DrawShadowConfig()
+    {
+        ImGui.SetNextItemOpen(false, ImGuiCond.FirstUseEver);
+
+        var open = GUI.BeginPanel("Shadows");
+        if (!open)
+        {
+            GUI.EndPanel(open);
+            return;
+        }
+
+        var conf = _config.Shadows;
+
+        ImGui.PushID("Shadows");
+
+        GUI.CheckRow("Enabled", conf.Enabled, v => conf.Enabled = v);
+
+        GUI.DragRow("Distance",   conf.Distance,   v => conf.Distance   = v,
+            0.5f,   1f, 500f,   "%.1f",   conf.AuthoredDistance);
+        GUI.DragRow("Depth Bias", conf.DepthBias,  v => conf.DepthBias  = v,
+            0.0001f, 0f, 0.02f, "%.4f",   conf.AuthoredDepthBias);
+        GUI.DragRow("Normal Bias", conf.NormalBias, v => conf.NormalBias = v,
+            0.001f, 0f, 0.2f,   "%.3f",   conf.AuthoredNormalBias);
+        
+        GUI.DragRow("PCF Radius", conf.PcfRadius, v => conf.PcfRadius = (int)MathF.Round(v),
+            1f, 0f, 4f, "%.0f", conf.AuthoredPcfRadius);
+
+        var sizeIndex = Array.IndexOf(ShadowSizes, conf.Size);
+        if (sizeIndex < 0) sizeIndex = 2;
+        
+        if (GUI.ComboRow("Map Size", ref sizeIndex, ShadowSizeLabels))
+            conf.Size = ShadowSizes[sizeIndex];
+
+        ImGui.TextDisabled($"Near {conf.Near:0.#}   Far {conf.Far:0.#}");   // still config-only
+
+        // --- CSM (later) -------------------------------------------------------
+        // When cascades land, add here:
+        //   GUI.DragRow("Cascades", ...)        // cascade count
+        //   GUI.DragRow("Split λ",  ...)        // log/uniform split blend
+        //   per-cascade split-distance readouts
+        // Enabled / DepthBias / NormalBias / PCF Radius stay shared across cascades,
+        // so this method becomes the single panel for both modes.
+        // ----------------------------------------------------------------------
+
         ImGui.PopID();
 
         GUI.EndPanel(open);

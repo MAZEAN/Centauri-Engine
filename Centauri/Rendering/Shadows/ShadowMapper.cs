@@ -14,20 +14,19 @@ using Graphics.Resources;
 public sealed class ShadowMapper : IDisposable
 {
     private readonly GL _gl;
-    private readonly ShadowConfig _config;
-    private readonly ShadowMap _map;
+    private ShadowMap _map;
     private readonly GLShader _depth;
 
     public bool      Active          { get; private set; }
     public uint      DepthTexture    => _map.DepthTexture;
     public Matrix4x4 LightView       { get; private set; }
     public Matrix4x4 LightProjection { get; private set; }
-    public ShadowConfig Config       => _config;
+    public ShadowConfig Config { get; }
 
     public ShadowMapper(GL gl, ShadowConfig config)
     {
         _gl = gl;
-        _config = config;
+        Config = config;
         _map = new ShadowMap(gl, config.Size);
         _depth = new GLShader(gl,
             PathResolver.Resolve("Assets/Shaders/Shadow/depth.vert"),
@@ -37,18 +36,25 @@ public sealed class ShadowMapper : IDisposable
     public void Render(Scene scene)
     {
         Active = false;
-        if (!_config.Enabled) return;
+        if (!Config.Enabled) return;
+        
+        if (_map.Size != Config.Size)        // live resolution switch
+        {
+            _map.Dispose();
+            _map = new ShadowMap(_gl, Config.Size);
+        }
+        
         if (scene.Lighting.DirectionalLights.Count == 0) return;   // collected upstream now
 
         var dir = Vector3.Normalize(scene.Lighting.DirectionalLights[0].Direction);
 
         // center the light box on the view camera so shadows follow the player
         var center = scene.Cameras.Active.Position;
-        var eye    = center - dir * _config.Distance;
+        var eye    = center - dir * Config.Distance;
 
         LightView = Matrix4x4.CreateLookAt(eye, center, Vector3.UnitY);
         LightProjection = Matrix4x4.CreateOrthographic(
-            _config.Distance * 2f, _config.Distance * 2f, _config.Near, _config.Far);
+            Config.Distance * 2f, Config.Distance * 2f, Config.Near, Config.Far);
 
         _gl.Disable(EnableCap.CullFace);   // depth from all faces — reduces peter-panning on open meshes
         _map.Bind();

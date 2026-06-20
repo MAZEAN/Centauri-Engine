@@ -1,4 +1,4 @@
-# <u> Useful commands </u>
+# Useful commands
 
 ## List Files by Line Count (Largest First)
 ```bash

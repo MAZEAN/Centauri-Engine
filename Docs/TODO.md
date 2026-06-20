@@ -11,21 +11,24 @@
 * [x] IBL
 * [ ] Shadow Maps
 * [ ] Cascaded shadow maps (CSM)
+* [ ] Day/Night cycle
 * [ ] Screen Space Reflections (SSR) (with ray tracing or PBR Accumulation)
 * [ ] Reflection Probes
-* [ ] Raytracing with BVH (inspired by Sebastian Lague)
+* [ ] Raytracing with BVH (only experimental, not real-time)
 * [ ] Physics engine integration (BEPUphysics2)
+* [ ] Game-Simulation
 * [ ] Terrain rendering
 * [ ] Water simulation (Sea of Thieves algorithm)
 * [ ] Foliage rendering
 
 ### Enhancements
 
-* [ ] Instancing & LOD system
 * [x] Performance graphs
+* [ ] Light editing
+* [ ] Multithreading (async asset loading etc.)
+* [ ] Instancing & LOD system
 * [ ] Keybindings
 * [ ] UI improvements (DPI-scaling etc.)
-* [ ] Multithreading
 
 ---
 
