@@ -7,6 +7,7 @@ public sealed class ShadowArray : IDisposable
 {
     private readonly GL   _gl;
     private readonly uint _fbo;
+    
     public uint DepthTexture { get; }
     public uint Size   { get; }
     public int  Layers { get; }

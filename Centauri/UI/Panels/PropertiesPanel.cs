@@ -341,14 +341,13 @@ public class PropertiesPanel
 
         ImGui.TextDisabled($"Near {conf.Near:0.#}   Far {conf.Far:0.#}");
 
-        // --- CSM (later) -------------------------------------------------------
-        // When cascades land, add here:
-        //   GUI.DragRow("Cascades", ...)        // cascade count
-        //   GUI.DragRow("Split λ",  ...)        // log/uniform split blend
-        //   per-cascade split-distance readouts
-        // Enabled / DepthBias / NormalBias / PCF Radius stay shared across cascades,
-        // so this method becomes the single panel for both modes.
-        // ----------------------------------------------------------------------
+        Widgets.DragRow("Cascades", conf.CascadeCount,
+            v => conf.CascadeCount = Math.Clamp((int)MathF.Round(v), 1, conf.MaxCascades),
+            1f, 1f, conf.MaxCascades, "%.0f", conf.AuthoredCascadeCount);
+        Widgets.DragRow("Split Blend", conf.SplitLambda, v => conf.SplitLambda = v,
+            0.01f, 0f, 1f, "%.2f", conf.AuthoredSplitLambda);
+
+        Widgets.CheckRow("Tint Cascades",  conf.DebugCascades,        v => conf.DebugCascades        = v);
 
         ImGui.PopID();
 

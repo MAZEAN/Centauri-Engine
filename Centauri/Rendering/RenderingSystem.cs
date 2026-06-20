@@ -94,11 +94,13 @@ public class RenderingSystem : IDisposable
         {
             var active = scene.Cameras.Active;
             _debugRenderer.Begin(active);
+            
             if (_config.Debug.ShowDebugView)
             {
                 _debugRenderer.DrawCameras(scene);
                 _debugRenderer.DrawAllAABBs(scene, scene.Cameras.Primary.Frustum);
             }
+            
             _debugRenderer.DrawSelection(scene);
             _debugRenderer.End();
         }

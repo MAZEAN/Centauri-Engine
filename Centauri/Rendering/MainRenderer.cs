@@ -1,4 +1,4 @@
-namespace Centauri.Rendering.Renderers;
+namespace Centauri.Rendering;
 
 using Silk.NET.OpenGL;
 using System.Numerics;
@@ -202,6 +202,7 @@ public class MainRenderer : IDisposable
         // CSM bindings
         shader.SetUniform("uShadowMap", 8);
         shader.SetUniform("uHasShadow", _shadows.Active ? 1 : 0);
+        shader.SetUniform("uShowCascades", _config.Shadows.DebugCascades ? 1 : 0);
         if (_shadows.Active)
         {
             int n = _shadows.LightMatrices.Length;

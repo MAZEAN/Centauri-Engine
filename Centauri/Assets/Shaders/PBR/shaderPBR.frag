@@ -72,6 +72,8 @@ uniform float uShadowBias;
 uniform float uNormalBias;
 uniform int   uPcfRadius;
 
+uniform int uShowCascades;
+
 int SelectCascade(float viewDepth) {
     for (int i = 0; i < uCascadeCount; ++i)
     if (viewDepth < uCascadeSplits[i]) return i;
@@ -193,6 +195,16 @@ vec3 CalcSpotLight(SpotLight light, vec3 N, vec3 V, vec3 albedo, float roughness
     return CalcPBR(L, radiance, N, V, albedo, roughness, metallic);
 }
 
+void showShadowCascadesView(vec3 color, vec4  albedoSample) {
+    int ci = SelectCascade(fViewDepth);
+    vec3 tint = ci == 0 ? vec3(1.0, 0.3, 0.3)
+            : ci == 1 ? vec3(0.3, 1.0, 0.3)
+            : ci == 2 ? vec3(0.3, 0.3, 1.0)
+            :           vec3(1.0, 1.0, 0.3);
+    
+    FragColor = vec4(color * tint, albedoSample.a);
+}
+
 // ─── main ─────────────────────────────────────────────────────────────────────
 void main()
 {
@@ -260,6 +272,11 @@ void main()
     }
     
     vec3 color = ambient + Lo;
+
+    if (uShowCascades == 1 && uHasShadow == 1) {
+        showShadowCascadesView(color, albedoSample);
+        return;
+    }
     
     FragColor = vec4(color, albedoSample.a);
 

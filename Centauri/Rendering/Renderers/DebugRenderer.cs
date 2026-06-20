@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using World;
 using Config;
 using Graphics.Geometry;
+using Shadows;
 
 public sealed class DebugRenderer : IDisposable
 {

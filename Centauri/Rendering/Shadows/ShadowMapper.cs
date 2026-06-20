@@ -38,7 +38,7 @@ public sealed class ShadowMapper : IDisposable
         Active = false;
         if (!_config.Shadows.Enabled) return;
 
-        // realloc on resolution OR cascade-count change
+        // re-alloc on resolution OR cascade-count change
         if (_maps.Size != _config.Shadows.Size || _maps.Layers != CascadeCount)
         {
             _maps.Dispose();
@@ -76,88 +76,123 @@ public sealed class ShadowMapper : IDisposable
                 }
             }
         }
+        
         _gl.Enable(EnableCap.CullFace);
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         Active = true;
     }
     private void ComputeCascades(Camera camera, Vector3 dir)
     {
-        int n = CascadeCount;
+        var n = CascadeCount;
         LightMatrices = new Matrix4x4[n];
         SplitDepths   = new float[n];
 
-        float near   = _config.Camera.Near;
-        float camFar = _config.Camera.Far;
-        float far    = MathF.Min(_config.Shadows.Distance, camFar);   // shadow range = split max
+        var near   = _config.Camera.Near;
+        var camFar = _config.Camera.Far;
+        var far    = MathF.Min(_config.Shadows.Distance, camFar);   // shadow range = split max
 
-        // full camera frustum corners (world space), unprojected from NDC
-        Matrix4x4.Invert(camera.GetViewMatrix() * camera.GetProjectionMatrix(), out var invVP);
-        Span<Vector3> full = stackalloc Vector3[8];
-        
-        int k = 0;
-        for (int x = 0; x < 2; x++)
-            for (int y = 0; y < 2; y++)
-                for (int z = 0; z < 2; z++)
-                {
-                    var ndc = new Vector4(x * 2 - 1, y * 2 - 1, z, 1f);
-                    var w   = Vector4.Transform(ndc, invVP);
-                    
-                    full[k++] = new Vector3(w.X, w.Y, w.Z) / w.W;
-                }
+        Span<Vector3> frustum = stackalloc Vector3[8];
+        GetFrustumCorners(camera, frustum);
 
-        float prevSplit = near;
-        for (int c = 0; c < n; c++)
+        var prevSplit = near;
+        for (var c = 0; c < n; c++)
         {
-            // logarithmic/uniform blended split distance (PSSM)
-            float p   = (c + 1) / (float)n;
-            float log = near * MathF.Pow(far / near, p);
-            float uni = near + (far - near) * p;
-            float split = _config.Shadows.SplitLambda * log + (1 - _config.Shadows.SplitLambda) * uni;
+            var split = CascadeSplit(c, n, near, far);
             SplitDepths[c] = split;
 
-            // interpolate the slice corners along each frustum edge (z is linear along edges)
-            float t0 = (prevSplit - near) / (camFar - near);
-            float t1 = (split     - near) / (camFar - near);
-            
-            Span<Vector3> corners = stackalloc Vector3[8];
-            for (int i = 0; i < 4; i++)
-            {
-                var rayN = full[i * 2 + 0];                 // near-plane corner i
-                var rayF = full[i * 2 + 1];                 // far-plane  corner i
-                var edge = rayF - rayN;
-                corners[i + 0] = rayN + edge * t0;          // slice near
-                corners[i + 4] = rayN + edge * t1;          // slice far
-            }
+            Span<Vector3> slice = stackalloc Vector3[8];
+            SliceCorners(frustum, (prevSplit - near) / (camFar - near),
+                                  (split     - near) / (camFar - near), slice);
 
-            // center + light view looking down the light dir
-            var center = Vector3.Zero;
-            foreach (var p2 in corners) 
-                center += p2;
-            
-            center /= 8f;
-
-            var up = MathF.Abs(dir.Y) > 0.99f ? Vector3.UnitZ : Vector3.UnitY;
-            var lightView = Matrix4x4.CreateLookAt(center - dir, center, up);
-
-            // fit ortho to corners in light space
-            var min = new Vector3(float.MaxValue);
-            var max = new Vector3(float.MinValue);
-            foreach (var p2 in corners)
-            {
-                var ls = Vector3.Transform(p2, lightView);
-                min = Vector3.Min(min, ls);
-                max = Vector3.Max(max, ls);
-            }
-
-            // pull the near plane back so occluders behind the slice still cast
-            float zPad = (max.Z - min.Z) * 0.5f;            // tune; or a config "z multiplier"
-            var lightProj = Matrix4x4.CreateOrthographicOffCenter(
-                min.X, max.X, min.Y, max.Y, -max.Z - zPad, -min.Z + zPad);
-
-            LightMatrices[c] = lightView * lightProj;        // numerics order; GLSL: uLightMatrix * pos
+            LightMatrices[c] = FitCascade(slice, dir);
             prevSplit = split;
         }
     }
 
-    public void Dispose() { _maps.Dispose(); _depth.Dispose(); }
+    // world-space corners of the camera's full frustum, unprojected from NDC
+    private static void GetFrustumCorners(Camera camera, Span<Vector3> corners)
+    {
+        Matrix4x4.Invert(camera.GetViewMatrix() * camera.GetProjectionMatrix(), out var invVP);
+
+        var k = 0;
+        for (var x = 0; x < 2; x++)
+            for (var y = 0; y < 2; y++)
+                for (var z = 0; z < 2; z++)
+                {
+                    var ndc = new Vector4(x * 2 - 1, y * 2 - 1, z, 1f);   // .NET proj: near z=0, far z=1
+                    var w   = Vector4.Transform(ndc, invVP);
+                    corners[k++] = new Vector3(w.X, w.Y, w.Z) / w.W;
+                }
+    }
+
+    // PSSM: blend logarithmic and uniform split distances
+    private float CascadeSplit(int c, int n, float near, float far)
+    {
+        var p   = (c + 1) / (float)n;
+        var log = near * MathF.Pow(far / near, p);
+        var uni = near + (far - near) * p;
+        
+        return _config.Shadows.SplitLambda * log + (1f - _config.Shadows.SplitLambda) * uni;
+    }
+
+    // interpolate the slice's 8 corners along the frustum edges (z is linear along edges)
+    private static void SliceCorners(ReadOnlySpan<Vector3> frustum, float t0, float t1, Span<Vector3> slice)
+    {
+        for (var i = 0; i < 4; i++)
+        {
+            var nearCorner = frustum[i * 2 + 0];
+            var edge       = frustum[i * 2 + 1] - nearCorner;   // near→far corner pair
+            slice[i + 0] = nearCorner + edge * t0;              // slice near
+            slice[i + 4] = nearCorner + edge * t1;              // slice far
+        }
+    }
+
+    // fit a stable, texel-snapped ortho box around the slice (bounding-sphere method)
+    private Matrix4x4 FitCascade(ReadOnlySpan<Vector3> corners, Vector3 dir)
+    {
+        // bounding sphere → box size is invariant to camera orientation
+        var center = Vector3.Zero;
+        foreach (var p in corners) 
+            center += p;
+        center /= 8f;
+
+        var radius = 0f;
+        foreach (var p in corners)
+            radius = MathF.Max(radius, (p - center).Length());
+        radius = MathF.Ceiling(radius * 16f) / 16f;             // quantize radius — removes size shimmer
+
+        var up   = MathF.Abs(dir.Y) > 0.99f ? Vector3.UnitZ : Vector3.UnitY;
+        var view = Matrix4x4.CreateLookAt(center - dir * radius, center, up);
+
+        // snap box center to whole-texel increments — this is what stops shadow swimming
+        var texelSize  = (radius * 2f) / _config.Shadows.Size;
+        var   centerLS   = Vector3.Transform(center, view);
+        
+        centerLS.X = MathF.Floor(centerLS.X / texelSize) * texelSize;
+        centerLS.Y = MathF.Floor(centerLS.Y / texelSize) * texelSize;
+
+        // z extent from corners + pull-back so occluders behind the slice still cast
+        float minZ = float.MaxValue, maxZ = float.MinValue;
+        foreach (var p in corners)
+        {
+            var z = Vector3.Transform(p, view).Z;
+            minZ = MathF.Min(minZ, z);
+            maxZ = MathF.Max(maxZ, z);
+        }
+        var zPad = radius;
+
+        var proj = Matrix4x4.CreateOrthographicOffCenter(
+            centerLS.X - radius, centerLS.X + radius,
+            centerLS.Y - radius, centerLS.Y + radius,
+            -maxZ - zPad, -minZ + zPad
+        );
+
+        return view * proj;   // numerics order; GLSL: uLightMatrix * pos
+    }
+
+    public void Dispose()
+    {
+        _maps.Dispose();
+        _depth.Dispose();
+    }
 }

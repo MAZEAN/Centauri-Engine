@@ -66,7 +66,6 @@ public class DebugConfig
     public void ToggleShowCameras()       => ShowCameras       = !ShowCameras;
     public void ToggleShowGrid()          => ShowGrid          = !ShowGrid;
     public void ToggleShowStatsOverlay()  => ShowStatsOverlay = !ShowStatsOverlay;
-    public void ToggleShowSkybox()        => ShowSkybox = !ShowSkybox;
 }
 
 public enum ViewMode { Fly, Edit }
@@ -89,7 +88,7 @@ public class ShadowConfig
     [JsonPropertyName("enabled")]    public bool Enabled { get; set; } = true;
     [JsonPropertyName("size")]       public uint Size    { get; set; } = 2048;
 
-    [JsonPropertyName("distance")] public float Distance { get; set; }
+    [JsonPropertyName("distance")]   public float Distance { get; set; }
     [JsonPropertyName("near")]       public float Near       { get; init; } = 1f;
     [JsonPropertyName("far")]        public float Far        { get; init; } = 200f;
 
@@ -97,8 +96,10 @@ public class ShadowConfig
     [JsonPropertyName("normalBias")] public float NormalBias { get; set; }
     [JsonPropertyName("pcfRadius")]  public int   PcfRadius  { get; set; }
     
-    [JsonPropertyName("cascadeCount")] public int   CascadeCount { get; set; } = 4;    // 2–4 typical
-    [JsonPropertyName("splitLambda")]  public float SplitLambda  { get; set; } = 0.85f; // 0=uniform, 1=logarithmic
+    [JsonPropertyName("cascadeCount")] public int   CascadeCount { get; set; }    // 2–4 typical
+    [JsonPropertyName("splitLambda")]  public float SplitLambda  { get; set; } // 0=uniform, 1=logarithmic
+    
+    [JsonIgnore] public bool DebugCascades { get; set; }
 
     [JsonIgnore] public float AuthoredDistance   { get; }
     [JsonIgnore] public float AuthoredDepthBias  { get; }
