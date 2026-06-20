@@ -49,9 +49,10 @@ public class PropertiesPanel
 
         DrawInspectorElements(scene);
         DrawSkybox(scene);
+        DrawShadowConfig();
         DrawColorGrading();
         DrawIBLConfig();
-        DrawShadowConfig();
+        DrawViewport();
 
         ImGui.PopFont();
         
@@ -348,6 +349,35 @@ public class PropertiesPanel
             0.01f, 0f, 1f, "%.2f", conf.AuthoredSplitLambda);
 
         Widgets.CheckRow("Tint Cascades",  conf.DebugCascades,        v => conf.DebugCascades        = v);
+
+        ImGui.PopID();
+
+        Widgets.EndPanel(open);
+    }
+    
+    private void DrawViewport()
+    {
+        ImGui.SetNextItemOpen(false, ImGuiCond.FirstUseEver);
+
+        var open = Widgets.BeginPanel("Viewport");
+        if (!open)
+        {
+            Widgets.EndPanel(open);
+            return;
+        }
+
+        var d = _config.Debug;   // reference type — setters mutate the shared instance
+
+        ImGui.PushID("Viewport");
+
+        Widgets.CheckRow("Grid",            d.ShowGrid,          v => d.ShowGrid          = v);
+        Widgets.CheckRow("Skybox",          d.ShowSkybox,        v => d.ShowSkybox        = v);
+        Widgets.CheckRow("Stats Overlay",   d.ShowStatsOverlay,  v => d.ShowStatsOverlay  = v);
+        Widgets.CheckRow("Frustum Culling", d.EnableCulling,     v => d.EnableCulling     = v);
+
+        Widgets.CheckRow("Bounding Boxes",  d.ShowBoundingBoxes, v => d.ShowBoundingBoxes = v);
+        Widgets.CheckRow("Cameras",         d.ShowCameras,       v => d.ShowCameras       = v);
+        Widgets.CheckRow("Frustums",        d.ShowFrustums,      v => d.ShowFrustums      = v);
 
         ImGui.PopID();
 

@@ -92,11 +92,6 @@ public class StatsOverlay
             RowColored("ViewMode", _config.Input.Mode.ToString(), ColorPalette.Amber);
             ConfigRow("VSync",         _config.Window.EnableVSync);
             ConfigRow("Culling",       _config.Debug.EnableCulling);
-            ConfigRow("DebugView",     _config.Debug.ShowDebugView);
-            ConfigRow("BoundingBoxes", _config.Debug.ShowBoundingBoxes);
-            ConfigRow("Frustums",      _config.Debug.ShowFrustums);
-            ConfigRow("Cameras",       _config.Debug.ShowCameras);
-            ConfigRow("Grid",          _config.Debug.ShowGrid);
         });
     }
 

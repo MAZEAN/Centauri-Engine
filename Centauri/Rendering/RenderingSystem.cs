@@ -85,25 +85,20 @@ public class RenderingSystem : IDisposable
 
         if (_config.Debug.ShowSkybox) 
             _skyboxRenderer.Render(scene);
+        
         if (_config.Debug.ShowGrid)   
             _gridRenderer.Render(scene);
         
         _mainRenderer.Render(scene, (float)deltaTime, ref _stats);
+        
+        var active = scene.Cameras.Active;
+        _debugRenderer.Begin(active);
 
-        if (_config.Debug.ShowDebugView || scene.Selected is not null)
-        {
-            var active = scene.Cameras.Active;
-            _debugRenderer.Begin(active);
-            
-            if (_config.Debug.ShowDebugView)
-            {
-                _debugRenderer.DrawCameras(scene);
-                _debugRenderer.DrawAllAABBs(scene, scene.Cameras.Primary.Frustum);
-            }
-            
-            _debugRenderer.DrawSelection(scene);
-            _debugRenderer.End();
-        }
+        _debugRenderer.DrawCameras(scene);
+        _debugRenderer.DrawAllAABBs(scene, scene.Cameras.Primary.Frustum);
+
+        _debugRenderer.DrawSelection(scene);
+        _debugRenderer.End();
 
         _post.Composite();              // resolve + tonemap to backbuffer
         _ui.Render(scene, in _stats);   // UI on top, ungraded

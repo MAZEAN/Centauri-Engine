@@ -57,7 +57,6 @@ public sealed class DebugRenderer : IDisposable
     public void DrawCameras(Scene scene)
     {
         AssertActive();
-        if (!_config.Debug.ShowCameras) return;
 
         var active = scene.Cameras.Active;
 
@@ -65,8 +64,11 @@ public sealed class DebugRenderer : IDisposable
         {
             if (cam == active) continue;
 
-            DrawCameraShape(cam);
-            DrawDirectionLine(cam);
+            if (_config.Debug.ShowCameras)
+            {
+                DrawCameraShape(cam);
+                DrawDirectionLine(cam);
+            }
 
             if (_config.Debug.ShowFrustums)
                 DrawFrustum(cam);

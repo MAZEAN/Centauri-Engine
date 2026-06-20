@@ -90,22 +90,25 @@ public class InputSystem : IDisposable
 
     private void OnKeyDown(IKeyboard keyboard, Key key, int code)
     {
-        if (key == Key.Escape)    { _window.Close(); return; }
-        if (key == _config.Input.ToggleModeKey) { ToggleMode(); _scene.ClearSelection(); return; }
+        if (key == Key.Escape)
+        {
+            _window.Close();
+            return;
+        }
+
+        if (key == _config.Input.ToggleModeKey)
+        {
+            ToggleMode(); _scene.ClearSelection();
+            return;
+        }
 
         if (_renderingSystem.ImGuiWantsKeyboard) return;
+        
         switch (key)
         {
             case Key.M:  _config.Debug.ToggleShowStatsOverlay();  break;
             case Key.C:  _scene.Cameras.Cycle(); ResetActiveController();  break;
             case Key.B:  _scene.Skyboxes.Cycle(); break;
-
-            case Key.F1: _config.Debug.ToggleShowDebugView();     break;
-            case Key.F2: _config.Debug.ToggleShowBoundingBoxes(); break;
-            case Key.F3: _config.Debug.ToggleShowFrustums();      break;
-            case Key.F4: _config.Debug.ToggleShowCameras();       break;
-            case Key.F5: _config.Debug.ToggleEnableCulling();     break;
-            case Key.F6: _config.Debug.ToggleShowGrid();          break;
         }
     }
 

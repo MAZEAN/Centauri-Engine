@@ -52,19 +52,7 @@ public class DebugConfig
     [JsonPropertyName("showGrid")]          public bool ShowGrid          { get; set; } = false;
     [JsonPropertyName("showStatsOverlay")]  public bool ShowStatsOverlay  { get; set; } = true;
     [JsonPropertyName("showSkybox")]        public bool ShowSkybox        { get; set; } = true;
-
-    public void ToggleShowDebugView()
-    {
-        ShowDebugView = !ShowDebugView;
-        
-        ShowBoundingBoxes = ShowFrustums = ShowCameras = ShowDebugView;
-    }
-
-    public void ToggleEnableCulling()     => EnableCulling     = !EnableCulling;
-    public void ToggleShowBoundingBoxes() => ShowBoundingBoxes = !ShowBoundingBoxes;
-    public void ToggleShowFrustums()      => ShowFrustums      = !ShowFrustums;
-    public void ToggleShowCameras()       => ShowCameras       = !ShowCameras;
-    public void ToggleShowGrid()          => ShowGrid          = !ShowGrid;
+    
     public void ToggleShowStatsOverlay()  => ShowStatsOverlay = !ShowStatsOverlay;
 }
 
