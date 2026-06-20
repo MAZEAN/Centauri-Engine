@@ -4,6 +4,7 @@ in vec2 fUv;
 in vec3 fNormal;
 in vec3 fFragPos;
 in mat3 fTBN;
+in  float fViewDepth;
 
 out vec4 FragColor;
 
@@ -11,6 +12,7 @@ out vec4 FragColor;
 const float PI               = 3.14159265359;
 const int   MAX_POINT_LIGHTS = 16;
 const int   MAX_SPOT_LIGHTS  = 16;
+const int MAX_CASCADES = 4;
 
 // ─── light structs (std140 — every member padded to vec4) ───────────────────────
 struct DirLight {
@@ -61,35 +63,38 @@ uniform float uMaxReflectionLod;
 uniform float uIblIntensity;
 
 // Shadows
-uniform sampler2D uShadowMap;        // unit 8
-uniform mat4  uLightView;
-uniform mat4  uLightProjection;
+uniform sampler2DArray uShadowMap;          // unit 8 (now an array)
+uniform mat4  uLightMatrices[MAX_CASCADES];
+uniform float uCascadeSplits[MAX_CASCADES]; // view-space far depth per cascade
+uniform int   uCascadeCount;
 uniform int   uHasShadow;
 uniform float uShadowBias;
 uniform float uNormalBias;
 uniform int   uPcfRadius;
 
-float ShadowFactor(vec3 N, vec3 L)
-{
-    // normal-offset the sample position to fight acne on slopes
-    vec4 lightSpace = uLightProjection * uLightView * vec4(fFragPos + N * uNormalBias, 1.0);
-    vec3 proj = lightSpace.xyz / lightSpace.w;
-    proj = proj * 0.5 + 0.5;                 // NDC [-1,1] -> [0,1]
-    if (proj.z > 1.0) return 0.0;            // beyond the light's far plane: lit
+int SelectCascade(float viewDepth) {
+    for (int i = 0; i < uCascadeCount; ++i)
+    if (viewDepth < uCascadeSplits[i]) return i;
+    return uCascadeCount - 1;
+}
+
+float ShadowFactor(vec3 N, vec3 L) {
+    int c = SelectCascade(fViewDepth);
+    vec4 ls = uLightMatrices[c] * vec4(fFragPos + N * uNormalBias, 1.0);
+    vec3 proj = ls.xyz / ls.w * 0.5 + 0.5;
+    if (proj.z > 1.0) return 0.0;
 
     float bias    = max(uShadowBias * (1.0 - dot(N, L)), uShadowBias * 0.1);
     float current = proj.z - bias;
 
     float shadow = 0.0;
-    vec2  texel  = 1.0 / vec2(textureSize(uShadowMap, 0));
+    vec2  texel  = 1.0 / vec2(textureSize(uShadowMap, 0).xy);
     for (int x = -uPcfRadius; x <= uPcfRadius; ++x)
     for (int y = -uPcfRadius; y <= uPcfRadius; ++y)
-    {
-        float closest = texture(uShadowMap, proj.xy + vec2(x, y) * texel).r;
-        shadow += current > closest ? 1.0 : 0.0;
-    }
-    float samples = float((2 * uPcfRadius + 1) * (2 * uPcfRadius + 1));
-    return shadow / samples;
+    shadow += current > texture(uShadowMap, vec3(proj.xy + vec2(x,y)*texel, c)).r ? 1.0 : 0.0;
+
+    float s = float((2*uPcfRadius+1)*(2*uPcfRadius+1));
+    return shadow / s;
 }
 
 // ─── lighting ──────────────────────────────────────────────────────────────────

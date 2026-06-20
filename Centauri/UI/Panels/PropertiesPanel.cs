@@ -339,7 +339,7 @@ public class PropertiesPanel
         if (Widgets.ComboRow("Map Size", ref sizeIndex, ShadowSizeLabels))
             conf.Size = ShadowSizes[sizeIndex];
 
-        ImGui.TextDisabled($"Near {conf.Near:0.#}   Far {conf.Far:0.#}");   // still config-only
+        ImGui.TextDisabled($"Near {conf.Near:0.#}   Far {conf.Far:0.#}");
 
         // --- CSM (later) -------------------------------------------------------
         // When cascades land, add here:

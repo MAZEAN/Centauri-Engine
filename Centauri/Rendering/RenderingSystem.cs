@@ -41,7 +41,7 @@ public class RenderingSystem : IDisposable
         _config        = config;
         
         _ibl = new IBLBaker(gl, _config.IBLConfig);  
-        _shadows = new ShadowMapper(gl, _config.Shadows);
+        _shadows = new ShadowMapper(gl, _config);
         
         _mainRenderer   = new MainRenderer(gl, config, _ibl, _shadows);
         _gridRenderer   = new GridRenderer(gl);

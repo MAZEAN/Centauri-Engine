@@ -191,6 +191,7 @@ public class MainRenderer : IDisposable
         shader.SetUniform("uMetallicMap",  3);
         shader.SetUniform("uAOMap",        4);
         
+        // IBL bindings
         shader.SetUniform("uIrradianceMap", 5);
         shader.SetUniform("uPrefilterMap",  6);
         shader.SetUniform("uBrdfLUT",       7);
@@ -198,15 +199,21 @@ public class MainRenderer : IDisposable
         shader.SetUniform("uMaxReflectionLod", (float)_ibl.MaxReflectionLod);
         shader.SetUniform("uIblIntensity", _config.IBLConfig.IblIntensity);
         
+        // CSM bindings
         shader.SetUniform("uShadowMap", 8);
         shader.SetUniform("uHasShadow", _shadows.Active ? 1 : 0);
         if (_shadows.Active)
         {
-            shader.SetUniform("uLightView",       _shadows.LightView);
-            shader.SetUniform("uLightProjection", _shadows.LightProjection);
-            shader.SetUniform("uShadowBias",  _shadows.Config.DepthBias);
-            shader.SetUniform("uNormalBias",  _shadows.Config.NormalBias);
-            shader.SetUniform("uPcfRadius",   _shadows.Config.PcfRadius);
+            int n = _shadows.LightMatrices.Length;
+            shader.SetUniform("uCascadeCount", n);
+            for (int i = 0; i < n; i++)
+            {
+                shader.SetUniform($"uLightMatrices[{i}]", _shadows.LightMatrices[i]);
+                shader.SetUniform($"uCascadeSplits[{i}]", _shadows.SplitDepths[i]);
+            }
+            shader.SetUniform("uShadowBias", _config.Shadows.DepthBias);
+            shader.SetUniform("uNormalBias", _config.Shadows.NormalBias);
+            shader.SetUniform("uPcfRadius",  _config.Shadows.PcfRadius);
         }
     }
     

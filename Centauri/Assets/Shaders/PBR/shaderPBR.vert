@@ -4,6 +4,7 @@ out vec2 fUv;       // UV after scale/offset applied
 out vec3 fNormal;   // world space normal
 out vec3 fFragPos;  // world space position of this fragment
 out mat3 fTBN;      // tangent space to world space matrix
+out float fViewDepth;
 
 layout (location = 0) in vec3 vPos;      // world position of vertex
 layout (location = 1) in vec3 vNormal;   // surface direction at vertex
@@ -19,7 +20,9 @@ uniform mat3 uNormalMatrix; // transposed inverse of uModel
 
 void main()
 {
-    gl_Position = uProjection * uView * uModel * vec4(vPos, 1.0);
+    vec4 viewPos = uView * uModel * vec4(vPos, 1.0);
+    fViewDepth   = -viewPos.z;
+    
     fUv         = vUv * uUvScale + uUvOffset;
     fFragPos    = vec3(uModel * vec4(vPos, 1.0));
 
@@ -30,4 +33,6 @@ void main()
 
     fTBN = mat3(T, B, N);
     fNormal = N;
+
+    gl_Position  = uProjection * viewPos;
 }
