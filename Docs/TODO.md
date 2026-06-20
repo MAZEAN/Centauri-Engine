@@ -9,10 +9,11 @@
 * [x] Entity inspector / modifier
 * [x] Skybox
 * [x] IBL
-* [ ] Shadow Maps
-* [ ] Cascaded shadow maps (CSM)
+* [x] Shadow Maps
+* [x] Cascaded shadow maps (CSM)
 * [ ] Day/Night cycle
 * [ ] Screen Space Reflections (SSR) (with ray tracing or PBR Accumulation)
+* [ ] Screen Space Ambient Occlusion (SSAO)
 * [ ] Reflection Probes
 * [ ] Raytracing with BVH (only experimental, not real-time)
 * [ ] Physics engine integration (BEPUphysics2)
