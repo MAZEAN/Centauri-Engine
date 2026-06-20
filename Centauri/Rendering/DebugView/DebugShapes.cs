@@ -1,4 +1,4 @@
-namespace Centauri.Rendering.Debug;
+namespace Centauri.Rendering.DebugView;
 
 using Silk.NET.OpenGL;
 using System.Numerics;

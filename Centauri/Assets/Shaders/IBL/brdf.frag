@@ -7,15 +7,15 @@ const float PI = 3.14159265359;
 
 float RadicalInverse_VdC(uint bits) {
     bits = (bits<<16u) | (bits>>16u);
-    bits = ((bits&0x55555555u)<<1u) | ((bits&0xAAAAAAAAu)>>1u);
-    bits = ((bits&0x33333333u)<<2u) | ((bits&0xCCCCCCCCu)>>2u);
-    bits = ((bits&0x0F0F0F0Fu)<<4u) | ((bits&0xF0F0F0F0u)>>4u);
-    bits = ((bits&0x00FF00FFu)<<8u) | ((bits&0xFF00FF00u)>>8u);
+    bits = ((bits & 0x55555555u)<<1u) | ((bits & 0xAAAAAAAAu)>>1u);
+    bits = ((bits & 0x33333333u)<<2u) | ((bits & 0xCCCCCCCCu)>>2u);
+    bits = ((bits & 0x0F0F0F0Fu)<<4u) | ((bits & 0xF0F0F0F0u)>>4u);
+    bits = ((bits & 0x00FF00FFu)<<8u) | ((bits & 0xFF00FF00u)>>8u);
     
     return float(bits) * 2.3283064365386963e-10;
 }
 
-vec2 Hammersley(uint i ,uint N) {
+vec2 Hammersley(uint i, uint N) {
     return vec2(float(i) / float(N), RadicalInverse_VdC(i));
 }
 
@@ -51,7 +51,7 @@ vec2 Integrate(float NdotV, float r) {
     float A = 0.0, B = 0.0;
     const uint S = 1024u;
     
-    for(uint i = 0u; i < S; i++){
+    for (uint i = 0u; i < S; i++) {
         vec2 Xi = Hammersley(i, S);
         vec3 H = ImportanceSampleGGX(Xi, N, r); 
         vec3 L = normalize(2.0 * dot(V, H) * H - V);
@@ -68,7 +68,7 @@ vec2 Integrate(float NdotV, float r) {
             A += (1.0 - Fc) * Gv; B += Fc * Gv; 
         }
     }
-    return vec2(A,B) / float(S);
+    return vec2(A, B) / float(S);
 }
 void main() { 
     FragColor = vec4(Integrate(clamp(vUv.x, 0.001, 1.0), vUv.y), 0.0, 1.0); 

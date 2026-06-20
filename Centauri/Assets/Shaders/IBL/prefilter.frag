@@ -12,10 +12,10 @@ uniform float uMaxRadiance;
 
 float RadicalInverse_VdC(uint bits) {
     bits = (bits<<16u) | (bits>>16u);
-    bits = ((bits&0x55555555u)<<1u) | ((bits&0xAAAAAAAAu)>>1u);
-    bits = ((bits&0x33333333u)<<2u) | ((bits&0xCCCCCCCCu)>>2u);
-    bits = ((bits&0x0F0F0F0Fu)<<4u) | ((bits&0xF0F0F0F0u)>>4u);
-    bits = ((bits&0x00FF00FFu)<<8u) | ((bits&0xFF00FF00u)>>8u);
+    bits = ((bits & 0x55555555u)<<1u) | ((bits & 0xAAAAAAAAu)>>1u);
+    bits = ((bits & 0x33333333u)<<2u) | ((bits & 0xCCCCCCCCu)>>2u);
+    bits = ((bits & 0x0F0F0F0Fu)<<4u) | ((bits & 0xF0F0F0F0u)>>4u);
+    bits = ((bits & 0x00FF00FFu)<<8u) | ((bits & 0xFF00FF00u)>>8u);
     
     return float(bits) * 2.3283064365386963e-10;
 }
@@ -24,18 +24,18 @@ vec2 Hammersley(uint i, uint N) {
     return vec2(float(i) / float(N), RadicalInverse_VdC(i));
 }
 
-vec3 ImportanceSampleGGX(vec2 Xi,vec3 N,float r) {
+vec3 ImportanceSampleGGX(vec2 Xi, vec3 N, float r) {
     float a = r * r; 
     float phi = 2.0 * PI * Xi.x;
     float ct = sqrt((1.0 - Xi.y) / (1.0 + (a * a - 1.0) * Xi.y)); 
     float st = sqrt(1.0 - ct * ct);
     
-    vec3 H = vec3(cos(phi) * st, sin(phi) * st,ct);
+    vec3 H = vec3(cos(phi) * st, sin(phi) * st, ct);
     vec3 up = abs(N.z) < 0.999 ? vec3(0, 0, 1) : vec3(1, 0, 0);
     vec3 tx = normalize(cross(up, N)); 
     vec3 ty = cross(N, tx);
     
-    return normalize(tx * H.x + ty * H.y + N*H.z);
+    return normalize(tx * H.x + ty * H.y + N * H.z);
 }
 
 float D_GGX(vec3 N, vec3 H, float r) {
@@ -56,14 +56,14 @@ void main() {
     vec3 acc = vec3(0.0); 
     float w = 0.0;
     
-    for(uint i = 0u; i < S; i++){
+    for (uint i = 0u; i < S; i++) {
         vec2 Xi = Hammersley(i, S);
         vec3 H = ImportanceSampleGGX(Xi, N, uRoughness);
         vec3 L = normalize(2.0 * dot(V, H) * H - V);
         
         float nl = max(dot(N, L), 0.0);
         
-        if (nl > 0.0){
+        if (nl > 0.0) {
             float d = D_GGX(N, H, uRoughness); 
             float nh = max(dot(N, H), 0.0); 
             float hv = max(dot(H, V), 0.0);
@@ -76,10 +76,13 @@ void main() {
 
             vec3 c = textureLod(uEnv, L, mip).rgb;
             float peak = max(max(c.r, c.g), c.b);
+            
             c *= uMaxRadiance / (uMaxRadiance + peak);   // soft rolloff — consistent with irradiance, no hard cap
             acc += c * nl;
+            
             w += nl;
         }
     }
-    FragColor = vec4(acc/ w, 1.0);
+    
+    FragColor = vec4(acc / w, 1.0);
 }

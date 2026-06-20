@@ -26,6 +26,7 @@ void main() {
 
         vec3 c = texture(uEnv, s).rgb;
         float peak = max(max(c.r, c.g), c.b);
+        
         c *= uMaxRadiance / (uMaxRadiance + peak);   // smooth rolloff — caps brights, no hard edge
         irradiance += c * cos(theta) * sin(theta);
         

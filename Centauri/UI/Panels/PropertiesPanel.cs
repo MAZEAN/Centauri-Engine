@@ -333,7 +333,8 @@ public class PropertiesPanel
             1f, 0f, 4f, "%.0f", conf.AuthoredPcfRadius);
 
         var sizeIndex = Array.IndexOf(ShadowSizes, conf.Size);
-        if (sizeIndex < 0) sizeIndex = 2;
+        if (sizeIndex < 0) 
+            sizeIndex = 3; // Default 4096
         
         if (Widgets.ComboRow("Map Size", ref sizeIndex, ShadowSizeLabels))
             conf.Size = ShadowSizes[sizeIndex];

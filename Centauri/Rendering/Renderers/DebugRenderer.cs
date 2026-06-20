@@ -11,7 +11,7 @@ using Graphics.Geometry;
 public sealed class DebugRenderer : IDisposable
 {
     private readonly AppConfig _config;
-    private readonly Debug.Draw _draw;
+    private readonly DebugView.Draw _draw;
     private readonly Mesh _cameraMesh;
 
     private bool _active;
@@ -29,8 +29,8 @@ public sealed class DebugRenderer : IDisposable
     public DebugRenderer(GL gl, AppConfig config)
     {
         _config     = config;
-        _draw       = new Debug.Draw(gl);
-        _cameraMesh = Debug.Shapes.BuildCameraMesh(gl);
+        _draw       = new DebugView.Draw(gl);
+        _cameraMesh = DebugView.Shapes.BuildCameraMesh(gl);
     }
 
     // ── Begin / End ───────────────────────────────────────────────────────────
@@ -87,10 +87,10 @@ public sealed class DebugRenderer : IDisposable
             var color   = culled ? AABBCulledColor : AABBColor;
 
             _draw.Color(color, FaceAlpha);          // translucent fill
-            _draw.Triangles(Debug.Shapes.BoxFaces(corners));
+            _draw.Triangles(DebugView.Shapes.BoxFaces(corners));
 
             _draw.Color(color);
-            _draw.Lines(Debug.Shapes.BoxEdges(corners));
+            _draw.Lines(DebugView.Shapes.BoxEdges(corners));
         }
     }
     
@@ -101,14 +101,14 @@ public sealed class DebugRenderer : IDisposable
 
         _draw.Model(Matrix4x4.Identity);
         _draw.Color(SelectedColor);
-        _draw.Lines(Debug.Shapes.BoxEdges(e.GetWorldBounds().GetBoxCorners()));
+        _draw.Lines(DebugView.Shapes.BoxEdges(e.GetWorldBounds().GetBoxCorners()));
     }
 
     // ── Private drawing ───────────────────────────────────────────────────────
     private void DrawCameraShape(Camera cam)
     {
         var model =
-            Matrix4x4.CreateScale(Debug.Shapes.CameraScale) *
+            Matrix4x4.CreateScale(DebugView.Shapes.CameraScale) *
             Matrix4x4.CreateWorld(cam.Position, cam.Forward, cam.Up);
 
         _draw.Model(model);
@@ -121,7 +121,7 @@ public sealed class DebugRenderer : IDisposable
         _draw.Model(Matrix4x4.Identity);
         _draw.Color(DirColor);
 
-        var tipOffset = MathF.Abs(Debug.Shapes.CameraModelBase) * Debug.Shapes.CameraScale;
+        var tipOffset = MathF.Abs(DebugView.Shapes.CameraModelBase) * DebugView.Shapes.CameraScale;
         var start     = cam.Position + cam.Forward * tipOffset;
         var end       = start + cam.Forward * DirLineLength;
 
@@ -132,7 +132,7 @@ public sealed class DebugRenderer : IDisposable
     {
         _draw.Model(Matrix4x4.Identity);
         _draw.Color(FrustumColor);
-        _draw.Lines(Debug.Shapes.BoxEdges(cam.Frustum.GetFrustumCorners()));
+        _draw.Lines(DebugView.Shapes.BoxEdges(cam.Frustum.GetFrustumCorners()));
     }
 
     private void AssertActive([CallerMemberName] string caller = "")
