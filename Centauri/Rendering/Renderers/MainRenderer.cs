@@ -298,7 +298,7 @@ public class MainRenderer : IDisposable
     {
         if (!_shadows.Active) return;
         _gl.ActiveTexture(TextureUnit.Texture8);
-        _gl.BindTexture(TextureTarget.Texture2D, _shadows.DepthTexture);
+        _gl.BindTexture(TextureTarget.Texture2DArray, _shadows.DepthTexture);
     }
 
     private void InitializeTextureCache()

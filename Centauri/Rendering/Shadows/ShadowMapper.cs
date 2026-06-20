@@ -59,7 +59,9 @@ public sealed class ShadowMapper : IDisposable
 
             foreach (var entity in scene.Entities)
             {
-                if (!entity.Enabled || entity.Model is not { } model) continue;
+                if (!entity.Enabled || entity.Model is not { } model) 
+                    continue;
+                
                 _depth.SetUniform("uModel", entity.Transform.WorldMatrix);
                 foreach (var mesh in model.Meshes)
                 {
@@ -88,13 +90,15 @@ public sealed class ShadowMapper : IDisposable
         // full camera frustum corners (world space), unprojected from NDC
         Matrix4x4.Invert(camera.GetViewMatrix() * camera.GetProjectionMatrix(), out var invVP);
         Span<Vector3> full = stackalloc Vector3[8];
+        
         int k = 0;
         for (int x = 0; x < 2; x++)
             for (int y = 0; y < 2; y++)
                 for (int z = 0; z < 2; z++)
                 {
-                    var ndc = new Vector4(x * 2 - 1, y * 2 - 1, z * 2 - 1, 1f);   // GL z in [-1,1]
+                    var ndc = new Vector4(x * 2 - 1, y * 2 - 1, z, 1f);
                     var w   = Vector4.Transform(ndc, invVP);
+                    
                     full[k++] = new Vector3(w.X, w.Y, w.Z) / w.W;
                 }
 
@@ -124,7 +128,9 @@ public sealed class ShadowMapper : IDisposable
 
             // center + light view looking down the light dir
             var center = Vector3.Zero;
-            foreach (var p2 in corners) center += p2;
+            foreach (var p2 in corners) 
+                center += p2;
+            
             center /= 8f;
 
             var lightView = Matrix4x4.CreateLookAt(center - dir, center, Vector3.UnitY);
