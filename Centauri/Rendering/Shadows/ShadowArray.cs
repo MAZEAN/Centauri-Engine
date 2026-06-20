@@ -24,6 +24,7 @@ public sealed class ShadowArray : IDisposable
         gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
         gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureWrapS, (int)GLEnum.ClampToBorder);
         gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureWrapT, (int)GLEnum.ClampToBorder);
+        
         Span<float> border = [1f, 1f, 1f, 1f];
         fixed (float* b = border)
             gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureBorderColor, b);

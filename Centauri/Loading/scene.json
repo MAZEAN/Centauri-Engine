@@ -80,12 +80,12 @@
       "position": [0, 2, 0],
       "light": {
         "type":      "spot",
-        "direction": [1.0, -1.0, 0.0],
+        "direction": [0.0, -1.0, 0.0],
         "color":     [1.0, 0.8, 0.6],
         "intensity": 10.0,
         "innerCutoff": 12.5,
         "OuterCutoff": 17.5,
-        "enabled":   true
+        "enabled":   false
       }
     }
   ],

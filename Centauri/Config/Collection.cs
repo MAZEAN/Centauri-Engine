@@ -84,6 +84,8 @@ public class InputConfig
 
 public class ShadowConfig
 {
+    public readonly int MaxCascades = 4;
+    
     [JsonPropertyName("enabled")]    public bool Enabled { get; set; } = true;
     [JsonPropertyName("size")]       public uint Size    { get; set; } = 2048;
 

@@ -20,12 +20,14 @@ public sealed class ShadowMapper : IDisposable
 
     public Matrix4x4[] LightMatrices { get; private set; } = [];  // proj·view per cascade (numerics order = View*Proj)
     public float[]     SplitDepths   { get; private set; } = [];  // view-space far depth per cascade
+    
+    private int CascadeCount => Math.Clamp(_config.Shadows.CascadeCount, 1, _config.Shadows.MaxCascades);
 
     public ShadowMapper(GL gl, AppConfig config)
     {
         _gl = gl;
         _config = config;
-        _maps = new ShadowArray(gl, config.Shadows.Size, config.Shadows.CascadeCount);
+        _maps = new ShadowArray(gl, config.Shadows.Size, CascadeCount);
         _depth = new GLShader(gl,
             PathResolver.Resolve("Assets/Shaders/Shadow/depth.vert"),
             PathResolver.Resolve("Assets/Shaders/Shadow/depth.frag"));
@@ -37,10 +39,10 @@ public sealed class ShadowMapper : IDisposable
         if (!_config.Shadows.Enabled) return;
 
         // realloc on resolution OR cascade-count change
-        if (_maps.Size != _config.Shadows.Size || _maps.Layers != _config.Shadows.CascadeCount)
+        if (_maps.Size != _config.Shadows.Size || _maps.Layers != CascadeCount)
         {
             _maps.Dispose();
-            _maps = new ShadowArray(_gl, _config.Shadows.Size, _config.Shadows.CascadeCount);
+            _maps = new ShadowArray(_gl, _config.Shadows.Size, CascadeCount);
         }
 
         if (scene.Lighting.DirectionalLights.Count == 0) return;
@@ -51,7 +53,7 @@ public sealed class ShadowMapper : IDisposable
         ComputeCascades(camera, dir);   // fills LightMatrices + SplitDepths
 
         _gl.Disable(EnableCap.CullFace);
-        for (var c = 0; c < _config.Shadows.CascadeCount; c++)
+        for (var c = 0; c < CascadeCount; c++)
         {
             _maps.BindLayer(c);
             _depth.Use();
@@ -80,12 +82,13 @@ public sealed class ShadowMapper : IDisposable
     }
     private void ComputeCascades(Camera camera, Vector3 dir)
     {
-        int n = _config.Shadows.CascadeCount;
+        int n = CascadeCount;
         LightMatrices = new Matrix4x4[n];
         SplitDepths   = new float[n];
 
-        float near = _config.Camera.Near;
-        float far  = MathF.Min(_config.Shadows.Distance, _config.Camera.Far);   // shadows extend to Distance
+        float near   = _config.Camera.Near;
+        float camFar = _config.Camera.Far;
+        float far    = MathF.Min(_config.Shadows.Distance, camFar);   // shadow range = split max
 
         // full camera frustum corners (world space), unprojected from NDC
         Matrix4x4.Invert(camera.GetViewMatrix() * camera.GetProjectionMatrix(), out var invVP);
@@ -113,8 +116,8 @@ public sealed class ShadowMapper : IDisposable
             SplitDepths[c] = split;
 
             // interpolate the slice corners along each frustum edge (z is linear along edges)
-            float t0 = (prevSplit - near) / (far - near);
-            float t1 = (split     - near) / (far - near);
+            float t0 = (prevSplit - near) / (camFar - near);
+            float t1 = (split     - near) / (camFar - near);
             
             Span<Vector3> corners = stackalloc Vector3[8];
             for (int i = 0; i < 4; i++)
@@ -133,7 +136,8 @@ public sealed class ShadowMapper : IDisposable
             
             center /= 8f;
 
-            var lightView = Matrix4x4.CreateLookAt(center - dir, center, Vector3.UnitY);
+            var up = MathF.Abs(dir.Y) > 0.99f ? Vector3.UnitZ : Vector3.UnitY;
+            var lightView = Matrix4x4.CreateLookAt(center - dir, center, up);
 
             // fit ortho to corners in light space
             var min = new Vector3(float.MaxValue);
