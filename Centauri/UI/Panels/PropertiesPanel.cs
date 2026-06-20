@@ -339,9 +339,7 @@ public class PropertiesPanel
         
         if (Widgets.ComboRow("Map Size", ref sizeIndex, ShadowSizeLabels))
             conf.Size = ShadowSizes[sizeIndex];
-
-        ImGui.TextDisabled($"Near {conf.Near:0.#}   Far {conf.Far:0.#}");
-
+        
         Widgets.DragRow("Cascades", conf.CascadeCount,
             v => conf.CascadeCount = Math.Clamp((int)MathF.Round(v), 1, conf.MaxCascades),
             1f, 1f, conf.MaxCascades, "%.0f", conf.AuthoredCascadeCount);

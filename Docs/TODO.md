@@ -25,7 +25,7 @@
 ### Enhancements
 
 * [x] Performance graphs
-* [ ] Light editing
+* [x] Light editing
 * [ ] Multithreading (async asset loading etc.)
 * [ ] Instancing & LOD system
 * [ ] Keybindings

@@ -39,7 +39,9 @@ public sealed class OutlinerPanel
         for (var i = 0; i < entities.Count; i++)
         {
             ImGui.PushID(i);
+            
             DrawRow(scene, entities[i]);
+            
             ImGui.PopID();
         }
 
