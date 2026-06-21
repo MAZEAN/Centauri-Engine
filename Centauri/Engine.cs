@@ -10,6 +10,7 @@ using Rendering;
 using Input;
 using Loading;
 using Windowing;
+using Simulation;
 
 public class Engine : IWindowCallbacks
 {
@@ -21,6 +22,7 @@ public class Engine : IWindowCallbacks
     private RenderingSystem _renderingSystem = null!;
     private ResourceSystem _resourceSystem = null!;
     private SceneLoader _sceneLoader = null!;
+    private SimulationSystem _simulation = null!;
 
     private const string ConfigPath = "Config/config.json";
 
@@ -55,6 +57,7 @@ public class Engine : IWindowCallbacks
     {
         _resourceSystem  = new ResourceSystem(_gl, _config);
         _renderingSystem = new RenderingSystem(_gl, _config);
+        _simulation = new SimulationSystem(_config);
     }
 
     private void LoadScene()
@@ -124,6 +127,7 @@ public class Engine : IWindowCallbacks
         var delta = (float)deltaTime;
         
         _inputSystem.Update(delta);
+        _simulation.Update(_scene, delta);
         _renderingSystem.Update(delta);
     }
 

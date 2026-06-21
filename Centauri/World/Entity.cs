@@ -5,15 +5,19 @@ using System.Numerics;
 using Graphics.Resources;
 using Utils.Geometry;
 using Graphics.Geometry;
+using Components;
 
 public readonly record struct TransformSnapshot(Vector3 Position, Vector3 Euler, Vector3 Scale);
 
 public class Entity : IDisposable
 {
     public string    Name    { get; set; }
-    public Model?    Model    { get; }   // optional now — a pure light has no mesh
+    public Model?    Model    { get; }
     public Material? Material { get; }
     public Light?    Light    { get; set; }
+    
+    private readonly List<Component> _components = new();
+    public IReadOnlyList<Component> Components => _components;
 
     private BoundingBox _worldBounds;
     private bool _boundsDirty = true;
@@ -44,6 +48,26 @@ public class Entity : IDisposable
         Light    = light;
         _transform.OnChanged += OnTransformChanged;
     }
+    
+    public T AddComponent<T>(T component) where T : Component
+    {
+        _components.Add(component);
+        component.Attach(this);
+        return component;
+    }
+    
+    public T? GetComponent<T>() where T : Component
+    {
+        foreach (var c in _components)
+            if (c is T t) return t;
+        return null;
+    }
+    
+    public void Update(float dt)
+    {
+        for (var i = 0; i < _components.Count; i++)
+            _components[i].Update(dt);
+    }
 
     public BoundingBox GetWorldBounds()
     {
@@ -63,5 +87,9 @@ public class Entity : IDisposable
     public void Dispose()
     {
         _transform.OnChanged -= OnTransformChanged;
+        
+        foreach (var c in _components)
+            if (c is IDisposable d) 
+                d.Dispose();
     }
 }
