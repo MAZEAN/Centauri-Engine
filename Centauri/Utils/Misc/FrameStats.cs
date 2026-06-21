@@ -11,4 +11,7 @@ public struct FrameStats
     public int   TextureBinds   { get; set; }
     public int   TotalIndices   { get; set; }
     public int   TotalVertices  { get; set; }
+    public int ShadowTotal => ShadowCasters + ShadowCulled;
+    public int ShadowCasters { get; set; }   // depth-pass draws, summed across cascades
+    public int ShadowCulled  { get; set; }   // frustum-culled per cascade, summed
 }

@@ -78,9 +78,6 @@ public class ShadowConfig
     [JsonPropertyName("size")]       public uint Size    { get; set; }
 
     [JsonPropertyName("distance")]   public float Distance { get; set; }
-    [JsonPropertyName("near")]       public float Near       { get; init; } = 1f;
-    [JsonPropertyName("far")]        public float Far        { get; init; } = 200f;
-
     [JsonPropertyName("depthBias")]  public float DepthBias  { get; set; }
     [JsonPropertyName("normalBias")] public float NormalBias { get; set; }
     [JsonPropertyName("pcfRadius")]  public int   PcfRadius  { get; set; }

@@ -67,6 +67,18 @@ public class StatsOverlay
                 : 0f;
             Row("Ratio", $"{Widgets.Float(ratio)} %");
         });
+        
+        Section("Shadows", ColorPalette.Blue, () =>
+        {
+            Row("Cascades", _config.Shadows.CascadeCount.ToString());
+            Row("Casters",  stats.ShadowCasters.ToString());
+            RowColored("Culled", stats.ShadowCulled.ToString(), ColorPalette.Red);
+
+            var ratio = stats.ShadowTotal > 0
+                ? stats.ShadowCulled / (float)stats.ShadowTotal * 100f
+                : 0f;
+            Row("Ratio", $"{Widgets.Float(ratio)} %");
+        });
 
         Section("Renderer", ColorPalette.Blue, () =>
         {

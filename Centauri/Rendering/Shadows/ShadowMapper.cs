@@ -13,6 +13,7 @@ public sealed class ShadowMapper : IDisposable
 {
     private const float UpThreshold = 0.99f;   // switch up-vector when the sun is ~vertical
     private const float RadiusSnap  = 16f;     // quantize sphere radius to 1/16 units (size-shimmer guard)
+    private const float ZEpsilon = 1f;
     
     private readonly GL _gl;
     private readonly AppConfig _config;
@@ -38,8 +39,14 @@ public sealed class ShadowMapper : IDisposable
             PathResolver.Resolve("Assets/Shaders/Shadow/depth.frag"));
     }
 
-    public void Render(Scene scene)
+    public void Render(Scene scene, ref FrameStats stats)
     {
+        stats.ShadowCasters = 0;
+        stats.ShadowCulled  = 0;
+
+        Active = false;
+        if (!_config.Shadows.Enabled) return;
+
         if (_maps.Size != _config.Shadows.Size)
         {
             _maps.Dispose();
@@ -48,10 +55,11 @@ public sealed class ShadowMapper : IDisposable
 
         if (scene.Lighting.DirectionalLights.Count == 0) return;
 
-        var dir    = Vector3.Normalize(scene.Lighting.DirectionalLights[0].Direction);
-        var camera = scene.Cameras.Active;
+        var dir         = Vector3.Normalize(scene.Lighting.DirectionalLights[0].Direction);
+        var camera      = scene.Cameras.Active;
+        var sceneBounds = ComputeSceneBounds(scene);
 
-        ComputeCascades(camera, dir);
+        ComputeCascades(camera, dir, sceneBounds);
 
         _gl.Disable(EnableCap.CullFace);
         for (var c = 0; c < Cascades.Length; c++)
@@ -59,17 +67,20 @@ public sealed class ShadowMapper : IDisposable
             _maps.BindLayer(c);
             _depth.Use();
             _depth.SetUniform("uLightMatrix", Cascades[c].Matrix);
-
-            _cull.Update(Cascades[c].Matrix);   // cascade ortho box → 6 planes
+            _cull.Update(Cascades[c].Matrix);
 
             foreach (var entity in scene.Entities)
             {
                 if (!entity.Enabled || entity.Model is not { } model)
                     continue;
 
-                if (!_cull.IsVisibleAABB(entity.GetWorldBounds()))   // outside this cascade → skip
+                if (!_cull.IsVisibleAABB(entity.GetWorldBounds()))
+                {
+                    stats.ShadowCulled++;
                     continue;
+                }
 
+                stats.ShadowCasters++;
                 _depth.SetUniform("uModel", entity.Transform.WorldMatrix);
                 foreach (var mesh in model.Meshes)
                 {
@@ -88,7 +99,7 @@ public sealed class ShadowMapper : IDisposable
         Active = true;
     }
     
-    private void ComputeCascades(Camera camera, Vector3 dir)
+    private void ComputeCascades(Camera camera, Vector3 dir, BoundingBox sceneBounds)
     {
         var n = CascadeCount;
         if (Cascades.Length != n)
@@ -110,7 +121,7 @@ public sealed class ShadowMapper : IDisposable
             SliceCorners(frustum, (prevSplit - near) / (camFar - near),
                 (split     - near) / (camFar - near), slice);
 
-            Cascades[c] = FitCascade(slice, dir, split);
+            Cascades[c] = FitCascade(slice, dir, split, sceneBounds);
             prevSplit = split;
         }
     }
@@ -154,7 +165,7 @@ public sealed class ShadowMapper : IDisposable
     }
 
     // fit a stable, texel-snapped ortho box around the slice (bounding-sphere method)
-    private Cascade FitCascade(ReadOnlySpan<Vector3> corners, Vector3 dir, float splitDepth)
+    private Cascade FitCascade(ReadOnlySpan<Vector3> corners, Vector3 dir, float splitDepth, BoundingBox sceneBounds)
     {
         var center = Vector3.Zero;
         foreach (var p in corners)
@@ -175,20 +186,24 @@ public sealed class ShadowMapper : IDisposable
         centerLS.X = MathF.Floor(centerLS.X / texelSize) * texelSize;
         centerLS.Y = MathF.Floor(centerLS.Y / texelSize) * texelSize;
 
-        float minZ = float.MaxValue, maxZ = float.MinValue;
+        float sliceMinZ = float.MaxValue, sliceMaxZ = float.MinValue;
         foreach (var p in corners)
         {
             var z = Vector3.Transform(p, view).Z;
-            minZ = MathF.Min(minZ, z);
-            maxZ = MathF.Max(maxZ, z);
+            sliceMinZ = MathF.Min(sliceMinZ, z);
+            sliceMaxZ = MathF.Max(sliceMaxZ, z);
         }
-        
-        var zPad = radius;
+
+        // near plane extends toward the light to the closest caster (so occluders above
+        // the slice still cast); far plane stays at the slice's farthest receiver
+        var casterMaxZ = LightSpaceMaxZ(sceneBounds, view);
+        var nearZ = -(MathF.Max(sliceMaxZ, casterMaxZ) + ZEpsilon);
+        var farZ  = -(sliceMinZ - ZEpsilon);
 
         var proj = Matrix4x4.CreateOrthographicOffCenter(
             centerLS.X - radius, centerLS.X + radius,
             centerLS.Y - radius, centerLS.Y + radius,
-            -maxZ - zPad, -minZ + zPad);
+            nearZ, farZ);
 
         return new Cascade
         {
@@ -197,6 +212,32 @@ public sealed class ShadowMapper : IDisposable
             Center     = center,
             Radius     = radius,
         };
+    }
+
+    private static float LightSpaceMaxZ(BoundingBox bounds, Matrix4x4 view)
+    {
+        var maxZ = float.MinValue;
+        foreach (var corner in bounds.GetBoxCorners())
+            maxZ = MathF.Max(maxZ, Vector3.Transform(corner, view).Z);
+        
+        return maxZ;
+    }
+    
+    private static BoundingBox ComputeSceneBounds(Scene scene)
+    {
+        var min = new Vector3(float.MaxValue);
+        var max = new Vector3(float.MinValue);
+
+        foreach (var e in scene.Entities)
+        {
+            if (!e.Enabled || e.Model is null) continue;
+            var b = e.GetWorldBounds();
+            min = Vector3.Min(min, b.Min);
+            max = Vector3.Max(max, b.Max);
+        }
+
+        return min.X <= max.X ? new BoundingBox(min, max)
+            : new BoundingBox(Vector3.Zero, Vector3.Zero);   // no casters
     }
 
     public void Dispose()

@@ -66,6 +66,7 @@ uniform float uIblIntensity;
 uniform sampler2DArrayShadow uShadowMap;         // unit 8 (now an array)
 uniform mat4  uLightMatrices[MAX_CASCADES];
 uniform float uCascadeSplits[MAX_CASCADES]; // view-space far depth per cascade
+
 uniform int   uCascadeCount;
 uniform int   uHasShadow;
 uniform float uShadowBias;
@@ -86,7 +87,9 @@ float ShadowFactor(vec3 N, vec3 L)
 
     vec4 ls   = uLightMatrices[c] * vec4(fFragPos + N * uNormalBias, 1.0);
     vec3 proj = ls.xyz / ls.w * 0.5 + 0.5;
-    if (proj.z > 1.0) return 0.0;                       // beyond far plane: lit
+    
+    if (proj.z > 1.0) 
+        return 0.0;                       // beyond far plane: lit
 
     float bias    = max(uShadowBias * (1.0 - dot(N, L)), uShadowBias * 0.1);
     float current = proj.z - bias;

@@ -79,7 +79,7 @@ public class RenderingSystem : IDisposable
     {
         scene.Lighting.Collect(scene.Entities);
         
-        _shadows.Render(scene);
+        _shadows.Render(scene, ref _stats);
         
         _post.BeginScene();
 
