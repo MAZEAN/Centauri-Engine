@@ -73,7 +73,10 @@
         "color":     [1.0, 1.0, 1.0],
         "intensity": 1.0,
         "enabled":   true
-      }
+      },
+      "components": [
+        { "type": "dayNight", "speed": 0.03, "startTime": 0.35, "dayIntensity": 4.0 }
+      ]
     },
     {
       "name":     "Lamp",

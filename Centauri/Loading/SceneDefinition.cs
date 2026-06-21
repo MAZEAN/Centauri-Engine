@@ -1,6 +1,7 @@
 namespace Centauri.Loading;
 
 using System.Text.Json.Serialization;
+using System.Text.Json;
 
 public class SceneDefinition
 {
@@ -22,6 +23,7 @@ public class EntityDefinition
     [JsonPropertyName("enabled")]  public bool    Enabled  { get; set; } = true;
 
     [JsonPropertyName("light")]    public LightDefinition? Light { get; set; }
+    [JsonPropertyName("components")] public List<ComponentDefinition>? Components { get; set; }
 }
 
 public class LightDefinition
@@ -76,4 +78,12 @@ public class SkyboxDefinition
     [JsonPropertyName("exposure")] public float  Exposure { get; set; } = 1.0f;
     [JsonPropertyName("blackLevel")] public float BlackLevel { get; set; } = 0.0f;
     [JsonPropertyName("active")]   public bool   Active   { get; set; }
+}
+
+public class ComponentDefinition
+{
+    [JsonPropertyName("type")] public string Type { get; set; } = "";
+
+    // every field other than "type" lands here — each component reads its own
+    [JsonExtensionData] public Dictionary<string, JsonElement>? Params { get; set; }
 }

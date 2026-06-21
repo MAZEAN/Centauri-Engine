@@ -8,6 +8,7 @@ using System.Numerics;
 using Config;
 using World;
 using Rendering;
+using World.Components;
 
 public class InputSystem : IDisposable
 {
@@ -109,6 +110,7 @@ public class InputSystem : IDisposable
             case Key.M:  _config.Debug.ToggleShowStatsOverlay();  break;
             case Key.C:  _scene.Cameras.Cycle(); ResetActiveController();  break;
             case Key.B:  _scene.Skyboxes.Cycle(); break;
+            case Key.N:  _scene.FindComponent<DayNightCycle>()?.Toggle(); break;
         }
     }
 

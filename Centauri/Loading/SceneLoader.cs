@@ -75,6 +75,10 @@ public class SceneLoader
                 entity.Transform.EulerAngles,
                 entity.Transform.Scale
             );
+            
+            if (e.Components is { Count: > 0 })
+                foreach (var c in e.Components)
+                    entity.AddComponent(ComponentFactory.Create(c));
 
             _scene.AddEntity(entity);
         }

@@ -2,6 +2,7 @@ namespace Centauri.World;
 
 using Utils.Geometry;
 using Collections;
+using Components;
 
 public class Scene
 {
@@ -28,6 +29,15 @@ public class Scene
         _entities.Remove(entity);
         if (Selected == entity) Selected = null;   // keep selection valid
         Revision++;
+    }
+    
+    // first component of type T across the scene, or null — handy for global toggles
+    public T? FindComponent<T>() where T : Component
+    {
+        foreach (var e in _entities)
+            if (e.GetComponent<T>() is { } c)
+                return c;
+        return null;
     }
 
     public Entity? Pick(Ray ray)
