@@ -332,13 +332,12 @@ public class PropertiesPanel
         
         Widgets.DragRow("PCF Radius", conf.PcfRadius, v => conf.PcfRadius = (int)MathF.Round(v),
             1f, 0f, 4f, "%.0f", conf.AuthoredPcfRadius);
-
-        var sizeIndex = Array.IndexOf(ShadowSizes, conf.Size);
-        if (sizeIndex < 0) 
-            sizeIndex = 3; // Default 4096
         
+        var sizeIndex = Array.IndexOf(ShadowSizes, conf.Size);
         if (Widgets.ComboRow("Map Size", ref sizeIndex, ShadowSizeLabels))
-            conf.Size = ShadowSizes[sizeIndex];
+        {
+            conf.Size = sizeIndex >= 0 ? ShadowSizes[sizeIndex] : conf.AuthoredSize;
+        }
         
         Widgets.DragRow("Cascades", conf.CascadeCount,
             v => conf.CascadeCount = Math.Clamp((int)MathF.Round(v), 1, conf.MaxCascades),

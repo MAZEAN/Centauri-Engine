@@ -26,7 +26,8 @@ public class WindowManager
 
         var monitor = FindMonitor();
         
-        options.WindowState = config.Window.WindowState;
+        options.WindowState = config.Window.State;
+        options.WindowBorder = config.Window.Border;
         options.Position = monitor.Bounds.Origin;
         options.Title = config.Window.Title;
         options.VSync = config.Window.EnableVSync;

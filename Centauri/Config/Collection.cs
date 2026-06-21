@@ -29,11 +29,12 @@ public class CameraConfig
 
 public class WindowConfig
 {
-    [JsonPropertyName("title")]       public string      Title       { get; init; } = "Centauri";
-    [JsonPropertyName("windowState")] public WindowState WindowState { get; init; } = WindowState.Maximized;
-    [JsonPropertyName("enableVSync")] public bool        EnableVSync { get; init; } = true;
-    [JsonPropertyName("samples")]     public int         Samples     { get; init; } = 4;
-    [JsonPropertyName("clearColor")]  public float[]     ClearColor  { get; init; } = [1.0f, 1.0f, 1.0f, 1.0f];
+    [JsonPropertyName("title")]       public string Title { get; init; } = "Centauri";
+    [JsonPropertyName("state")]       public WindowState State { get; init; } = WindowState.Maximized;
+    [JsonPropertyName("border")]      public WindowBorder Border { get; init; } = WindowBorder.Hidden;
+    [JsonPropertyName("enableVSync")] public bool EnableVSync { get; init; } = true;
+    [JsonPropertyName("samples")]     public int Samples { get; init; } = 4;
+    [JsonPropertyName("clearColor")]  public float[] ClearColor { get; init; } = [1.0f, 1.0f, 1.0f, 1.0f];
 }
 
 public class ImGuiConfig
@@ -74,7 +75,7 @@ public class ShadowConfig
     public readonly int MaxCascades = 4;
     
     [JsonPropertyName("enabled")]    public bool Enabled { get; set; } = true;
-    [JsonPropertyName("size")]       public uint Size    { get; set; } = 2048;
+    [JsonPropertyName("size")]       public uint Size    { get; set; }
 
     [JsonPropertyName("distance")]   public float Distance { get; set; }
     [JsonPropertyName("near")]       public float Near       { get; init; } = 1f;
@@ -88,22 +89,26 @@ public class ShadowConfig
     [JsonPropertyName("splitLambda")]  public float SplitLambda  { get; set; } // 0=uniform, 1=logarithmic
     
     [JsonIgnore] public bool DebugCascades { get; set; }
-
+    
+    [JsonIgnore] public uint AuthoredSize { get; set; }
     [JsonIgnore] public float AuthoredDistance   { get; }
     [JsonIgnore] public float AuthoredDepthBias  { get; }
     [JsonIgnore] public float AuthoredNormalBias { get; }
     [JsonIgnore] public int   AuthoredPcfRadius  { get; }
-    [JsonIgnore] public int   AuthoredCascadeCount  { get; }
+    [JsonIgnore] public int   AuthoredCascadeCount { get; }
     [JsonIgnore] public float AuthoredSplitLambda { get; }
 
     public ShadowConfig(
+        uint size = 2048,
         float distance   = 150f,
         float depthBias  = 0.0015f,
         float normalBias = 0.02f,
-        int   pcfRadius  = 2,
+        int   pcfRadius  = 1,
         int   cascadeCount = 4,
-        float splitLambda = 0.85f)
+        float splitLambda = 0.85f
+    )
     {
+        Size = AuthoredSize = size;
         Distance   = AuthoredDistance   = distance;
         DepthBias  = AuthoredDepthBias  = depthBias;
         NormalBias = AuthoredNormalBias = normalBias;
@@ -125,7 +130,12 @@ public sealed class ColorGrading
     [JsonIgnore] public float AuthoredContrast   { get; }
     [JsonIgnore] public float AuthoredSaturation { get; }
 
-    public ColorGrading(float exposure = 1f, float blackLevel = 0f, float contrast = 1f, float saturation = 1f)
+    public ColorGrading(
+        float exposure = 1f,
+        float blackLevel = 0f,
+        float contrast = 1f,
+        float saturation = 1f
+    )
     {
         Exposure   = AuthoredExposure   = exposure;
         BlackLevel = AuthoredBlackLevel = blackLevel;
