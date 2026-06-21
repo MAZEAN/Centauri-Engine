@@ -10,18 +10,19 @@ public sealed class DayNightCycle : Component
 {
     private readonly float   _speed;        // time-of-day fraction advanced per second
     private readonly float   _dayIntensity; // peak sun intensity at noon
-    private readonly Vector3 _dayColor;     // sun colour near noon
-    private readonly Vector3 _duskColor;    // sun colour near the horizon
+    private readonly Vector3 _dayColor;     // sun color near noon
+    private readonly Vector3 _duskColor;    // sun color near the horizon
 
     private float _time;  // [0,1): 0 midnight, .25 sunrise, .5 noon, .75 sunset
-    public bool Paused { get; private set; }
+    public bool Paused { get; private set; } = true;
 
     public DayNightCycle(
         float    speed        = 0.02f,
         float    startTime    = 0.3f,
         float    dayIntensity = 4f,
         Vector3? dayColor     = null,
-        Vector3? duskColor    = null)
+        Vector3? duskColor    = null
+    )
     {
         _speed        = speed;
         _time         = Wrap01(startTime);

@@ -328,7 +328,7 @@ public class PropertiesPanel
         Widgets.DragRow("Depth Bias", conf.DepthBias,  v => conf.DepthBias  = v,
             0.0001f, 0f, 0.02f, "%.4f",   conf.AuthoredDepthBias);
         Widgets.DragRow("Normal Bias", conf.NormalBias, v => conf.NormalBias = v,
-            0.001f, 0f, 0.2f,   "%.3f",   conf.AuthoredNormalBias);
+            0.01f, 0f, 2.0f,   "%.3f",   conf.AuthoredNormalBias);
         
         Widgets.DragRow("PCF Radius", conf.PcfRadius, v => conf.PcfRadius = (int)MathF.Round(v),
             1f, 0f, 4f, "%.0f", conf.AuthoredPcfRadius);
