@@ -66,7 +66,8 @@ public class Entity : IDisposable
     public void Update(float dt)
     {
         for (var i = 0; i < _components.Count; i++)
-            _components[i].Update(dt);
+            if (_components[i].Enabled)
+                _components[i].Update(dt);
     }
 
     public BoundingBox GetWorldBounds()

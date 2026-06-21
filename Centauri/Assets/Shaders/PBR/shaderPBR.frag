@@ -66,6 +66,7 @@ uniform float uIblIntensity;
 uniform sampler2DArrayShadow uShadowMap;         // unit 8 (now an array)
 uniform mat4  uLightMatrices[MAX_CASCADES];
 uniform float uCascadeSplits[MAX_CASCADES]; // view-space far depth per cascade
+uniform float uTexelWorld[MAX_CASCADES];    // world-space size of one shadow texel, per cascade
 
 uniform int   uCascadeCount;
 uniform int   uHasShadow;
@@ -77,7 +78,9 @@ uniform int uShowCascades;
 
 int SelectCascade(float viewDepth) {
     for (int i = 0; i < uCascadeCount; ++i)
-    if (viewDepth < uCascadeSplits[i]) return i;
+        if (viewDepth < uCascadeSplits[i]) 
+            return i;
+    
     return uCascadeCount - 1;
 }
 
@@ -85,7 +88,10 @@ float ShadowFactor(vec3 N, vec3 L)
 {
     int c = SelectCascade(fViewDepth);
 
-    vec4 ls   = uLightMatrices[c] * vec4(fFragPos + N * uNormalBias, 1.0);
+    // offset along the normal by N texels of THIS cascade — self-tunes near vs far,
+    // so one bias value works across every cascade instead of being a single guess
+    float nOffset = uNormalBias * uTexelWorld[c];
+    vec4 ls = uLightMatrices[c] * vec4(fFragPos + N * nOffset, 1.0);
     vec3 proj = ls.xyz / ls.w * 0.5 + 0.5;
     
     if (proj.z > 1.0) 

@@ -213,6 +213,7 @@ public class MainRenderer : IDisposable
             {
                 shader.SetUniform($"uLightMatrices[{i}]", cascades[i].Matrix);
                 shader.SetUniform($"uCascadeSplits[{i}]", cascades[i].SplitDepth);
+                shader.SetUniform($"uTexelWorld[{i}]", cascades[i].Radius * 2f / _config.Shadows.Size);
             }
             
             shader.SetUniform("uShadowBias", _config.Shadows.DepthBias);

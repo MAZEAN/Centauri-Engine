@@ -82,8 +82,9 @@ public class SkyboxDefinition
 
 public class ComponentDefinition
 {
-    [JsonPropertyName("type")] public string Type { get; set; } = "";
+    [JsonPropertyName("type")]    public string Type    { get; set; } = "";
+    [JsonPropertyName("enabled")] public bool   Enabled { get; set; } = true;
 
-    // every field other than "type" lands here — each component reads its own
+    // every field other than "type"/"enabled" lands here — each component reads its own
     [JsonExtensionData] public Dictionary<string, JsonElement>? Params { get; set; }
 }

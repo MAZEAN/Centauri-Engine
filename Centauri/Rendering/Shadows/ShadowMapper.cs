@@ -62,9 +62,7 @@ public sealed class ShadowMapper : IDisposable
 
         ComputeCascades(camera, dir, sceneBounds);
 
-        _gl.Disable(EnableCap.CullFace);
-        _gl.Enable(EnableCap.PolygonOffsetFill);
-        _gl.PolygonOffset(2.5f, 4f);        // slope-scaled depth bias in hardware (per-cascade correct, no smear)
+        SetRenderState();
         
         for (var c = 0; c < Cascades.Length; c++)
         {
@@ -98,10 +96,7 @@ public sealed class ShadowMapper : IDisposable
             }
         }
 
-        _gl.PolygonOffset(0f, 0f);
-        _gl.Disable(EnableCap.PolygonOffsetFill);
-        _gl.Enable(EnableCap.CullFace);
-        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        ResetRenderState();
         Active = true;
     }
     
@@ -249,6 +244,21 @@ public sealed class ShadowMapper : IDisposable
 
         return min.X <= max.X ? new BoundingBox(min, max)
             : new BoundingBox(Vector3.Zero, Vector3.Zero);   // no casters
+    }
+
+    private void SetRenderState()
+    {
+        _gl.Disable(EnableCap.CullFace);
+        _gl.Enable(EnableCap.PolygonOffsetFill);
+        _gl.PolygonOffset(2.5f, 4f);
+    }
+    
+    private void ResetRenderState()
+    {
+        _gl.PolygonOffset(0f, 0f);
+        _gl.Disable(EnableCap.PolygonOffsetFill);
+        _gl.Enable(EnableCap.CullFace);
+        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
     }
 
     public void Dispose()

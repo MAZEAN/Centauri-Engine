@@ -70,78 +70,67 @@ public class InputConfig
     }
 }
 
-public class ShadowConfig
+public class ShadowConfig : IJsonOnDeserialized
 {
     public readonly int MaxCascades = 4;
-    
-    [JsonPropertyName("enabled")]    public bool Enabled { get; set; } = true;
-    [JsonPropertyName("size")]       public uint Size    { get; set; }
 
-    [JsonPropertyName("distance")]   public float Distance { get; set; }
-    [JsonPropertyName("depthBias")]  public float DepthBias  { get; set; }
-    [JsonPropertyName("normalBias")] public float NormalBias { get; set; }
-    [JsonPropertyName("pcfRadius")]  public int   PcfRadius  { get; set; }
-    
-    [JsonPropertyName("cascadeCount")] public int   CascadeCount { get; set; }    // 2–4 typical
-    [JsonPropertyName("splitLambda")]  public float SplitLambda  { get; set; } // 0=uniform, 1=logarithmic
-    
+    [JsonPropertyName("enabled")]      public bool  Enabled      { get; set; } = true;
+    [JsonPropertyName("size")]         public uint  Size         { get; set; } = 4096;
+    [JsonPropertyName("distance")]     public float Distance     { get; set; } = 150f;
+    [JsonPropertyName("depthBias")]    public float DepthBias    { get; set; } = 0.0005f;
+    [JsonPropertyName("normalBias")]   public float NormalBias   { get; set; } = 1.5f;
+    [JsonPropertyName("pcfRadius")]    public int   PcfRadius    { get; set; } = 2;
+    [JsonPropertyName("cascadeCount")] public int   CascadeCount { get; set; } = 4;   // 2–4 typical
+    [JsonPropertyName("splitLambda")]  public float SplitLambda  { get; set; } = 0.85f; // 0=uniform, 1=log
+
     [JsonIgnore] public bool DebugCascades { get; set; }
-    
-    [JsonIgnore] public uint AuthoredSize { get; set; }
-    [JsonIgnore] public float AuthoredDistance   { get; }
-    [JsonIgnore] public float AuthoredDepthBias  { get; }
-    [JsonIgnore] public float AuthoredNormalBias { get; }
-    [JsonIgnore] public int   AuthoredPcfRadius  { get; }
-    [JsonIgnore] public int   AuthoredCascadeCount { get; }
-    [JsonIgnore] public float AuthoredSplitLambda { get; }
 
-    public ShadowConfig(
-        uint size = 2048,
-        float distance   = 150f,
-        float depthBias  = 0.0005f,
-        float normalBias = 0.01f,
-        int   pcfRadius  = 2,
-        int   cascadeCount = 4,
-        float splitLambda = 0.85f
-    )
+    [JsonIgnore] public uint  AuthoredSize         { get; private set; }
+    [JsonIgnore] public float AuthoredDistance     { get; private set; }
+    [JsonIgnore] public float AuthoredDepthBias    { get; private set; }
+    [JsonIgnore] public float AuthoredNormalBias   { get; private set; }
+    [JsonIgnore] public int   AuthoredPcfRadius    { get; private set; }
+    [JsonIgnore] public int   AuthoredCascadeCount { get; private set; }
+    [JsonIgnore] public float AuthoredSplitLambda  { get; private set; }
+
+    public ShadowConfig() => OnDeserialized();
+
+    public void OnDeserialized()
     {
-        Size = AuthoredSize = size;
-        Distance   = AuthoredDistance   = distance;
-        DepthBias  = AuthoredDepthBias  = depthBias;
-        NormalBias = AuthoredNormalBias = normalBias;
-        PcfRadius  = AuthoredPcfRadius  = pcfRadius;
-        CascadeCount = AuthoredCascadeCount = cascadeCount;
-        SplitLambda = AuthoredSplitLambda = splitLambda;
+        AuthoredSize         = Size;
+        AuthoredDistance     = Distance;
+        AuthoredDepthBias    = DepthBias;
+        AuthoredNormalBias   = NormalBias;
+        AuthoredPcfRadius    = PcfRadius;
+        AuthoredCascadeCount = CascadeCount;
+        AuthoredSplitLambda  = SplitLambda;
     }
 }
 
-public sealed class ColorGrading
+public sealed class ColorGrading : IJsonOnDeserialized
 {
-    [JsonPropertyName("exposure")]   public float Exposure   { get; set; }
-    [JsonPropertyName("blackLevel")] public float BlackLevel { get; set; }
-    [JsonPropertyName("contrast")]   public float Contrast   { get; set; }
-    [JsonPropertyName("saturation")] public float Saturation { get; set; }
+    [JsonPropertyName("exposure")]   public float Exposure   { get; set; } = 1f;
+    [JsonPropertyName("blackLevel")] public float BlackLevel { get; set; } = 0f;
+    [JsonPropertyName("contrast")]   public float Contrast   { get; set; } = 1f;
+    [JsonPropertyName("saturation")] public float Saturation { get; set; } = 1f;
 
-    [JsonIgnore] public float AuthoredExposure   { get; }
-    [JsonIgnore] public float AuthoredBlackLevel { get; }
-    [JsonIgnore] public float AuthoredContrast   { get; }
-    [JsonIgnore] public float AuthoredSaturation { get; }
+    [JsonIgnore] public float AuthoredExposure   { get; private set; }
+    [JsonIgnore] public float AuthoredBlackLevel { get; private set; }
+    [JsonIgnore] public float AuthoredContrast   { get; private set; }
+    [JsonIgnore] public float AuthoredSaturation { get; private set; }
 
-    public ColorGrading(
-        float exposure = 1f,
-        float blackLevel = 0f,
-        float contrast = 1f,
-        float saturation = 1f
-    )
+    public ColorGrading() => OnDeserialized();
+
+    public void OnDeserialized()
     {
-        Exposure   = AuthoredExposure   = exposure;
-        BlackLevel = AuthoredBlackLevel = blackLevel;
-        Contrast   = AuthoredContrast   = contrast;
-        Saturation = AuthoredSaturation = saturation;
+        AuthoredExposure   = Exposure;
+        AuthoredBlackLevel = BlackLevel;
+        AuthoredContrast   = Contrast;
+        AuthoredSaturation = Saturation;
     }
 }
 
-public class IBLConfig
+public class IBLConfig : IJsonOnDeserialized
 {
     [JsonPropertyName("iblIntensity")]    public float IblIntensity { get; set; } = 0.3f;
     [JsonPropertyName("maxRadiance")]     public float MaxRadiance { get; init; } = 10f;
@@ -151,10 +140,12 @@ public class IBLConfig
     [JsonPropertyName("prefilterMips")]   public int PrefilterMips { get; init; }  = 5;
     [JsonPropertyName("brdfSize")]        public uint BrdfSize { get; init; }  = 512;
     
-    [JsonIgnore] public float AuthoredIblIntensity { get; }
+    [JsonIgnore] public float AuthoredIblIntensity { get; private set; }
     
-    public IBLConfig(float iblIntensity = 0.3f)
+    public IBLConfig() => OnDeserialized();
+
+    public void OnDeserialized()
     {
-        IblIntensity = AuthoredIblIntensity = iblIntensity;
+        AuthoredIblIntensity =  IblIntensity;
     }
 }

@@ -22,10 +22,15 @@ public static class ComponentFactory
                 duskColor:    d.Vector3("duskColor")),
         };
 
-    public static Component Create(ComponentDefinition def) =>
-        Registry.TryGetValue(def.Type, out var make)
-            ? make(def)
-            : throw new Exception($"Unknown component type '{def.Type}'.");
+    public static Component Create(ComponentDefinition def)
+    {
+        if (!Registry.TryGetValue(def.Type, out var make))
+            throw new Exception($"Unknown component type '{def.Type}'.");
+
+        var component = make(def);
+        component.Enabled = def.Enabled;
+        return component;
+    }
 }
 
 internal static class ComponentParams

@@ -6,12 +6,14 @@ public abstract class Component
 {
     public Entity Owner { get; private set; } = null!;
 
+    public bool Enabled { get; set; } = true;   // disabled components are skipped by Entity.Update
+
     internal void Attach(Entity owner)
     {
         Owner = owner;
         OnAttach();
     }
 
-    protected virtual void OnAttach() { }   // one-time setup once Owner is set
+    protected virtual void OnAttach() { }
     public    virtual void Update(float dt) { }
 }
