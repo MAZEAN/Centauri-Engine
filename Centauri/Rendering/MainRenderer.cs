@@ -203,15 +203,18 @@ public class MainRenderer : IDisposable
         shader.SetUniform("uShadowMap", 8);
         shader.SetUniform("uHasShadow", _shadows.Active ? 1 : 0);
         shader.SetUniform("uShowCascades", _config.Shadows.DebugCascades ? 1 : 0);
+        
         if (_shadows.Active)
         {
-            int n = _shadows.LightMatrices.Length;
-            shader.SetUniform("uCascadeCount", n);
-            for (int i = 0; i < n; i++)
+            var cascades = _shadows.Cascades;
+            shader.SetUniform("uCascadeCount", cascades.Length);
+            
+            for (var i = 0; i < cascades.Length; i++)
             {
-                shader.SetUniform($"uLightMatrices[{i}]", _shadows.LightMatrices[i]);
-                shader.SetUniform($"uCascadeSplits[{i}]", _shadows.SplitDepths[i]);
+                shader.SetUniform($"uLightMatrices[{i}]", cascades[i].Matrix);
+                shader.SetUniform($"uCascadeSplits[{i}]", cascades[i].SplitDepth);
             }
+            
             shader.SetUniform("uShadowBias", _config.Shadows.DepthBias);
             shader.SetUniform("uNormalBias", _config.Shadows.NormalBias);
             shader.SetUniform("uPcfRadius",  _config.Shadows.PcfRadius);

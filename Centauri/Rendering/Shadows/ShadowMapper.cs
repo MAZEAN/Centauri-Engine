@@ -10,6 +10,9 @@ using Graphics.Resources;
 
 public sealed class ShadowMapper : IDisposable
 {
+    private const float UpThreshold = 0.99f;   // switch up-vector when the sun is ~vertical
+    private const float RadiusSnap  = 16f;     // quantize sphere radius to 1/16 units (size-shimmer guard)
+    
     private readonly GL _gl;
     private readonly AppConfig _config;
     private ShadowArray _maps;
@@ -17,9 +20,8 @@ public sealed class ShadowMapper : IDisposable
 
     public bool Active { get; private set; }
     public uint DepthTexture => _maps.DepthTexture;
-
-    public Matrix4x4[] LightMatrices { get; private set; } = [];  // proj·view per cascade (numerics order = View*Proj)
-    public float[]     SplitDepths   { get; private set; } = [];  // view-space far depth per cascade
+    
+    public Cascade[] Cascades { get; private set; } = [];
     
     private int CascadeCount => Math.Clamp(_config.Shadows.CascadeCount, 1, _config.Shadows.MaxCascades);
 
@@ -27,7 +29,8 @@ public sealed class ShadowMapper : IDisposable
     {
         _gl = gl;
         _config = config;
-        _maps = new ShadowArray(gl, config.Shadows.Size, CascadeCount);
+        // pre-allocate every layer up front — cascade-count changes never re-alloc (no frame stall)
+        _maps = new ShadowArray(gl, config.Shadows.Size, config.Shadows.MaxCascades);
         _depth = new GLShader(gl,
             PathResolver.Resolve("Assets/Shaders/Shadow/depth.vert"),
             PathResolver.Resolve("Assets/Shaders/Shadow/depth.frag"));
@@ -35,14 +38,10 @@ public sealed class ShadowMapper : IDisposable
 
     public void Render(Scene scene)
     {
-        Active = false;
-        if (!_config.Shadows.Enabled) return;
-
-        // re-alloc on resolution OR cascade-count change
-        if (_maps.Size != _config.Shadows.Size || _maps.Layers != CascadeCount)
+        if (_maps.Size != _config.Shadows.Size)
         {
             _maps.Dispose();
-            _maps = new ShadowArray(_gl, _config.Shadows.Size, CascadeCount);
+            _maps = new ShadowArray(_gl, _config.Shadows.Size, _config.Shadows.MaxCascades);
         }
 
         if (scene.Lighting.DirectionalLights.Count == 0) return;
@@ -50,20 +49,20 @@ public sealed class ShadowMapper : IDisposable
         var dir    = Vector3.Normalize(scene.Lighting.DirectionalLights[0].Direction);
         var camera = scene.Cameras.Active;
 
-        ComputeCascades(camera, dir);   // fills LightMatrices + SplitDepths
+        ComputeCascades(camera, dir);
 
         _gl.Disable(EnableCap.CullFace);
-        for (var c = 0; c < CascadeCount; c++)
+        for (var c = 0; c < Cascades.Length; c++)
         {
             _maps.BindLayer(c);
             _depth.Use();
-            _depth.SetUniform("uLightMatrix", LightMatrices[c]);
+            _depth.SetUniform("uLightMatrix", Cascades[c].Matrix);
 
             foreach (var entity in scene.Entities)
             {
-                if (!entity.Enabled || entity.Model is not { } model) 
+                if (!entity.Enabled || entity.Model is not { } model)
                     continue;
-                
+
                 _depth.SetUniform("uModel", entity.Transform.WorldMatrix);
                 foreach (var mesh in model.Meshes)
                 {
@@ -76,20 +75,21 @@ public sealed class ShadowMapper : IDisposable
                 }
             }
         }
-        
+
         _gl.Enable(EnableCap.CullFace);
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         Active = true;
     }
+    
     private void ComputeCascades(Camera camera, Vector3 dir)
     {
         var n = CascadeCount;
-        LightMatrices = new Matrix4x4[n];
-        SplitDepths   = new float[n];
+        if (Cascades.Length != n)
+            Cascades = new Cascade[n];
 
         var near   = _config.Camera.Near;
         var camFar = _config.Camera.Far;
-        var far    = MathF.Min(_config.Shadows.Distance, camFar);   // shadow range = split max
+        var far    = MathF.Min(_config.Shadows.Distance, camFar);
 
         Span<Vector3> frustum = stackalloc Vector3[8];
         GetFrustumCorners(camera, frustum);
@@ -98,13 +98,12 @@ public sealed class ShadowMapper : IDisposable
         for (var c = 0; c < n; c++)
         {
             var split = CascadeSplit(c, n, near, far);
-            SplitDepths[c] = split;
 
             Span<Vector3> slice = stackalloc Vector3[8];
             SliceCorners(frustum, (prevSplit - near) / (camFar - near),
-                                  (split     - near) / (camFar - near), slice);
+                (split     - near) / (camFar - near), slice);
 
-            LightMatrices[c] = FitCascade(slice, dir);
+            Cascades[c] = FitCascade(slice, dir, split);
             prevSplit = split;
         }
     }
@@ -148,30 +147,27 @@ public sealed class ShadowMapper : IDisposable
     }
 
     // fit a stable, texel-snapped ortho box around the slice (bounding-sphere method)
-    private Matrix4x4 FitCascade(ReadOnlySpan<Vector3> corners, Vector3 dir)
+    private Cascade FitCascade(ReadOnlySpan<Vector3> corners, Vector3 dir, float splitDepth)
     {
-        // bounding sphere → box size is invariant to camera orientation
         var center = Vector3.Zero;
-        foreach (var p in corners) 
+        foreach (var p in corners)
             center += p;
         center /= 8f;
 
         var radius = 0f;
         foreach (var p in corners)
             radius = MathF.Max(radius, (p - center).Length());
-        radius = MathF.Ceiling(radius * 16f) / 16f;             // quantize radius — removes size shimmer
+        radius = MathF.Ceiling(radius * RadiusSnap) / RadiusSnap;
 
-        var up   = MathF.Abs(dir.Y) > 0.99f ? Vector3.UnitZ : Vector3.UnitY;
+        var up   = MathF.Abs(dir.Y) > UpThreshold ? Vector3.UnitZ : Vector3.UnitY;
         var view = Matrix4x4.CreateLookAt(center - dir * radius, center, up);
 
-        // snap box center to whole-texel increments — this is what stops shadow swimming
-        var texelSize  = (radius * 2f) / _config.Shadows.Size;
-        var   centerLS   = Vector3.Transform(center, view);
+        var texelSize = (radius * 2f) / _config.Shadows.Size;
+        var centerLS  = Vector3.Transform(center, view);
         
         centerLS.X = MathF.Floor(centerLS.X / texelSize) * texelSize;
         centerLS.Y = MathF.Floor(centerLS.Y / texelSize) * texelSize;
 
-        // z extent from corners + pull-back so occluders behind the slice still cast
         float minZ = float.MaxValue, maxZ = float.MinValue;
         foreach (var p in corners)
         {
@@ -179,15 +175,21 @@ public sealed class ShadowMapper : IDisposable
             minZ = MathF.Min(minZ, z);
             maxZ = MathF.Max(maxZ, z);
         }
+        
         var zPad = radius;
 
         var proj = Matrix4x4.CreateOrthographicOffCenter(
             centerLS.X - radius, centerLS.X + radius,
             centerLS.Y - radius, centerLS.Y + radius,
-            -maxZ - zPad, -minZ + zPad
-        );
+            -maxZ - zPad, -minZ + zPad);
 
-        return view * proj;   // numerics order; GLSL: uLightMatrix * pos
+        return new Cascade
+        {
+            Matrix     = view * proj,
+            SplitDepth = splitDepth,
+            Center     = center,
+            Radius     = radius,
+        };
     }
 
     public void Dispose()
