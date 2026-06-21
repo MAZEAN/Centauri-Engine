@@ -14,6 +14,7 @@ public sealed class ShadowMapper : IDisposable
     private const float UpThreshold = 0.99f;   // switch up-vector when the sun is ~vertical
     private const float RadiusSnap  = 16f;     // quantize sphere radius to 1/16 units (size-shimmer guard)
     private const float ZEpsilon = 1f;
+    private const float ZSnap    = 1f;         // quantize ortho depth range to whole units (depth-precision shimmer guard)
     
     private readonly GL _gl;
     private readonly AppConfig _config;
@@ -62,6 +63,9 @@ public sealed class ShadowMapper : IDisposable
         ComputeCascades(camera, dir, sceneBounds);
 
         _gl.Disable(EnableCap.CullFace);
+        _gl.Enable(EnableCap.PolygonOffsetFill);
+        _gl.PolygonOffset(2.5f, 4f);        // slope-scaled depth bias in hardware (per-cascade correct, no smear)
+        
         for (var c = 0; c < Cascades.Length; c++)
         {
             _maps.BindLayer(c);
@@ -94,6 +98,8 @@ public sealed class ShadowMapper : IDisposable
             }
         }
 
+        _gl.PolygonOffset(0f, 0f);
+        _gl.Disable(EnableCap.PolygonOffsetFill);
         _gl.Enable(EnableCap.CullFace);
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         Active = true;
@@ -199,6 +205,11 @@ public sealed class ShadowMapper : IDisposable
         var casterMaxZ = LightSpaceMaxZ(sceneBounds, view);
         var nearZ = -(MathF.Max(sliceMaxZ, casterMaxZ) + ZEpsilon);
         var farZ  = -(sliceMinZ - ZEpsilon);
+
+        // snap outward to a fixed grid so the depth range steps discretely instead of
+        // swinging every frame with the light — keeps stored depth precision stable
+        nearZ = MathF.Floor(nearZ / ZSnap) * ZSnap;
+        farZ  = MathF.Ceiling(farZ / ZSnap) * ZSnap;
 
         var proj = Matrix4x4.CreateOrthographicOffCenter(
             centerLS.X - radius, centerLS.X + radius,

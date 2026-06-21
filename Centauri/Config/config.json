@@ -56,9 +56,9 @@
     "enabled": true,
     "size": 4096,
     "distance": 150.0,
-    "depthBias": 0.0015,
-    "normalBias": 0.02,
-    "pcfRadius": 1,
+    "depthBias": 0.0005,
+    "normalBias": 0.01,
+    "pcfRadius": 2,
     "cascadeCount": 4,
     "splitLambda": 0.85
   }

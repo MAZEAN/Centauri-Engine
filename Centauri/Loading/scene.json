@@ -75,7 +75,7 @@
         "enabled":   true
       },
       "components": [
-        { "type": "dayNight", "speed": 0.03, "startTime": 0.35, "dayIntensity": 4.0 }
+        { "type": "dayNight", "speed": 0.01, "startTime": 0.35, "dayIntensity": 4.0 }
       ]
     },
     {

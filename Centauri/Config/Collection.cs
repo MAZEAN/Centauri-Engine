@@ -98,9 +98,9 @@ public class ShadowConfig
     public ShadowConfig(
         uint size = 2048,
         float distance   = 150f,
-        float depthBias  = 0.0015f,
-        float normalBias = 0.02f,
-        int   pcfRadius  = 1,
+        float depthBias  = 0.0005f,
+        float normalBias = 0.01f,
+        int   pcfRadius  = 2,
         int   cascadeCount = 4,
         float splitLambda = 0.85f
     )
