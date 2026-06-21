@@ -7,7 +7,7 @@ using System.Runtime.CompilerServices;
 using World;
 using Config;
 using Graphics.Geometry;
-using Shadows;
+using Utils.Geometry;
 
 public sealed class DebugRenderer : IDisposable
 {
@@ -135,7 +135,7 @@ public sealed class DebugRenderer : IDisposable
     {
         _draw.Model(Matrix4x4.Identity);
         _draw.Color(FrustumColor);
-        _draw.Lines(DebugView.Shapes.BoxEdges(cam.Frustum.GetFrustumCorners()));
+        _draw.Lines(DebugView.Shapes.BoxEdges(cam.GetFrustumCorners()));
     }
 
     private void AssertActive([CallerMemberName] string caller = "")

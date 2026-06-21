@@ -54,7 +54,7 @@ public class MainRenderer : IDisposable
         var viewCamera    = scene.Cameras.Active;
         var cullingCamera = scene.Cameras.Primary;
         
-        cullingCamera.Frustum.BuildFrustumPlanes();
+        cullingCamera.UpdateFrustum();
 
         var view          = viewCamera.GetViewMatrix();
         var cameraPosition = viewCamera.Position;

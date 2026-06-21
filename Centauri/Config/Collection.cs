@@ -97,11 +97,11 @@ public class ShadowConfig
     [JsonIgnore] public float AuthoredSplitLambda { get; }
 
     public ShadowConfig(
-        float distance   = 50f,
+        float distance   = 150f,
         float depthBias  = 0.0015f,
         float normalBias = 0.02f,
         int   pcfRadius  = 2,
-        int cascadeCount = 4,
+        int   cascadeCount = 4,
         float splitLambda = 0.85f)
     {
         Distance   = AuthoredDistance   = distance;

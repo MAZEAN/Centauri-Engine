@@ -20,11 +20,9 @@ public class Camera
     public float Pitch       { get; private set; }
     public float Zoom        { get; private set; }
     public float AspectRatio { get; private set; }
-    
-    public Frustum Frustum { get; private set; }
-    public bool IsFrustumDirty { get; private set; } = true;
-    
-    public void ClearFrustumDirty() => IsFrustumDirty = false;
+
+    public Frustum Frustum { get; private set; } = new();
+    private bool IsFrustumDirty { get; set; } = true;
 
     public Camera(CameraConfig config, string name, Vector3 position, Vector3 worldUp, float yaw, float pitch)
     {
@@ -37,8 +35,6 @@ public class Camera
         Yaw = yaw;
         Pitch = pitch;
         Zoom = config.FOV;
-
-        Frustum = new Frustum(this, _config);
 
         UpdateVectors();
     }
@@ -111,6 +107,13 @@ public class Camera
         return new Vector3(p.X, p.Y, p.Z) / p.W;
     }
     
+    public void UpdateFrustum()
+    {
+        if (!IsFrustumDirty) return;
+        Frustum.Update(GetViewMatrix() * GetProjectionMatrix());
+        IsFrustumDirty = false;
+    }
+    
     public Matrix4x4 GetViewMatrix()
     {
         return Matrix4x4.CreateLookAt(Position, Position + Forward, Up);
@@ -122,5 +125,34 @@ public class Camera
             throw new InvalidOperationException("Aspect ratio has not been set.");
         
         return Matrix4x4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(Zoom), AspectRatio, _config.Near, _config.Far);
+    }
+    
+    // camera-frustum corners in world space — debug visualization only
+    public Vector3[] GetFrustumCorners()
+    {
+        var tanFov = MathF.Tan(MathHelper.DegreesToRadians(Zoom) / 2f);
+
+        var near = _config.Near;
+        var far  = _config.Far;
+
+        var nearHeight = 2f * tanFov * near;
+        var nearWidth  = nearHeight * AspectRatio;
+        var farHeight  = 2f * tanFov * far;
+        var farWidth   = farHeight * AspectRatio;
+
+        var nearCenter = Position + Forward * near;
+        var farCenter  = Position + Forward * far;
+
+        return
+        [
+            nearCenter + Up * (nearHeight * 0.5f) - Right * (nearWidth * 0.5f),
+            nearCenter + Up * (nearHeight * 0.5f) + Right * (nearWidth * 0.5f),
+            nearCenter - Up * (nearHeight * 0.5f) - Right * (nearWidth * 0.5f),
+            nearCenter - Up * (nearHeight * 0.5f) + Right * (nearWidth * 0.5f),
+            farCenter  + Up * (farHeight  * 0.5f) - Right * (farWidth  * 0.5f),
+            farCenter  + Up * (farHeight  * 0.5f) + Right * (farWidth  * 0.5f),
+            farCenter  - Up * (farHeight  * 0.5f) - Right * (farWidth  * 0.5f),
+            farCenter  - Up * (farHeight  * 0.5f) + Right * (farWidth  * 0.5f),
+        ];
     }
 }

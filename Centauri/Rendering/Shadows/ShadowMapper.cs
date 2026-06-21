@@ -7,6 +7,7 @@ using Config;
 using World;
 using Utils.Misc;
 using Graphics.Resources;
+using Utils.Geometry;
 
 public sealed class ShadowMapper : IDisposable
 {
@@ -17,6 +18,7 @@ public sealed class ShadowMapper : IDisposable
     private readonly AppConfig _config;
     private ShadowArray _maps;
     private readonly GLShader _depth;
+    private readonly Frustum _cull = new();
 
     public bool Active { get; private set; }
     public uint DepthTexture => _maps.DepthTexture;
@@ -58,9 +60,14 @@ public sealed class ShadowMapper : IDisposable
             _depth.Use();
             _depth.SetUniform("uLightMatrix", Cascades[c].Matrix);
 
+            _cull.Update(Cascades[c].Matrix);   // cascade ortho box → 6 planes
+
             foreach (var entity in scene.Entities)
             {
                 if (!entity.Enabled || entity.Model is not { } model)
+                    continue;
+
+                if (!_cull.IsVisibleAABB(entity.GetWorldBounds()))   // outside this cascade → skip
                     continue;
 
                 _depth.SetUniform("uModel", entity.Transform.WorldMatrix);
