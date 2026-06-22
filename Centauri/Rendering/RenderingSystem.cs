@@ -115,7 +115,7 @@ public class RenderingSystem : IDisposable
 
         _post.Composite();              // resolve + tonemap to backbuffer
         
-        _bufferDebug.Render(_config.Debug.PrepassView, _prepass.NormalTexture, _prepass.DepthTexture,
+        _bufferDebug.Render(_config.Debug.Shading, _prepass.NormalTexture, _prepass.DepthTexture,
             _config.Camera.Near, _config.Camera.Far);
         
         _ui.Render(scene, in _stats);   // UI on top

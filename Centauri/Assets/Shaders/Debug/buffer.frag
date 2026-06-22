@@ -21,6 +21,7 @@ void main()
         // reverse a [0,1] perspective depth back to linear view-space distance
         float z = (uNear * uFar) / (uFar - d * (uFar - uNear));
         float g = z / uFar;                                 // normalize to [near/far, 1]
+        
         FragColor = vec4(vec3(g), 1.0);
     }
 }

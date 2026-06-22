@@ -101,9 +101,8 @@ public class StatsOverlay
 
         Section("Config", ColorPalette.Purple, () =>
         {
-            RowColored("ViewMode", _config.Input.Mode.ToString(), ColorPalette.Amber);
-            ConfigRow("VSync",         _config.Window.EnableVSync);
-            ConfigRow("Culling",       _config.Debug.EnableCulling);
+            ConfigRow("VSync",   _config.Window.EnableVSync);
+            ConfigRow("Culling", _config.Debug.EnableCulling);
         });
     }
 

@@ -18,6 +18,7 @@ public sealed class UISystem : IDisposable
     private readonly StatsOverlay   _statsOverlay;
     private readonly PropertiesPanel _properties;
     private readonly OutlinerPanel _outliner;
+    private readonly ViewportToolbar _toolbar;
 
     public UISystem(GL gl, AppConfig config, IWindow window, IInputContext input, ColorGrading grading)
     {
@@ -26,6 +27,7 @@ public sealed class UISystem : IDisposable
         _statsOverlay = new StatsOverlay(_imGui.Font, config);
         _properties    = new PropertiesPanel(_imGui.Font, _config, grading);
         _outliner = new OutlinerPanel(_imGui.Font);
+        _toolbar = new ViewportToolbar(_imGui.Font, config);
     }
 
     public bool WantsMouse    => _imGui.WantsMouseCapture;
@@ -36,7 +38,9 @@ public sealed class UISystem : IDisposable
     public void Render(Scene scene, in FrameStats stats)
     {
         if (_config.Debug.ShowStatsOverlay)
-            _statsOverlay.Render(scene, stats);
+            _statsOverlay.Render(scene, stats);        
+        
+        _toolbar.Render();
 
         if (_config.Input.Mode == ViewMode.Edit)
         {
@@ -44,7 +48,7 @@ public sealed class UISystem : IDisposable
             _properties.Render(scene);
         }
 
-        _imGui.Render();   // ImGui draw pass — always last
+        _imGui.Render();
     }
 
     public void Dispose() => _imGui.Dispose();

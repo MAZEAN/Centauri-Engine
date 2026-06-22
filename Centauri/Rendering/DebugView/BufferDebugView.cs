@@ -24,9 +24,9 @@ public sealed class BufferDebugView : IDisposable
         _vao = gl.GenVertexArray();
     }
 
-    public void Render(GBufferDebug mode, uint normalTex, uint depthTex, float near, float far)
+    public void Render(ShadingMode mode, uint normalTex, uint depthTex, float near, float far)
     {
-        if (mode == GBufferDebug.Off) return;
+        if (mode == ShadingMode.Shaded) return;
 
         _gl.Disable(EnableCap.DepthTest);
 
@@ -39,7 +39,7 @@ public sealed class BufferDebugView : IDisposable
 
         _shader.SetUniform("uNormal", 0);
         _shader.SetUniform("uDepth",  1);
-        _shader.SetUniform("uMode",   mode == GBufferDebug.Normals ? 1 : 2);
+        _shader.SetUniform("uMode",   mode == ShadingMode.Normals ? 1 : 2);
         _shader.SetUniform("uNear",   near);
         _shader.SetUniform("uFar",    far);
 

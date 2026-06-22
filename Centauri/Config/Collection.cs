@@ -53,15 +53,16 @@ public class DebugConfig
     [JsonPropertyName("showGrid")]          public bool ShowGrid          { get; set; } = false;
     [JsonPropertyName("showStatsOverlay")]  public bool ShowStatsOverlay  { get; set; } = true;
     [JsonPropertyName("showSkybox")]        public bool ShowSkybox        { get; set; } = true;
-    
-    // runtime-only: which prepass G-buffer to overlay on screen (debug aid for SSAO/SSR work)
-    [JsonIgnore] public GBufferDebug PrepassView { get; set; } = GBufferDebug.Off;
+
+    [JsonIgnore] public ShadingMode Shading { get; set; } = ShadingMode.Shaded;
 
     public void ToggleShowStatsOverlay()  => ShowStatsOverlay = !ShowStatsOverlay;
-    public void CyclePrepassView()        => PrepassView = (GBufferDebug)(((int)PrepassView + 1) % 3);
+    public void CycleShading() =>
+        Shading = (ShadingMode)(((int)Shading + 1) % Enum.GetValues<ShadingMode>().Length);
 }
 
-public enum GBufferDebug { Off, Normals, Depth }
+public enum ShadingMode { Shaded, Normals, Depth }
+
 
 public enum ViewMode { Fly, Edit }
 
