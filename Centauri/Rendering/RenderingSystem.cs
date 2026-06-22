@@ -14,6 +14,7 @@ using IBL;
 using Postprocessing;
 using Prepass;
 using Shadows;
+using DebugView;
 
 public class RenderingSystem : IDisposable
 {
@@ -29,6 +30,8 @@ public class RenderingSystem : IDisposable
     private UISystem _ui = null!;
     private PostProcessor _post = null!;
     private GeometryPrepass _prepass = null!;
+    private BufferDebugView _bufferDebug = null!;
+
     
     private bool? _skyIsDay;   // tracks day/night skybox crossings (see UpdateDayNightSkybox)
 
@@ -64,6 +67,7 @@ public class RenderingSystem : IDisposable
         _post = new PostProcessor(_gl, hdr, _config.ColorGrading);
         _ui   = new UISystem(_gl, _config, window, input, _config.ColorGrading);
         _prepass = new GeometryPrepass(_gl, (uint)framebufferSize.X, (uint)framebufferSize.Y);
+        _bufferDebug = new BufferDebugView(_gl);
     }
     
     public void BakeEnvironments(Scene scene)
@@ -110,7 +114,11 @@ public class RenderingSystem : IDisposable
         _debugRenderer.End();
 
         _post.Composite();              // resolve + tonemap to backbuffer
-        _ui.Render(scene, in _stats);   // UI on top, ungraded
+        
+        _bufferDebug.Render(_config.Debug.PrepassView, _prepass.NormalTexture, _prepass.DepthTexture,
+            _config.Camera.Near, _config.Camera.Far);
+        
+        _ui.Render(scene, in _stats);   // UI on top
     }
     
     private void UpdateDayNightSkybox(Scene scene)
@@ -154,6 +162,7 @@ public class RenderingSystem : IDisposable
         _ui.Dispose();
         _post.Dispose();
         _prepass.Dispose();
+        _bufferDebug.Dispose();
         _ibl.Dispose();
         _shadows.Dispose();
     }

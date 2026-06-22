@@ -111,6 +111,7 @@ public class InputSystem : IDisposable
             case Key.C:  _scene.Cameras.Cycle(); ResetActiveController();  break;
             case Key.B:  _scene.Skyboxes.Cycle(); break;
             case Key.N:  _scene.FindComponent<DayNightCycle>()?.Toggle(); break;
+            case Key.G:  _config.Debug.CyclePrepassView(); break;
         }
     }
 

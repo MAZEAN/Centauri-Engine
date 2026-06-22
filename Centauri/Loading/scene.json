@@ -16,7 +16,7 @@
     },
     {
       "name":     "Dragon",
-      "model":    "Assets/Objects/reduced_dragon.glb",
+      "model":    "Assets/Objects/medium_dragon.glb",
       "position": [0, 1, -8]
     },
     {
@@ -85,10 +85,10 @@
         "type":      "spot",
         "direction": [0.0, -1.0, 0.0],
         "color":     [1.0, 0.8, 0.6],
-        "intensity": 10.0,
+        "intensity": 2.0,
         "innerCutoff": 12.5,
-        "OuterCutoff": 17.5,
-        "enabled":   false
+        "OuterCutoff": 70,
+        "enabled":   true
       }
     }
   ],
