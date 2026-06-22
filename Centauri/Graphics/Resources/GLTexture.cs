@@ -7,12 +7,8 @@ using SixLabors.ImageSharp.Processing;
 
 using HighDynamicRange;
 
-public class GLTexture : IDisposable
+public class GLTexture : GLResource
 {
-    private readonly GL _gl;
-
-    public uint Handle { get; }
-    
     // True when the texture holds linear floating-point radiance (loaded from
     // a <c>.hdr</c> / <c>.exr</c> panorama) rather than 8-bit sRGB data.
     // Consumers such as the skybox use this to decide whether to tonemap.
@@ -20,13 +16,12 @@ public class GLTexture : IDisposable
 
     // Loads from disk: .hdr / .exr decode to a linear float panorama, everything
     // else to 8-bit sRGB.
-    public GLTexture(GL gl, string path)
+    public GLTexture(GL gl, string path) : base(gl)
     {
-        _gl = gl;
         var fullPath = Path.GetFullPath(path);
 
-        Handle = _gl.GenTexture();
-        _gl.BindTexture(TextureTarget.Texture2D, Handle);
+        Handle = Gl.GenTexture();
+        Gl.BindTexture(TextureTarget.Texture2D, Handle);
 
         if (HDRLoader.IsHDRPath(fullPath))
         {
@@ -42,15 +37,14 @@ public class GLTexture : IDisposable
     }
 
     // Wraps an in-memory 8-bit RGBA buffer (e.g. the 1×1 default texture).
-    public unsafe GLTexture(GL gl, Span<byte> data, uint width, uint height)
+    public unsafe GLTexture(GL gl, Span<byte> data, uint width, uint height) : base(gl)
     {
-        _gl = gl;
-        Handle = _gl.GenTexture();
-        _gl.BindTexture(TextureTarget.Texture2D, Handle);
+        Handle = Gl.GenTexture();
+        Gl.BindTexture(TextureTarget.Texture2D, Handle);
 
         fixed (void* d = &data[0])
         {
-            _gl.TexImage2D(
+            Gl.TexImage2D(
                 TextureTarget.Texture2D, 0, InternalFormat.Rgba8,
                 width, height, 0,
                 PixelFormat.Rgba, PixelType.UnsignedByte, d);
@@ -69,7 +63,7 @@ public class GLTexture : IDisposable
 
         fixed (void* data = pixels)
         {
-            _gl.TexImage2D(
+            Gl.TexImage2D(
                 TextureTarget.Texture2D, 0, InternalFormat.Rgba8,
                 (uint)img.Width, (uint)img.Height, 0,
                 PixelFormat.Rgba, PixelType.UnsignedByte, data);
@@ -84,7 +78,7 @@ public class GLTexture : IDisposable
 
         fixed (void* data = image.Pixels)
         {
-            _gl.TexImage2D(
+            Gl.TexImage2D(
                 TextureTarget.Texture2D, 0, InternalFormat.Rgb16f,
                 (uint)image.Width, (uint)image.Height, 0,
                 PixelFormat.Rgb, PixelType.Float, data);
@@ -93,26 +87,18 @@ public class GLTexture : IDisposable
 
     private void SetParameters(bool hdr)
     {
-        // Horizontal axis always wraps (the 360° seam); equirect panoramas clamp
-        // the vertical axis so the poles don't bleed into each other.
-        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS,
-            (int)GLEnum.Repeat);
-        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT,
-            (int)(hdr ? GLEnum.ClampToEdge : GLEnum.Repeat));
-        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, 
-            (int)GLEnum.Linear);
+        // Horizontal axis always wraps (the 360° seam); equirect panoramas clamp the
+        // vertical axis so the poles don't bleed. HDR samples mip 0 only (no chain);
+        // LDR gets a trilinear mip chain.
+        GLSampler.Set(Gl, TextureTarget.Texture2D,
+            wrapS: GLEnum.Repeat,
+            wrapT: hdr ? GLEnum.ClampToEdge : GLEnum.Repeat,
+            minFilter: hdr ? GLEnum.Linear : GLEnum.LinearMipmapLinear,
+            magFilter: GLEnum.Linear);
 
-        if (hdr)
-        {
-            // Skybox samples mip 0 only — no mip chain needed.
-            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Linear);
-        }
-        else
-        {
-            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.LinearMipmapLinear);
-            _gl.GenerateMipmap(TextureTarget.Texture2D);
-        }
+        if (!hdr)
+            Gl.GenerateMipmap(TextureTarget.Texture2D);
     }
 
-    public void Dispose() => _gl.DeleteTexture(Handle);
+    protected override void DeleteGL() => Gl.DeleteTexture(Handle);
 }

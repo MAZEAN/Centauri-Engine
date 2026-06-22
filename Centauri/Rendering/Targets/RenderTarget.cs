@@ -2,6 +2,8 @@ namespace Centauri.Rendering.Targets;
 
 using Silk.NET.OpenGL;
 
+using Graphics.Resources;
+
 // A reusable single-sample off-screen target: N float color textures plus an optional
 // sampleable depth texture. Unlike HDRFramebuffer (which is multisampled and bespoke for
 // the lit scene), this is what screen-space passes — the geometry prepass, SSAO, SSR —
@@ -70,10 +72,7 @@ public sealed class RenderTarget : IDisposable
             _gl.BindTexture(TextureTarget.Texture2D, tex);
             _gl.TexImage2D(TextureTarget.Texture2D, 0, _colorFormats[i], _width, _height, 0,
                 PixelFormat.Rgba, PixelType.Float, null);
-            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Nearest);
-            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Nearest);
-            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)GLEnum.ClampToEdge);
-            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)GLEnum.ClampToEdge);
+            GLSampler.Set(_gl, TextureTarget.Texture2D, GLEnum.ClampToEdge, GLEnum.Nearest, GLEnum.Nearest);
 
             var attachment = FramebufferAttachment.ColorAttachment0 + i;
             _gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, attachment, TextureTarget.Texture2D, tex, 0);
@@ -91,10 +90,7 @@ public sealed class RenderTarget : IDisposable
             _gl.BindTexture(TextureTarget.Texture2D, DepthTexture);
             _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.DepthComponent32f, _width, _height, 0,
                 PixelFormat.DepthComponent, PixelType.Float, null);
-            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Nearest);
-            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Nearest);
-            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)GLEnum.ClampToEdge);
-            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)GLEnum.ClampToEdge);
+            GLSampler.Set(_gl, TextureTarget.Texture2D, GLEnum.ClampToEdge, GLEnum.Nearest, GLEnum.Nearest);
             _gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment,
                 TextureTarget.Texture2D, DepthTexture, 0);
         }

@@ -143,7 +143,7 @@ public sealed class IBLBaker : IDisposable
         _gl.TexImage2D(TextureTarget.Texture2D, 0,
             InternalFormat.RG16f, _config.BrdfSize, _config.BrdfSize, 0, PixelFormat.RG, PixelType.Float, null);
         
-        foreach (var (k, v) in ClampLinear()) _gl.TexParameter(TextureTarget.Texture2D, k, v);
+        GLSampler.Set(_gl, TextureTarget.Texture2D, GLEnum.ClampToEdge, GLEnum.Linear, GLEnum.Linear);
 
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, _fbo);
         _gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, _rbo);
@@ -176,29 +176,17 @@ public sealed class IBLBaker : IDisposable
             _gl.TexImage2D((TextureTarget)((int)TextureTarget.TextureCubeMapPositiveX + i), 0,
                 InternalFormat.Rgb16f, size, size, 0, PixelFormat.Rgb, PixelType.Float, null);
 
-        _gl.TexParameter(TextureTarget.TextureCubeMap,
-            TextureParameterName.TextureWrapS, (int)GLEnum.ClampToEdge);
-        _gl.TexParameter(TextureTarget.TextureCubeMap,
-            TextureParameterName.TextureWrapT, (int)GLEnum.ClampToEdge);
-        _gl.TexParameter(TextureTarget.TextureCubeMap,
-            TextureParameterName.TextureWrapR, (int)GLEnum.ClampToEdge);
-        _gl.TexParameter(TextureTarget.TextureCubeMap,
-            TextureParameterName.TextureMinFilter, (int)(mips ? GLEnum.LinearMipmapLinear : GLEnum.Linear));
-        _gl.TexParameter(TextureTarget.TextureCubeMap, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
-        
-        if (mips) 
+        GLSampler.Set(_gl, TextureTarget.TextureCubeMap,
+            wrap: GLEnum.ClampToEdge,
+            minFilter: mips ? GLEnum.LinearMipmapLinear : GLEnum.Linear,
+            magFilter: GLEnum.Linear,
+            wrapR: true);
+
+        if (mips)
             _gl.GenerateMipmap(TextureTarget.TextureCubeMap);
         
         return id;
     }
-
-    private static (TextureParameterName, int)[] ClampLinear() =>
-    [
-        (TextureParameterName.TextureWrapS, (int)GLEnum.ClampToEdge),
-        (TextureParameterName.TextureWrapT, (int)GLEnum.ClampToEdge),
-        (TextureParameterName.TextureMinFilter, (int)GLEnum.Linear),
-        (TextureParameterName.TextureMagFilter, (int)GLEnum.Linear),
-    ];
 
     private GLShader Load(string name) => new(_gl,
         PathResolver.Resolve("Assets/Shaders/IBL/cube.vert"),

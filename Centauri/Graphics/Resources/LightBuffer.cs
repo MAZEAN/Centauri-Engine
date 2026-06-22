@@ -15,7 +15,7 @@ using System.Runtime.InteropServices;
 //   PointLight : position, color, params                   = 3 vec4   (48 B)  x16
 //   SpotLight  : position, direction, color, params, cut   = 5 vec4   (80 B)  x16
 //   ivec4 counts (point, spot, hasDir, _)                  = 1 vec4   (16 B)
-public sealed class LightBuffer : IDisposable
+public sealed class LightBuffer : GLResource
 {
     public const uint BindingPoint = 0;
 
@@ -33,22 +33,19 @@ public sealed class LightBuffer : IDisposable
     private const int TotalFloats = CountsBase + CountsFloats;          // 528
     private const int TotalBytes  = TotalFloats * sizeof(float);
 
-    private readonly GL _gl;
-    private readonly uint _handle;
     private readonly float[] _data = new float[TotalFloats];
 
     private int _pointCount;
     private int _spotCount;
     private int _hasDir;
 
-    public unsafe LightBuffer(GL gl)
+    public unsafe LightBuffer(GL gl) : base(gl)
     {
-        _gl = gl;
-        _handle = gl.GenBuffer();
+        Handle = gl.GenBuffer();
 
-        gl.BindBuffer(BufferTargetARB.UniformBuffer, _handle);
+        gl.BindBuffer(BufferTargetARB.UniformBuffer, Handle);
         gl.BufferData(BufferTargetARB.UniformBuffer, (nuint)TotalBytes, null, BufferUsageARB.DynamicDraw);
-        gl.BindBufferBase(BufferTargetARB.UniformBuffer, BindingPoint, _handle);
+        gl.BindBufferBase(BufferTargetARB.UniformBuffer, BindingPoint, Handle);
         gl.BindBuffer(BufferTargetARB.UniformBuffer, 0);
     }
 
@@ -111,10 +108,10 @@ public sealed class LightBuffer : IDisposable
         counts[2] = _hasDir;
         counts[3] = 0;
 
-        _gl.BindBuffer(BufferTargetARB.UniformBuffer, _handle);
+        Gl.BindBuffer(BufferTargetARB.UniformBuffer, Handle);
         fixed (float* p = _data)
-            _gl.BufferSubData(BufferTargetARB.UniformBuffer, 0, (nuint)TotalBytes, p);
-        _gl.BindBuffer(BufferTargetARB.UniformBuffer, 0);
+            Gl.BufferSubData(BufferTargetARB.UniformBuffer, 0, (nuint)TotalBytes, p);
+        Gl.BindBuffer(BufferTargetARB.UniformBuffer, 0);
     }
 
     private void WriteVec3(int floatOffset, Vector3 v)
@@ -124,5 +121,5 @@ public sealed class LightBuffer : IDisposable
         _data[floatOffset + 2] = v.Z;
     }
 
-    public void Dispose() => _gl.DeleteBuffer(_handle);
+    protected override void DeleteGL() => Gl.DeleteBuffer(Handle);
 }
