@@ -80,9 +80,30 @@ public sealed class ShadowMapper : IDisposable
                 {
                     stats.ShadowCulled++;
                     continue;
+                }       
+                
+                // solid casters record BACK-face depth (cull front) to avoid self-shadow
+                // acne; two-sided casters have no back face, so draw both sides
+                if (entity.Material is { TwoSided: true })
+                    _gl.Disable(EnableCap.CullFace);
+                else
+                {
+                    _gl.Enable(EnableCap.CullFace);
+                    _gl.CullFace(TriangleFace.Front);
                 }
 
                 stats.ShadowCasters++;
+                
+                // solid casters record BACK-face depth (cull front) to avoid self-shadow
+                // acne; two-sided casters have no back face, so draw both sides
+                if (entity.Material is { TwoSided: true })
+                    _gl.Disable(EnableCap.CullFace);
+                else
+                {
+                    _gl.Enable(EnableCap.CullFace);
+                    _gl.CullFace(TriangleFace.Front);
+                }
+                
                 _depth.SetUniform("uModel", entity.Transform.WorldMatrix);
                 foreach (var mesh in model.Meshes)
                 {
@@ -248,18 +269,22 @@ public sealed class ShadowMapper : IDisposable
 
     private void SetRenderState()
     {
-        _gl.Disable(EnableCap.CullFace);
+        // lighter offset now that solid meshes record back-face depth — the offset
+        // mainly covers two-sided casters that still self-shadow
         _gl.Enable(EnableCap.PolygonOffsetFill);
-        _gl.PolygonOffset(2.5f, 4f);
+        _gl.PolygonOffset(1.5f, 2f);
+        _gl.Enable(EnableCap.CullFace);   // per-entity cull face is selected in the draw loop
     }
-    
+
     private void ResetRenderState()
     {
         _gl.PolygonOffset(0f, 0f);
         _gl.Disable(EnableCap.PolygonOffsetFill);
+        _gl.CullFace(TriangleFace.Back);   // restore the global default
         _gl.Enable(EnableCap.CullFace);
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
     }
+
 
     public void Dispose()
     {

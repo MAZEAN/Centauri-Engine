@@ -15,6 +15,9 @@ public sealed class DayNightCycle : Component
 
     private float _time;  // [0,1): 0 midnight, .25 sunrise, .5 noon, .75 sunset
     public bool Paused { get; private set; } = true;
+    
+    // 0 = full night, 1 = full day — drives ambient/IBL dimming and skybox selection
+    public float Daylight { get; private set; }
 
     public DayNightCycle(
         float    speed        = 0.02f,
@@ -53,6 +56,7 @@ public sealed class DayNightCycle : Component
 
         // sunPos.Y is elevation in [-1,1]; daylight only once it clears the horizon
         var day = Smoothstep(-0.05f, 0.25f, sunPos.Y);
+        Daylight = day;
 
         sun.Intensity = _dayIntensity * day;
         sun.Color     = Vector3.Lerp(_duskColor, _dayColor, day);

@@ -157,7 +157,8 @@ public class SceneLoader
             AO        = def.AO        != null ? _resourceSystem.Textures.Get(def.AO)         : _resourceSystem.DefaultTexture, 
             RoughnessValue = def.RoughnessValue,
             MetallicValue  = def.MetallicValue,
-            Color          = new Vector4(def.Color[0], def.Color[1], def.Color[2], def.Color[3])
+            Color          = new Vector4(def.Color[0], def.Color[1], def.Color[2], def.Color[3]),
+            TwoSided       = def.TwoSided
         };
     }
     

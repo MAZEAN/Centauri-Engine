@@ -43,6 +43,14 @@ public class SkyboxSet
             throw new Exception($"Skybox '{name}' not found.");
         Active = sky;
     }
+    
+    public bool TrySetActive(string name)
+    {
+        if (!_byName.TryGetValue(name, out var sky)) return false;
+        
+        Active = sky;
+        return true;
+    }
 
     public void Cycle()
     {

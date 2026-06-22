@@ -15,6 +15,11 @@ public class Material
     public Vector4 Color        { get; set; } = Vector4.One;
     public float RoughnessValue { get; set; } = 0.5f;
     public float MetallicValue  { get; set; } = 0.1f;
+    
+    // Shadow casting: solid meshes record BACK-face depth (front-face cull) to avoid
+    // self-shadow acne. Thin / two-sided geometry (foliage, single-quad walls) has no
+    // back face, so it must render double-sided in the shadow pass instead.
+    public bool TwoSided { get; set; } = false;
 
     public Material(GLShader shader)
     {

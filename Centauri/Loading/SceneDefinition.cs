@@ -58,6 +58,7 @@ public class MaterialDefinition
     [JsonPropertyName("roughnessValue")] public float RoughnessValue { get; set; } = 0.5f;
     [JsonPropertyName("metallicValue")]  public float MetallicValue  { get; set; } = 0.1f;
     [JsonPropertyName("color")]          public float[] Color        { get; set; } = [1f, 1f, 1f, 1f];
+    [JsonPropertyName("twoSided")]       public bool   TwoSided      { get; set; } = false;
 }
 
 public class CameraDefinition

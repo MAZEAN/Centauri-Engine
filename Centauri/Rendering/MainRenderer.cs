@@ -8,6 +8,7 @@ using World;
 using Graphics.Resources;
 using Graphics.Geometry;
 using World.Collections;
+using World.Components;
 using Utils.Misc;
 using IBL;
 using Shadows;
@@ -22,6 +23,8 @@ public class MainRenderer : IDisposable
     private const float SpotConstant  = 1.0f;
     private const float SpotLinear    = 0.09f;
     private const float SpotQuadratic = 0.032f;
+    
+    private const float NightAmbient = 0.15f;
 
     private uint[] _boundTextures = null!;
 
@@ -34,6 +37,7 @@ public class MainRenderer : IDisposable
     private readonly HashSet<GLShader> _lightBlockBound = new();
     
     private bool _iblActive;
+    private float _iblIntensityScale = 1f; 
 
     public MainRenderer(GL gl, AppConfig config, IBLBaker ibl, ShadowMapper shadows)
     {
@@ -60,6 +64,8 @@ public class MainRenderer : IDisposable
         var cameraPosition = viewCamera.Position;
 
         UploadLights(scene.Lighting);
+        
+        _iblIntensityScale = DaylightIblScale(scene);
         
         BindIbl(scene);
         BindShadows();
@@ -197,7 +203,7 @@ public class MainRenderer : IDisposable
         shader.SetUniform("uBrdfLUT",       7);
         shader.SetUniform("uHasIBL", _iblActive ? 1 : 0);
         shader.SetUniform("uMaxReflectionLod", (float)_ibl.MaxReflectionLod);
-        shader.SetUniform("uIblIntensity", _config.IBLConfig.IblIntensity);
+        shader.SetUniform("uIblIntensity", _config.IBLConfig.IblIntensity * _iblIntensityScale);
         
         // CSM bindings
         shader.SetUniform("uShadowMap", 8);
@@ -284,6 +290,11 @@ public class MainRenderer : IDisposable
 
         _lightBuffer.Upload();
     }
+    
+    private static float DaylightIblScale(Scene scene) =>
+        scene.FindComponent<DayNightCycle>() is { } cycle
+            ? NightAmbient + (1f - NightAmbient) * cycle.Daylight
+            : 1f;
     
     private void BindIbl(Scene scene)
     {

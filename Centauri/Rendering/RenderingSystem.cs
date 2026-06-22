@@ -7,10 +7,12 @@ using Silk.NET.Input;
 using Config;
 using Renderers;
 using World;
+using World.Components;
 using Utils.Misc;
 using UI;
 using IBL;
 using Postprocessing;
+using Prepass;
 using Shadows;
 
 public class RenderingSystem : IDisposable
@@ -26,6 +28,9 @@ public class RenderingSystem : IDisposable
     
     private UISystem _ui = null!;
     private PostProcessor _post = null!;
+    private GeometryPrepass _prepass = null!;
+    
+    private bool? _skyIsDay;   // tracks day/night skybox crossings (see UpdateDayNightSkybox)
 
     private FrameStats _stats;
     
@@ -57,7 +62,8 @@ public class RenderingSystem : IDisposable
         );
         
         _post = new PostProcessor(_gl, hdr, _config.ColorGrading);
-        _ui   = new UISystem(_gl, _config, window, input, _config.ColorGrading);   // shares the same instance
+        _ui   = new UISystem(_gl, _config, window, input, _config.ColorGrading);
+        _prepass = new GeometryPrepass(_gl, (uint)framebufferSize.X, (uint)framebufferSize.Y);
     }
     
     public void BakeEnvironments(Scene scene)
@@ -79,7 +85,10 @@ public class RenderingSystem : IDisposable
     {
         scene.Lighting.Collect(scene.Entities);
         
+        UpdateDayNightSkybox(scene);
+        
         _shadows.Render(scene, ref _stats);
+        _prepass.Render(scene);
         
         _post.BeginScene();
 
@@ -104,6 +113,17 @@ public class RenderingSystem : IDisposable
         _ui.Render(scene, in _stats);   // UI on top, ungraded
     }
     
+    private void UpdateDayNightSkybox(Scene scene)
+    {
+        if (scene.FindComponent<DayNightCycle>() is not { } cycle) return;
+
+        var isDay = cycle.Daylight >= 0.5f;
+        if (isDay == _skyIsDay) return;
+
+        _skyIsDay = isDay;
+        scene.Skyboxes.TrySetActive(isDay ? "Day" : "Night");
+    }
+    
     private void UpdateFPSCounter(float deltaTime)
     {
         // FPS + frame time smoothed over 1 second
@@ -119,7 +139,11 @@ public class RenderingSystem : IDisposable
         }
     }
     
-    public void Resize(uint width, uint height) => _post.Resize(width, height);
+    public void Resize(uint width, uint height)
+    {
+        _post.Resize(width, height);
+        _prepass.Resize(width, height);
+    }
 
     public void Dispose()
     {
@@ -129,6 +153,7 @@ public class RenderingSystem : IDisposable
         _skyboxRenderer.Dispose();
         _ui.Dispose();
         _post.Dispose();
+        _prepass.Dispose();
         _ibl.Dispose();
         _shadows.Dispose();
     }
