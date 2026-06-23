@@ -12,8 +12,8 @@ void main()
 
     float sum = 0.0;
     for (int x = -2; x < 2; x++)
-    for (int y = -2; y < 2; y++)
-    sum += texture(uSsao, vUv + vec2(x, y) * texel).r;
+        for (int y = -2; y < 2; y++)
+            sum += texture(uSsao, vUv + vec2(x, y) * texel).r;
 
     FragColor = vec4(sum / 16.0);
 }

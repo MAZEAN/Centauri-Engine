@@ -21,8 +21,9 @@ uniform float uPower;
 vec3 viewPos(vec2 uv)
 {
     float d   = texture(uDepth, uv).r;
-    vec4  ndc = vec4(uv * 2.0 - 1.0, d, 1.0);
+    vec4  ndc = vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
     vec4  v   = uInvProjection * ndc;
+    
     return v.xyz / v.w;
 }
 
@@ -47,6 +48,7 @@ void main()
 
         vec4 clip = uProjection * vec4(samplePos, 1.0);        // -> screen uv
         clip.xyz /= clip.w;
+        
         vec2 sUv  = clip.xy * 0.5 + 0.5;
 
         float sceneZ = viewPos(sUv).z;                         // geometry depth at that uv

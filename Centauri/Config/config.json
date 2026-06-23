@@ -37,12 +37,6 @@
     "mode": "Fly",
     "toggleModeKey": "Tab"
   },
-  "grading": {
-    "exposure": 1.0,
-    "blackLevel": 0.0,
-    "contrast": 1.0,
-    "saturation": 0.95
-  },
   "ibl": {
     "iblIntensity": 0.3,
     "maxRadiance": 10,
@@ -61,5 +55,18 @@
     "pcfRadius": 2,
     "cascadeCount": 4,
     "splitLambda": 0.85
+  },
+  "grading": {
+    "exposure": 1.0,
+    "blackLevel": 0.0,
+    "contrast": 1.0,
+    "saturation": 0.95
+  },
+  "ssao": {
+    "enabled": true,
+    "radius": 0.5,
+    "bias": 0.025,
+    "power": 1.5,
+    "sampleCount": 24
   }
 }
