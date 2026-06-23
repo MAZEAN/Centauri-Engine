@@ -5,6 +5,7 @@ in vec3 fNormal;
 in vec3 fFragPos;
 in mat3 fTBN;
 in  float fViewDepth;
+in  vec4 fClipPos;
 
 out vec4 FragColor;
 
@@ -289,8 +290,11 @@ void main()
     }
 
     if (uHasSSAO == 1)
-        ambient *= texture(uSsaoMap, gl_FragCoord.xy / vec2(textureSize(uSsaoMap, 0))).r;
-    
+    {
+        vec2 ssaoUv = (fClipPos.xy / fClipPos.w) * 0.5 + 0.5;
+        ambient *= texture(uSsaoMap, ssaoUv).r;
+    }
+
     vec3 color = ambient + Lo;
 
     if (uShowCascades == 1 && uHasShadow == 1) {

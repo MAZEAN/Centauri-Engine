@@ -5,6 +5,7 @@ out vec3 fNormal;   // world space normal
 out vec3 fFragPos;  // world space position of this fragment
 out mat3 fTBN;      // tangent space to world space matrix
 out float fViewDepth;
+out vec4 fClipPos;  // clip-space position, for screen-space lookups (SSAO)
 
 layout (location = 0) in vec3 vPos;      // world position of vertex
 layout (location = 1) in vec3 vNormal;   // surface direction at vertex
@@ -35,4 +36,5 @@ void main()
     fNormal = N;
 
     gl_Position  = uProjection * viewPos;
+    fClipPos     = gl_Position;
 }

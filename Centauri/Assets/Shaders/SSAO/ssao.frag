@@ -36,7 +36,11 @@ void main()
 
     vec3 rnd = texture(uNoise, gl_FragCoord.xy / float(textureSize(uNoise, 0).x)).xyz;
     
-    vec3 tangent   = normalize(rnd - normal * dot(rnd, normal));
+    vec3 t   = rnd - normal * dot(rnd, normal);
+    vec3 tangent = length(t) > 1e-4
+        ? t / length(t)
+        : normalize(cross(normal, abs(normal.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
+    
     vec3 bitangent = cross(normal, tangent);
     mat3 tbn       = mat3(tangent, bitangent, normal);
 
@@ -56,6 +60,6 @@ void main()
         occlusion += (sceneZ >= samplePos.z + uBias ? 1.0 : 0.0) * rangeCheck;
     }
 
-    occlusion = 1.0 - occlusion / float(uKernelSize);
+    occlusion = clamp(1.0 - occlusion / float(uKernelSize), 0.0, 1.0);
     FragColor = vec4(pow(occlusion, uPower));
 }
