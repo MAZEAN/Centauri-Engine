@@ -8,6 +8,7 @@ using Config;
 using World;
 using Utils.Misc;
 using Panels;
+using Rendering.Profiling;
 
 // Owns the whole ImGui surface — the controller plus every panel.
 // RenderingSystem holds one of these instead of juggling them individually.
@@ -35,10 +36,10 @@ public sealed class UISystem : IDisposable
 
     public void Update(float deltaTime) => _imGui.Update(deltaTime);
 
-    public void Render(Scene scene, in FrameStats stats)
+    public void Render(Scene scene, in FrameStats stats, IReadOnlyList<GpuTiming> gpuTimings)
     {
         if (_config.Debug.ShowStatsOverlay)
-            _statsOverlay.Render(scene, stats);        
+            _statsOverlay.Render(scene, stats, gpuTimings);
         
         _toolbar.Render();
 

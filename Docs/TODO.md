@@ -15,7 +15,9 @@
 * [ ] Screen Space Reflections (SSR) (with ray tracing or PBR Accumulation)
 * [ ] Screen Space Ambient Occlusion (SSAO)
 * [ ] Reflection Probes
+* [ ] GTAO (Ground-Truth AO)
 * [ ] Contact-hardening / PCSS
+* [ ] Temporal Anti-Aliasing (TAA)
 * [ ] Raytracing with BVH (only experimental, not real-time)
 * [ ] Physics engine integration (BEPUphysics2)
 * [ ] Game-Simulation
@@ -27,7 +29,7 @@
 
 * [x] Performance graphs
 * [x] Light editing
-* [ ] Performance improvements
+* [ ] bloom + auto-exposure + volumetric fog
 * [ ] Multithreading (async asset loading etc.)
 * [ ] Instancing & LOD system
 * [ ] Keybindings

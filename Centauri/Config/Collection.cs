@@ -53,6 +53,7 @@ public class DebugConfig
     [JsonPropertyName("showGrid")]          public bool ShowGrid          { get; set; } = false;
     [JsonPropertyName("showStatsOverlay")]  public bool ShowStatsOverlay  { get; set; } = true;
     [JsonPropertyName("showSkybox")]        public bool ShowSkybox        { get; set; } = true;
+    [JsonPropertyName("showGPUTimings")]    public bool ShowGPUTimings    { get; set; } = false;
 
     [JsonIgnore] public ShadingMode Shading { get; set; } = ShadingMode.Shaded;
 

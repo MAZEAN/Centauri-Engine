@@ -133,7 +133,7 @@ public class Engine : IWindowCallbacks
 
     public void OnRender(double deltaTime)
     {
-        _renderingSystem.Render(_scene, deltaTime);
+        _renderingSystem.Render(_scene, (float)deltaTime);
     }
     
     public void OnResize(Vector2D<int> size)

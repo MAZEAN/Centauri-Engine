@@ -15,6 +15,7 @@ using Postprocessing;
 using Prepass;
 using Shadows;
 using DebugView;
+using Profiling;
 
 public class RenderingSystem : IDisposable
 {
@@ -26,16 +27,16 @@ public class RenderingSystem : IDisposable
     private readonly SkyboxRenderer _skyboxRenderer;
     private readonly ShadowMapper _shadows;
     private readonly IBLBaker _ibl;
+    private readonly GpuProfiler _profiler;
     
     private UISystem _ui = null!;
     private PostProcessor _post = null!;
     private GeometryPrepass _prepass = null!;
     private BufferDebugView _bufferDebug = null!;
 
-    
-    private bool? _skyIsDay;   // tracks day/night skybox crossings (see UpdateDayNightSkybox)
-
     private FrameStats _stats;
+    
+    private bool? _skyIsDay;
     
     private float _fpsTimer;
     private int   _frameCount;
@@ -48,8 +49,9 @@ public class RenderingSystem : IDisposable
         _gl            = gl;
         _config        = config;
         
-        _ibl = new IBLBaker(gl, _config.IBLConfig);  
         _shadows = new ShadowMapper(gl, _config);
+        _ibl = new IBLBaker(gl, _config.IBLConfig);
+        _profiler = new GpuProfiler(gl);
         
         _mainRenderer   = new MainRenderer(gl, config, _ibl, _shadows);
         _gridRenderer   = new GridRenderer(gl);
@@ -85,7 +87,7 @@ public class RenderingSystem : IDisposable
         UpdateFPSCounter(deltaTime);
     }
 
-    public void Render(Scene scene, double deltaTime)
+    public void Render(Scene scene, float deltaTime)
     {
         scene.Lighting.Collect(scene.Entities);
         
@@ -93,37 +95,52 @@ public class RenderingSystem : IDisposable
         
         _post.BeginScene();
         RenderCentralComponents(scene, deltaTime);
-        _post.Composite();
+        
+        using (_profiler.Measure("Post"))
+            _post.Composite();
         
         RenderAfterPostComponents(scene, deltaTime);
     }
 
-    private void RenderCentralComponents(Scene scene, double deltaTime)
+    private void RenderCentralComponents(Scene scene, float deltaTime)
     {
-        if (_config.Debug.ShowSkybox) 
-            _skyboxRenderer.Render(scene);
-        
-        if (_config.Debug.ShowGrid)   
-            _gridRenderer.Render(scene);
-        
-        _mainRenderer.Render(scene, (float)deltaTime, ref _stats);
-        
-        _debugRenderer.Begin(scene.Cameras.Active);
+        using (_profiler.Measure("Sky+Grid"))
+        {
+            if (_config.Debug.ShowSkybox)
+                _skyboxRenderer.Render(scene);
 
-        _debugRenderer.DrawCameras(scene);
-        _debugRenderer.DrawAllAABBs(scene, scene.Cameras.Primary.Frustum);
+            if (_config.Debug.ShowGrid)
+                _gridRenderer.Render(scene);
+        }
 
-        _debugRenderer.DrawSelection(scene);
-        _debugRenderer.End();
+        using (_profiler.Measure("Forward"))
+            _mainRenderer.Render(scene, deltaTime, ref _stats);
+
+        using (_profiler.Measure("Debug"))
+        {
+            var active = scene.Cameras.Active;
+            _debugRenderer.Begin(active);
+
+            _debugRenderer.DrawCameras(scene);
+            _debugRenderer.DrawAllAABBs(scene, scene.Cameras.Primary.Frustum);
+
+            _debugRenderer.DrawSelection(scene);
+            _debugRenderer.End();
+        }
     }
 
-    private void RenderPrePostComponents(Scene scene, double deltaTime)
+    private void RenderPrePostComponents(Scene scene, float deltaTime)
     {
         UpdateDayNightSkybox(scene);
-        _shadows.Render(scene, ref _stats);
+        
+        _profiler.BeginFrame(_config.Debug.ShowGPUTimings);
+
+        using (_profiler.Measure("Shadows"))
+            _shadows.Render(scene, ref _stats);
         
         if (_config.Debug.Shading != ShadingMode.Shaded)
-            _prepass.Render(scene);
+            using (_profiler.Measure("Prepass"))
+                _prepass.Render(scene);
     }
 
     private void RenderAfterPostComponents(Scene scene, double deltaTime)
@@ -131,7 +148,7 @@ public class RenderingSystem : IDisposable
         _bufferDebug.Render(_config.Debug.Shading, _prepass.NormalTexture, _prepass.DepthTexture,
             _config.Camera.Near, _config.Camera.Far);
         
-        _ui.Render(scene, in _stats);
+        _ui.Render(scene, in _stats, _profiler.Results);
     }
     
     private void UpdateDayNightSkybox(Scene scene)
@@ -178,5 +195,6 @@ public class RenderingSystem : IDisposable
         _bufferDebug.Dispose();
         _ibl.Dispose();
         _shadows.Dispose();
+        _profiler.Dispose();
     }
 }

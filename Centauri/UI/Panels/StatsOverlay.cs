@@ -7,6 +7,7 @@ using Utils.Misc;
 using World;
 using Config;
 using Common;
+using Rendering.Profiling;
 
 public class StatsOverlay
 {
@@ -27,7 +28,7 @@ public class StatsOverlay
         _config = config;
     }
 
-    public void Render(Scene scene, FrameStats stats)
+    public void Render(Scene scene, FrameStats stats, IReadOnlyList<GpuTiming> gpuTimings)
     {
         _perfGraph.Push(stats.FPS, stats.FrameTime);
         SetupWindow();
@@ -39,14 +40,14 @@ public class StatsOverlay
         }
         
         ImGui.PushFont(_font);
-
-        DrawSections(scene, stats);
+        
+        DrawSections(scene, stats, gpuTimings);
 
         ImGui.PopFont();
         ImGui.End();
     }
 
-    private void DrawSections(Scene scene, FrameStats stats)
+    private void DrawSections(Scene scene, FrameStats stats, IReadOnlyList<GpuTiming> gpuTimings)
     {
         Section("Performance", ColorPalette.Amber, () =>
         {
@@ -54,6 +55,20 @@ public class StatsOverlay
             Row("Frame Time", $"{Widgets.Float(stats.FrameTime)} ms");
             _perfGraph.Draw();
         });
+
+        if (gpuTimings.Count > 0)
+        {
+            Section("GPU (ms)", ColorPalette.Amber, () =>
+            {
+                var total = 0.0;
+                foreach (var t in gpuTimings)
+                {
+                    Row(t.Name, Widgets.Float((float)t.Milliseconds, 3));
+                    total += t.Milliseconds;
+                }
+                RowColored("Total", Widgets.Float((float)total, 3), ColorPalette.Amber);
+            }); 
+        }
 
         Section("Culling", ColorPalette.Green, () =>
         {
