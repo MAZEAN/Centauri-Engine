@@ -16,7 +16,7 @@
     },
     {
       "name":     "Dragon",
-      "model":    "Assets/Objects/reduced_dragon.glb",
+      "model":    "Assets/Objects/medium_dragon.glb",
       "position": [0, 1, -8]
     },
     {

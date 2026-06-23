@@ -11,7 +11,7 @@
 * [x] IBL
 * [x] Shadow Maps
 * [x] Cascaded shadow maps (CSM)
-* [ ] Day/Night cycle
+* [x] Day/Night cycle
 * [ ] Screen Space Reflections (SSR) (with ray tracing or PBR Accumulation)
 * [ ] Screen Space Ambient Occlusion (SSAO)
 * [ ] Reflection Probes

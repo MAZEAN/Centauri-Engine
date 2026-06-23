@@ -89,13 +89,17 @@ public class RenderingSystem : IDisposable
     {
         scene.Lighting.Collect(scene.Entities);
         
-        UpdateDayNightSkybox(scene);
-        
-        _shadows.Render(scene, ref _stats);
-        _prepass.Render(scene);
+        RenderPrePostComponents(scene, deltaTime);
         
         _post.BeginScene();
+        RenderCentralComponents(scene, deltaTime);
+        _post.Composite();
+        
+        RenderAfterPostComponents(scene, deltaTime);
+    }
 
+    private void RenderCentralComponents(Scene scene, double deltaTime)
+    {
         if (_config.Debug.ShowSkybox) 
             _skyboxRenderer.Render(scene);
         
@@ -104,21 +108,30 @@ public class RenderingSystem : IDisposable
         
         _mainRenderer.Render(scene, (float)deltaTime, ref _stats);
         
-        var active = scene.Cameras.Active;
-        _debugRenderer.Begin(active);
+        _debugRenderer.Begin(scene.Cameras.Active);
 
         _debugRenderer.DrawCameras(scene);
         _debugRenderer.DrawAllAABBs(scene, scene.Cameras.Primary.Frustum);
 
         _debugRenderer.DrawSelection(scene);
         _debugRenderer.End();
+    }
 
-        _post.Composite();              // resolve + tonemap to backbuffer
+    private void RenderPrePostComponents(Scene scene, double deltaTime)
+    {
+        UpdateDayNightSkybox(scene);
+        _shadows.Render(scene, ref _stats);
         
+        if (_config.Debug.Shading != ShadingMode.Shaded)
+            _prepass.Render(scene);
+    }
+
+    private void RenderAfterPostComponents(Scene scene, double deltaTime)
+    {
         _bufferDebug.Render(_config.Debug.Shading, _prepass.NormalTexture, _prepass.DepthTexture,
             _config.Camera.Near, _config.Camera.Far);
         
-        _ui.Render(scene, in _stats);   // UI on top
+        _ui.Render(scene, in _stats);
     }
     
     private void UpdateDayNightSkybox(Scene scene)
