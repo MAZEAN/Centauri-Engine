@@ -25,7 +25,7 @@ public sealed class ShaderUniformBinder
         _shadows = shadows;
     }
 
-    public void UploadGlobals(GLShader shader, Camera camera, bool iblActive, float iblIntensityScale)
+    public void UploadGlobals(GLShader shader, Camera camera, bool iblActive, float iblIntensityScale, bool ssaoActive)
     {
         shader.SetUniform("uProjection", camera.GetProjectionMatrix());
 
@@ -43,6 +43,10 @@ public sealed class ShaderUniformBinder
         shader.SetUniform("uHasIBL", iblActive ? 1 : 0);
         shader.SetUniform("uMaxReflectionLod", (float)_ibl.MaxReflectionLod);
         shader.SetUniform("uIblIntensity", _config.IBLConfig.IblIntensity * iblIntensityScale);
+        
+        // screen-space AO
+        shader.SetUniform("uSsaoMap", 9);
+        shader.SetUniform("uHasSSAO", ssaoActive ? 1 : 0);
 
         // CSM bindings
         shader.SetUniform("uShadowMap", 8);

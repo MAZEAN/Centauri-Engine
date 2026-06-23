@@ -12,7 +12,7 @@ out vec4 FragColor;
 const float PI               = 3.14159265359;
 const int   MAX_POINT_LIGHTS = 16;
 const int   MAX_SPOT_LIGHTS  = 16;
-const int MAX_CASCADES = 4;
+const int   MAX_CASCADES = 4;
 
 // ─── light structs (std140 — every member padded to vec4) ───────────────────────
 struct DirLight {
@@ -61,6 +61,10 @@ uniform sampler2D   uBrdfLUT;         // unit 7
 uniform int   uHasIBL;
 uniform float uMaxReflectionLod;
 uniform float uIblIntensity;
+
+// SSAO
+uniform sampler2D uSsaoMap;   // unit 9
+uniform int       uHasSSAO;
 
 // Shadows
 uniform sampler2DArrayShadow uShadowMap;         // unit 8 (now an array)
@@ -283,6 +287,9 @@ void main()
     } else {
         ambient = vec3(0.03) * mix(albedo, F0, metallic) * ao;   // fallback
     }
+
+    if (uHasSSAO == 1)
+        ambient *= texture(uSsaoMap, gl_FragCoord.xy / vec2(textureSize(uSsaoMap, 0))).r;
     
     vec3 color = ambient + Lo;
 

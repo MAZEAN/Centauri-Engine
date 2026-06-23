@@ -24,7 +24,7 @@ public sealed class BufferDebugView : IDisposable
         _vao = gl.GenVertexArray();
     }
 
-    public void Render(ShadingMode mode, uint normalTex, uint depthTex, float near, float far)
+    public void Render(ShadingMode mode, uint normalTex, uint depthTex, uint aoTex, float near, float far)
     {
         if (mode == ShadingMode.Shaded) return;
 
@@ -36,10 +36,19 @@ public sealed class BufferDebugView : IDisposable
         _gl.BindTexture(TextureTarget.Texture2D, normalTex);
         _gl.ActiveTexture(TextureUnit.Texture1);
         _gl.BindTexture(TextureTarget.Texture2D, depthTex);
+        _gl.ActiveTexture(TextureUnit.Texture2);
+        _gl.BindTexture(TextureTarget.Texture2D, aoTex);
 
         _shader.SetUniform("uNormal", 0);
         _shader.SetUniform("uDepth",  1);
         _shader.SetUniform("uMode",   mode == ShadingMode.Normals ? 1 : 2);
+        _shader.SetUniform("uAo",     2);
+        _shader.SetUniform("uMode",   mode switch
+        {
+            ShadingMode.Normals => 1,
+            ShadingMode.Depth   => 2,
+            _                   => 3,   // AmbientOcclusion
+        });
         _shader.SetUniform("uNear",   near);
         _shader.SetUniform("uFar",    far);
 

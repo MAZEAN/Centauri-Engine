@@ -49,10 +49,16 @@ public class MainRenderer : IDisposable
         _uniforms    = new ShaderUniformBinder(config, ibl, shadows);
     }
 
-    public void Render(Scene scene, float deltaTime, ref FrameStats stats)
+    public void Render(Scene scene, float deltaTime, ref FrameStats stats, uint ssaoTexture, bool ssaoActive)
     {
         ResetFrameStats(ref stats);
         _textures.Reset();
+        
+        if (ssaoActive)
+        {
+            _gl.ActiveTexture(TextureUnit.Texture9);
+            _gl.BindTexture(TextureTarget.Texture2D, ssaoTexture);
+        }
 
         var viewCamera    = scene.Cameras.Active;
         var cullingCamera = scene.Cameras.Primary;
@@ -79,7 +85,7 @@ public class MainRenderer : IDisposable
             shader.SetUniform("uView",      view);
             shader.SetUniform("uCameraPos", cameraPosition);
 
-            _uniforms.UploadGlobals(shader, viewCamera, _iblActive, iblScale);
+            _uniforms.UploadGlobals(shader, viewCamera, _iblActive, iblScale, ssaoActive);
 
             foreach (var entity in entities)
             {

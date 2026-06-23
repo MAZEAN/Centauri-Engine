@@ -16,6 +16,7 @@ using Prepass;
 using Shadows;
 using DebugView;
 using Profiling;
+using SSAO;
 
 public class RenderingSystem : IDisposable
 {
@@ -32,10 +33,13 @@ public class RenderingSystem : IDisposable
     private UISystem _ui = null!;
     private PostProcessor _post = null!;
     private GeometryPrepass _prepass = null!;
+    private SsaoPass _ssao = null!;
     private BufferDebugView _bufferDebug = null!;
 
     private FrameStats _stats;
     
+    // Flags
+    private bool _ssaoActive;   // SSAO ran this frame → bind/apply its result
     private bool? _skyIsDay;
     
     private float _fpsTimer;
@@ -69,6 +73,7 @@ public class RenderingSystem : IDisposable
         _post = new PostProcessor(_gl, hdr, _config.ColorGrading);
         _ui   = new UISystem(_gl, _config, window, input, _config.ColorGrading);
         _prepass = new GeometryPrepass(_gl, (uint)framebufferSize.X, (uint)framebufferSize.Y);
+        _ssao    = new SsaoPass(_gl, _config.SSAO, (uint)framebufferSize.X, (uint)framebufferSize.Y);
         _bufferDebug = new BufferDebugView(_gl);
     }
     
@@ -114,7 +119,7 @@ public class RenderingSystem : IDisposable
         }
 
         using (_profiler.Measure("Forward"))
-            _mainRenderer.Render(scene, deltaTime, ref _stats);
+            _mainRenderer.Render(scene, deltaTime, ref _stats, _ssao.AoTexture, _ssaoActive);
 
         using (_profiler.Measure("Debug"))
         {
@@ -132,21 +137,30 @@ public class RenderingSystem : IDisposable
     private void RenderPrePostComponents(Scene scene, float deltaTime)
     {
         UpdateDayNightSkybox(scene);
-        
+
         _profiler.BeginFrame(_config.Debug.ShowGPUTimings);
 
         using (_profiler.Measure("Shadows"))
             _shadows.Render(scene, ref _stats);
-        
-        if (_config.Debug.Shading != ShadingMode.Shaded)
+
+        // SSAO (and the Normals/Depth/AO debug views) all need the prepass buffers
+        _ssaoActive = _config.SSAO.Enabled || _config.Debug.Shading == ShadingMode.AmbientOcclusion;
+        var needPrepass = _ssaoActive || _config.Debug.Shading != ShadingMode.Shaded;
+
+        if (needPrepass)
             using (_profiler.Measure("Prepass"))
                 _prepass.Render(scene);
+
+        if (_ssaoActive)
+            using (_profiler.Measure("SSAO"))
+                _ssao.Render(_prepass.DepthTexture, _prepass.NormalTexture, scene.Cameras.Active);
     }
 
-    private void RenderAfterPostComponents(Scene scene, double deltaTime)
+
+    private void RenderAfterPostComponents(Scene scene, float deltaTime)
     {
         _bufferDebug.Render(_config.Debug.Shading, _prepass.NormalTexture, _prepass.DepthTexture,
-            _config.Camera.Near, _config.Camera.Far);
+            _ssao.AoTexture, _config.Camera.Near, _config.Camera.Far);
         
         _ui.Render(scene, in _stats, _profiler.Results);
     }
@@ -181,6 +195,7 @@ public class RenderingSystem : IDisposable
     {
         _post.Resize(width, height);
         _prepass.Resize(width, height);
+        _ssao.Resize(width, height);
     }
 
     public void Dispose()
@@ -192,6 +207,7 @@ public class RenderingSystem : IDisposable
         _ui.Dispose();
         _post.Dispose();
         _prepass.Dispose();
+        _ssao.Dispose();
         _bufferDebug.Dispose();
         _ibl.Dispose();
         _shadows.Dispose();

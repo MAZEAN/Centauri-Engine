@@ -29,6 +29,7 @@ public class PropertiesPanel
             new EntityInspectorSection(),
             new SkyboxSection(),
             new ShadowSection(config),
+            new SSAOSection(config),
             new ColorGradingSection(grading),
             new IBLSection(config),
             new ViewportSection(config),
