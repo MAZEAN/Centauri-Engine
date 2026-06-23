@@ -4,18 +4,16 @@ using Silk.NET.OpenGL;
 using System.Numerics;
 using System.Runtime.InteropServices;
 
-// A single std140 uniform buffer holding all scene lights, shared by every lit shader
-// (bound to BindingPoint). Every member is padded to a vec4 so the byte layout is
-// deterministic across drivers — no alignment surprises.
-//
-// Pure GPU layout — knows nothing about scene/light types. Callers push values via
-// Begin() / SetDirectional() / AddPoint() / AddSpot() / Upload().
+// The std140 layout for all scene lights, shared by every lit shader (bound to
+// BindingPoint). Owns only the layout + write API — the GL buffer lifecycle lives in
+// UniformBufferObject, and per-slot packing in Std140Writer. Knows nothing about the
+// scene/light types; callers push values via Begin() / Set*/Add* / Upload().
 //
 //   DirLight   : direction, color, params                  = 3 vec4   (48 B)
 //   PointLight : position, color, params                   = 3 vec4   (48 B)  x16
 //   SpotLight  : position, direction, color, params, cut   = 5 vec4   (80 B)  x16
 //   ivec4 counts (point, spot, hasDir, _)                  = 1 vec4   (16 B)
-public sealed class LightBuffer : GLResource
+public sealed class LightBuffer : IDisposable
 {
     public const uint BindingPoint = 0;
 
@@ -27,27 +25,20 @@ public sealed class LightBuffer : GLResource
     private const int SpotFloats   = 20;             // 5 vec4
     private const int CountsFloats = 4;              // ivec4
 
-    private const int PointsBase = DirFloats;                       // 12
-    private const int SpotsBase  = DirFloats + PointFloats * MaxPoint;  // 204
-    private const int CountsBase = SpotsBase + SpotFloats * MaxSpot;    // 524
-    private const int TotalFloats = CountsBase + CountsFloats;          // 528
+    private const int PointsBase = DirFloats;                          // 12
+    private const int SpotsBase  = DirFloats + PointFloats * MaxPoint; // 204
+    private const int CountsBase = SpotsBase + SpotFloats * MaxSpot;   // 524
+    private const int TotalFloats = CountsBase + CountsFloats;         // 528
     private const int TotalBytes  = TotalFloats * sizeof(float);
 
+    private readonly UniformBufferObject _ubo;
     private readonly float[] _data = new float[TotalFloats];
 
     private int _pointCount;
     private int _spotCount;
     private int _hasDir;
 
-    public unsafe LightBuffer(GL gl) : base(gl)
-    {
-        Handle = gl.GenBuffer();
-
-        gl.BindBuffer(BufferTargetARB.UniformBuffer, Handle);
-        gl.BufferData(BufferTargetARB.UniformBuffer, (nuint)TotalBytes, null, BufferUsageARB.DynamicDraw);
-        gl.BindBufferBase(BufferTargetARB.UniformBuffer, BindingPoint, Handle);
-        gl.BindBuffer(BufferTargetARB.UniformBuffer, 0);
-    }
+    public LightBuffer(GL gl) => _ubo = new UniformBufferObject(gl, BindingPoint, (nuint)TotalBytes);
 
     // ── write API (begin → push → upload) ───────────────────────────────────────
     public void Begin()
@@ -60,10 +51,11 @@ public sealed class LightBuffer : GLResource
 
     public void SetDirectional(Vector3 direction, Vector3 color, float intensity)
     {
-        WriteVec3(0, direction);
-        WriteVec3(4, color);
-        _data[8] = intensity;
-        _hasDir  = 1;
+        var w = new Std140Writer(_data);
+        w.Vec3(direction);
+        w.Vec3(color);
+        w.Vec4(intensity, 0f, 0f, 0f);
+        _hasDir = 1;
     }
 
     public void AddPoint(Vector3 position, Vector3 color, float intensity,
@@ -71,13 +63,10 @@ public sealed class LightBuffer : GLResource
     {
         if (_pointCount >= MaxPoint) return;
 
-        var o = PointsBase + _pointCount * PointFloats;
-        WriteVec3(o + 0, position);
-        WriteVec3(o + 4, color);
-        _data[o + 8]  = intensity;
-        _data[o + 9]  = constant;
-        _data[o + 10] = linear;
-        _data[o + 11] = quadratic;
+        var w = new Std140Writer(_data, PointsBase + _pointCount * PointFloats);
+        w.Vec3(position);
+        w.Vec3(color);
+        w.Vec4(intensity, constant, linear, quadratic);
         _pointCount++;
     }
 
@@ -87,20 +76,17 @@ public sealed class LightBuffer : GLResource
     {
         if (_spotCount >= MaxSpot) return;
 
-        var o = SpotsBase + _spotCount * SpotFloats;
-        WriteVec3(o + 0, position);
-        WriteVec3(o + 4, direction);
-        WriteVec3(o + 8, color);
-        _data[o + 12] = intensity;
-        _data[o + 13] = constant;
-        _data[o + 14] = linear;
-        _data[o + 15] = quadratic;
-        _data[o + 16] = MathF.Cos(innerCutoffDeg * MathF.PI / 180f);
-        _data[o + 17] = MathF.Cos(outerCutoffDeg * MathF.PI / 180f);
+        var w = new Std140Writer(_data, SpotsBase + _spotCount * SpotFloats);
+        w.Vec3(position);
+        w.Vec3(direction);
+        w.Vec3(color);
+        w.Vec4(intensity, constant, linear, quadratic);
+        w.Vec4(MathF.Cos(innerCutoffDeg * MathF.PI / 180f),
+               MathF.Cos(outerCutoffDeg * MathF.PI / 180f), 0f, 0f);
         _spotCount++;
     }
 
-    public unsafe void Upload()
+    public void Upload()
     {
         var counts = MemoryMarshal.Cast<float, int>(_data.AsSpan(CountsBase, CountsFloats));
         counts[0] = _pointCount;
@@ -108,18 +94,8 @@ public sealed class LightBuffer : GLResource
         counts[2] = _hasDir;
         counts[3] = 0;
 
-        Gl.BindBuffer(BufferTargetARB.UniformBuffer, Handle);
-        fixed (float* p = _data)
-            Gl.BufferSubData(BufferTargetARB.UniformBuffer, 0, (nuint)TotalBytes, p);
-        Gl.BindBuffer(BufferTargetARB.UniformBuffer, 0);
+        _ubo.Upload(_data);
     }
 
-    private void WriteVec3(int floatOffset, Vector3 v)
-    {
-        _data[floatOffset + 0] = v.X;
-        _data[floatOffset + 1] = v.Y;
-        _data[floatOffset + 2] = v.Z;
-    }
-
-    protected override void DeleteGL() => Gl.DeleteBuffer(Handle);
+    public void Dispose() => _ubo.Dispose();
 }
