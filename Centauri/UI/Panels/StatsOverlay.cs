@@ -8,6 +8,7 @@ using World;
 using Config;
 using Common;
 using Rendering.Profiling;
+using Graphs;
 
 public class StatsOverlay
 {
@@ -21,6 +22,7 @@ public class StatsOverlay
     private readonly ImFontPtr _font;
     private readonly AppConfig _config;
     private readonly PerformanceGraph _perfGraph = new();
+    private readonly GpuTimingGraph _gpuGraph = new();
 
     public StatsOverlay(ImFontPtr font, AppConfig config)
     {
@@ -54,20 +56,16 @@ public class StatsOverlay
             Row("FPS", Widgets.Float(stats.FPS));
             Row("Frame Time", $"{Widgets.Float(stats.FrameTime)} ms");
             _perfGraph.Draw();
+            
+            var gpu = _config.Debug.ShowGPUTimings;
+            if (ImGui.Checkbox("GPU Timings", ref gpu))
+                _config.Debug.ShowGPUTimings = gpu;
         });
 
         if (gpuTimings.Count > 0)
         {
-            Section("GPU (ms)", ColorPalette.Amber, () =>
-            {
-                var total = 0.0;
-                foreach (var t in gpuTimings)
-                {
-                    Row(t.Name, Widgets.Float((float)t.Milliseconds, 3));
-                    total += t.Milliseconds;
-                }
-                RowColored("Total", Widgets.Float((float)total, 3), ColorPalette.Amber);
-            }); 
+            _gpuGraph.Push(gpuTimings, stats.FrameTime);
+            Section("GPU (ms)", ColorPalette.Amber, () => _gpuGraph.Draw());
         }
 
         Section("Culling", ColorPalette.Green, () =>

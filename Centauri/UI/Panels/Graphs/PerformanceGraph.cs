@@ -1,4 +1,4 @@
-namespace Centauri.UI.Panels;
+namespace Centauri.UI.Panels.Graphs;
 
 using ImGuiNET;
 using System.Numerics;
