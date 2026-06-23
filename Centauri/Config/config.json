@@ -27,7 +27,7 @@
   },
   "imGui": {
     "font": "Assets/Fonts/IosevkaCharon-Regular.ttf",
-    "fontSize": 20.0
+    "fontSize": 18.0
   },
   "debug": {
     "enableCulling": true,

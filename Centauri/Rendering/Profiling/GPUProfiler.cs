@@ -10,7 +10,7 @@ public readonly record struct GpuTiming(string Name, double Milliseconds);
 // zones must be sequential — Begin/End pairs with no overlap (overlapping calls are ignored).
 public sealed class GpuProfiler : IDisposable
 {
-    private const int Sets     = 2;
+    private const int Sets     = 3;
     private const int MaxZones = 16;
 
     private readonly GL _gl;
@@ -20,7 +20,7 @@ public sealed class GpuProfiler : IDisposable
     private readonly double[] _ms     = new double[MaxZones];
     private readonly Dictionary<string, int> _slots = new();
 
-    private int  _write;
+    private int  _frame = Sets - 1;   // current write set; advanced each frame
     private int  _zoneCount;
     private bool _enabled;
     private bool _open;
@@ -36,29 +36,30 @@ public sealed class GpuProfiler : IDisposable
                 _queries[s, z] = _gl.GenQuery();
     }
 
-    // Read last frame's results (the set we're NOT about to write), then arm this frame.
+    // Advance to the set we'll write this frame — it was last used `Sets` frames ago, so its
+    // results are long since ready (a 2-set/1-frame ring stalls or, with the availability
+    // skip, freezes once the GPU runs a couple frames behind the CPU). Read it, then re-arm.
     public void BeginFrame(bool enabled)
     {
         _enabled = enabled;
         _results.Clear();
         if (!enabled) return;
 
-        _write ^= 1;
-        var read = _write ^ 1;
+        _frame = (_frame + 1) % Sets;
 
         for (var z = 0; z < _zoneCount; z++)
         {
-            if (!_issued[read, z]) continue;
+            if (!_issued[_frame, z]) continue;
 
-            _gl.GetQueryObject(_queries[read, z], QueryObjectParameterName.QueryResultAvailable, out uint ready);
-            if (ready == 0) continue;   // not done — keep last value rather than stalling
+            _gl.GetQueryObject(_queries[_frame, z], QueryObjectParameterName.QueryResultAvailable, out uint ready);
+            if (ready != 0)
+            {
+                _gl.GetQueryObject(_queries[_frame, z], QueryObjectParameterName.QueryResult, out uint ns);
+                _ms[z] = ns / 1_000_000.0;
+            }
 
-            _gl.GetQueryObject(_queries[read, z], QueryObjectParameterName.QueryResult, out uint ns);
-            _ms[z] = ns / 1_000_000.0;
+            _issued[_frame, z] = false;   // consumed; re-armed below if measured this frame
         }
-
-        for (var z = 0; z < _zoneCount; z++)
-            _issued[_write, z] = false;
 
         for (var z = 0; z < _zoneCount; z++)
             _results.Add(new GpuTiming(_names[z], _ms[z]));
@@ -72,8 +73,8 @@ public sealed class GpuProfiler : IDisposable
 
         var slot = Slot(name);
         _open = true;
-        _issued[_write, slot] = true;
-        _gl.BeginQuery(QueryTarget.TimeElapsed, _queries[_write, slot]);
+        _issued[_frame, slot] = true;
+        _gl.BeginQuery(QueryTarget.TimeElapsed, _queries[_frame, slot]);
     }
 
     private void End()
