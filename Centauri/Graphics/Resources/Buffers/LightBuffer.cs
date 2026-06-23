@@ -1,4 +1,4 @@
-namespace Centauri.Graphics.Resources;
+namespace Centauri.Graphics.Resources.Buffers;
 
 using Silk.NET.OpenGL;
 using System.Numerics;

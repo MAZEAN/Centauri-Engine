@@ -2,7 +2,7 @@ namespace Centauri.World;
 
 using System.Numerics;
 
-using Graphics.Resources;
+using Graphics.Resources.Materials;
 using Utils.Geometry;
 using Graphics.Geometry;
 using Components;

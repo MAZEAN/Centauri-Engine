@@ -1,10 +1,11 @@
-namespace Centauri.Rendering;
+namespace Centauri.Rendering.Helper;
 
 using System.Numerics;
 
 using Config;
 using World;
 using Graphics.Resources;
+using Graphics.Resources.Materials;
 using IBL;
 using Shadows;
 

@@ -1,8 +1,9 @@
-namespace Centauri.Rendering;
+namespace Centauri.Rendering.Helper;
 
 using Silk.NET.OpenGL;
 
 using Graphics.Resources;
+using Graphics.Resources.Materials;
 
 // Per-frame texture-unit bind cache: skips a redundant glBindTexture when a unit already
 // holds the wanted handle. Covers the material slots (0-4); returns the count of real GPU
@@ -33,7 +34,7 @@ public sealed class TextureBinder
         return binds;
     }
 
-    public int Bind(GLTexture? tex, TextureUnit slot)
+    private int Bind(GLTexture? tex, TextureUnit slot)
     {
         var index  = (int)slot - (int)TextureUnit.Texture0;
         var handle = tex?.Handle ?? 0;

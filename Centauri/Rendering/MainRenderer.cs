@@ -6,15 +6,15 @@ using Config;
 using World;
 using Graphics.Resources;
 using Graphics.Geometry;
+using Graphics.Resources.Buffers;
+using Graphics.Resources.Materials;
 using World.Collections;
 using World.Components;
 using Utils.Misc;
 using IBL;
 using Shadows;
+using Helper;
 
-// Orchestrates the lit forward pass: uploads lights, binds IBL/shadow textures, then
-// draws shader-batched entities. The heavy lifting is delegated — ShaderBatcher (grouping),
-// TextureBinder (material textures), ShaderUniformBinder (uniform packing), LightBuffer (UBO).
 public class MainRenderer : IDisposable
 {
     private readonly GL _gl;

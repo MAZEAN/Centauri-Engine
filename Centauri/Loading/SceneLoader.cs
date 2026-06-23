@@ -3,7 +3,7 @@ namespace Centauri.Loading;
 using System.Text.Json;
 using System.Numerics;
 
-using Graphics.Resources;
+using Graphics.Resources.Materials;
 using Config;
 using Rendering;
 using Utils.Misc;

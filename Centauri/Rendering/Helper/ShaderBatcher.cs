@@ -1,4 +1,4 @@
-namespace Centauri.Rendering;
+namespace Centauri.Rendering.Helper;
 
 using Graphics.Resources;
 using World;

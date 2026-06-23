@@ -4,6 +4,7 @@ using Silk.NET.OpenGL;
 
 using Utils.Caching;
 using Graphics.Resources;
+using Graphics.Resources.Materials;
 using Config;
 using Utils.Misc;
 using Graphics.Geometry;

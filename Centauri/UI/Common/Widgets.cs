@@ -45,6 +45,28 @@ internal static class Widgets
             ImGui.Unindent(PanelIndent);
         ImGui.Spacing();
     }
+    
+    public readonly ref struct PanelScope
+    {
+        public bool Open { get; }
+
+        public PanelScope(string label, bool startCollapsed)
+        {
+            if (startCollapsed)
+                ImGui.SetNextItemOpen(false, ImGuiCond.FirstUseEver);
+
+            Open = BeginPanel(label);
+            if (Open) ImGui.PushID(label);
+        }
+
+        public void Dispose()
+        {
+            if (Open) ImGui.PopID();
+            EndPanel(Open);
+        }
+    }
+
+    public static PanelScope Section(string label, bool startCollapsed = false) => new(label, startCollapsed);
 
     // Lays out a right-aligned label and sizes the next item to fill the row.
     private static void RowLabel(string label)
