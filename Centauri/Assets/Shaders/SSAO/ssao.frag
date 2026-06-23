@@ -34,9 +34,8 @@ void main()
     vec3 pos    = viewPos(vUv);
     vec3 normal = normalize(texture(uNormal, vUv).xyz * 2.0 - 1.0);
 
-    vec2 noiseScale = vec2(textureSize(uDepth, 0)) / vec2(textureSize(uNoise, 0));
-    vec3 rnd        = texture(uNoise, vUv * noiseScale).xyz;
-
+    vec3 rnd = texture(uNoise, gl_FragCoord.xy / float(textureSize(uNoise, 0).x)).xyz;
+    
     vec3 tangent   = normalize(rnd - normal * dot(rnd, normal));
     vec3 bitangent = cross(normal, tangent);
     mat3 tbn       = mat3(tangent, bitangent, normal);

@@ -13,6 +13,7 @@ public sealed class RenderTarget : IDisposable
     private readonly GL _gl;
     private readonly InternalFormat[] _colorFormats;
     private readonly bool _withDepth;
+    private readonly GLEnum _filter;
 
     private uint _fbo;
     private uint _width, _height;
@@ -23,11 +24,12 @@ public sealed class RenderTarget : IDisposable
     public uint Width  => _width;
     public uint Height => _height;
 
-    public RenderTarget(GL gl, uint width, uint height, InternalFormat[] colorFormats, bool withDepth)
+    public RenderTarget(GL gl, uint width, uint height, InternalFormat[] colorFormats, bool withDepth, GLEnum filter = GLEnum.Nearest)
     {
         _gl = gl;
         _colorFormats = colorFormats;
         _withDepth = withDepth;
+        _filter = filter;
         Allocate(width, height);
     }
 
@@ -72,7 +74,7 @@ public sealed class RenderTarget : IDisposable
             _gl.BindTexture(TextureTarget.Texture2D, tex);
             _gl.TexImage2D(TextureTarget.Texture2D, 0, _colorFormats[i], _width, _height, 0,
                 PixelFormat.Rgba, PixelType.Float, null);
-            GLSampler.Set(_gl, TextureTarget.Texture2D, GLEnum.ClampToEdge, GLEnum.Nearest, GLEnum.Nearest);
+            GLSampler.Set(_gl, TextureTarget.Texture2D, GLEnum.ClampToEdge, _filter, _filter);
 
             var attachment = FramebufferAttachment.ColorAttachment0 + i;
             _gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, attachment, TextureTarget.Texture2D, tex, 0);

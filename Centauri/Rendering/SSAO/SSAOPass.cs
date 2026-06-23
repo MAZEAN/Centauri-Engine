@@ -17,6 +17,7 @@ public sealed class SsaoPass : IDisposable
 {
     private const int MaxKernel = 64;
     private const int NoiseDim  = 4;
+    private const uint ResDivisor = 2;   // half-res
 
     private readonly GL _gl;
     private readonly SSAOConfig _config;
@@ -43,8 +44,12 @@ public sealed class SsaoPass : IDisposable
             PathResolver.Resolve("Assets/Shaders/Post/post.vert"),
             PathResolver.Resolve("Assets/Shaders/SSAO/ssao_blur.frag"));
 
-        _aoTarget   = new RenderTarget(gl, width, height, [InternalFormat.Rgba16f], withDepth: false);
-        _blurTarget = new RenderTarget(gl, width, height, [InternalFormat.Rgba16f], withDepth: false);
+        // occlusion buffer stays Nearest (consumed only by the blur); the blur output is
+        // Linear so the full-res lit pass gets a smooth bilinear upsample.
+        _aoTarget   = new RenderTarget(gl, width / ResDivisor, height / ResDivisor,
+            [InternalFormat.Rgba16f], withDepth: false);
+        _blurTarget = new RenderTarget(gl, width / ResDivisor, height / ResDivisor,
+            [InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Linear);
 
         _vao   = gl.GenVertexArray();
         _noise = CreateNoise();
@@ -53,8 +58,8 @@ public sealed class SsaoPass : IDisposable
 
     public void Resize(uint width, uint height)
     {
-        _aoTarget.Resize(width, height);
-        _blurTarget.Resize(width, height);
+        _aoTarget.Resize(width / ResDivisor, height / ResDivisor);
+        _blurTarget.Resize(width / ResDivisor, height / ResDivisor);
     }
 
     public void Render(uint depthTex, uint normalTex, Camera camera)

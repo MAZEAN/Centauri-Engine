@@ -7,6 +7,7 @@ using World;
 using Graphics.Resources;
 using Utils.Misc;
 using Targets;
+using Config;
 
 // Renders view-space normals + depth into single-sample textures before the lit pass.
 // These are the inputs the screen-space effects need (SSAO first, then SSR). Nothing
@@ -14,15 +15,17 @@ using Targets;
 public sealed class GeometryPrepass : IDisposable
 {
     private readonly GL _gl;
+    private readonly AppConfig _config;
     private readonly GLShader _shader;
     private readonly RenderTarget _target;
 
     public uint NormalTexture => _target.ColorTextures[0];
     public uint DepthTexture  => _target.DepthTexture;
 
-    public GeometryPrepass(GL gl, uint width, uint height)
+    public GeometryPrepass(GL gl, AppConfig config, uint width, uint height)
     {
         _gl = gl;
+        _config = config;
         _shader = new GLShader(gl,
             PathResolver.Resolve("Assets/Shaders/Prepass/prepass.vert"),
             PathResolver.Resolve("Assets/Shaders/Prepass/prepass.frag"));
@@ -34,6 +37,10 @@ public sealed class GeometryPrepass : IDisposable
     public void Render(Scene scene)
     {
         var camera = scene.Cameras.Active;
+        
+        var cullingCamera = scene.Cameras.Primary;
+        cullingCamera.UpdateFrustum();
+        var cull = _config.Debug.EnableCulling;
 
         _target.Bind();
         _target.Clear();
@@ -49,6 +56,8 @@ public sealed class GeometryPrepass : IDisposable
         foreach (var entity in scene.Entities)
         {
             if (!entity.Enabled || entity.Model is not { } model) continue;
+            if (cull && !cullingCamera.Frustum.IsVisibleAABB(entity.GetWorldBounds()))
+                continue;
 
             var world = entity.Transform.WorldMatrix;
             _shader.SetUniform("uModel", world);

@@ -72,7 +72,7 @@ public class RenderingSystem : IDisposable
         
         _post = new PostProcessor(_gl, hdr, _config.ColorGrading);
         _ui   = new UISystem(_gl, _config, window, input, _config.ColorGrading);
-        _prepass = new GeometryPrepass(_gl, (uint)framebufferSize.X, (uint)framebufferSize.Y);
+        _prepass = new GeometryPrepass(_gl, _config, (uint)framebufferSize.X, (uint)framebufferSize.Y);
         _ssao    = new SsaoPass(_gl, _config.SSAO, (uint)framebufferSize.X, (uint)framebufferSize.Y);
         _bufferDebug = new BufferDebugView(_gl);
     }
