@@ -12,9 +12,7 @@ public sealed class PostProcessor : IDisposable
 {
     private readonly GL _gl;
     private readonly HDRFramebuffer _hdr;
-    private readonly ColorGrading _grading;
-    private readonly BloomConfig _bloomConfig;
-    private readonly SSRConfig _ssrConfig;
+    private readonly AppConfig _config;
     private readonly SSRPass _ssr;
     private uint _width, _height;
     
@@ -22,21 +20,19 @@ public sealed class PostProcessor : IDisposable
     private readonly uint _emptyVao;   // core profile needs a bound VAO for attribute-less draws
     private readonly BloomPass _bloom;
 
-    public PostProcessor(GL gl, HDRFramebuffer hdr, ColorGrading grading, BloomConfig bloomConfig, SSRConfig ssrConfig, uint width, uint height)
+    public PostProcessor(GL gl, HDRFramebuffer hdr, AppConfig config, uint width, uint height)
     {
         _gl = gl;
         _hdr = hdr;
-        _grading = grading;
-        _bloomConfig = bloomConfig;
-        _ssrConfig = ssrConfig;
+        _config = config;
         _width = width;
         _height = height;
         
         _tonemap = new GLShader(gl,
             PathResolver.Resolve("Assets/Shaders/Post/post.vert"),
             PathResolver.Resolve("Assets/Shaders/Post/post.frag"));
-        _bloom = new BloomPass(gl, bloomConfig, width, height);
-        _ssr = new SSRPass(gl, ssrConfig, width, height);
+        _bloom = new BloomPass(gl, _config.Bloom, width, height);
+        _ssr = new SSRPass(gl, _config.SSR, width, height);
         _emptyVao = gl.GenVertexArray();
     }
 
@@ -55,11 +51,11 @@ public sealed class PostProcessor : IDisposable
     {
         _hdr.Resolve();
         
-        var ssrActive = ssrAvailable && _ssrConfig.Enabled;
+        var ssrActive = ssrAvailable && _config.SSR.Enabled;
         if (ssrActive)
             _ssr.Render(_hdr.ResolvedTexture, depthTex, normalTex, materialTex, camera);
         
-        var bloomActive = _bloomConfig.Enabled;
+        var bloomActive = _config.Bloom.Enabled;
         if (bloomActive)
             _bloom.Render(_hdr.ResolvedTexture);
 
@@ -67,17 +63,17 @@ public sealed class PostProcessor : IDisposable
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         _gl.Viewport(0, 0, _width, _height);
         
-        _gl.Disable(EnableCap.DepthTest);
+        SetRenderState();
 
         _tonemap.Use();
         _gl.ActiveTexture(TextureUnit.Texture0);
         _gl.BindTexture(TextureTarget.Texture2D, _hdr.ResolvedTexture);
         
         _tonemap.SetUniform("uHdr",        0);
-        _tonemap.SetUniform("uExposure",   _grading.Exposure);
-        _tonemap.SetUniform("uBlackLevel", _grading.BlackLevel);
-        _tonemap.SetUniform("uContrast",   _grading.Contrast);
-        _tonemap.SetUniform("uSaturation", _grading.Saturation);
+        _tonemap.SetUniform("uExposure",   _config.ColorGrading.Exposure);
+        _tonemap.SetUniform("uBlackLevel", _config.ColorGrading.BlackLevel);
+        _tonemap.SetUniform("uContrast",   _config.ColorGrading.Contrast);
+        _tonemap.SetUniform("uSaturation", _config.ColorGrading.Saturation);
         
         // Bloom
         _gl.ActiveTexture(TextureUnit.Texture1);
@@ -85,7 +81,7 @@ public sealed class PostProcessor : IDisposable
         
         _tonemap.SetUniform("uBloom",          1);
         _tonemap.SetUniform("uHasBloom",       bloomActive ? 1 : 0);
-        _tonemap.SetUniform("uBloomIntensity", _bloomConfig.Intensity);
+        _tonemap.SetUniform("uBloomIntensity", _config.Bloom.Intensity);
         
         _gl.ActiveTexture(TextureUnit.Texture2);
         _gl.BindTexture(TextureTarget.Texture2D, ssrActive ? _ssr.ReflectionTexture : 0);
@@ -97,6 +93,16 @@ public sealed class PostProcessor : IDisposable
         _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
         _gl.BindVertexArray(0);
 
+        ResetRenderState();
+    }
+
+    private void SetRenderState()
+    {
+        _gl.Disable(EnableCap.DepthTest);
+    }
+    
+    private void ResetRenderState()
+    {
         _gl.Enable(EnableCap.DepthTest);
     }
 

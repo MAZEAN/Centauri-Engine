@@ -20,7 +20,7 @@ public sealed class SSRPass : IDisposable
     private readonly GLShader _shader;
     private readonly uint _vao;
 
-    private RenderTarget _target;
+    private readonly RenderTarget _target;
 
     public uint ReflectionTexture => _target.ColorTextures[0];
 
@@ -63,6 +63,7 @@ public sealed class SSRPass : IDisposable
         _shader.SetUniform("uDepth",    1);
         _shader.SetUniform("uNormal",   2);
         _shader.SetUniform("uMaterial", 3);
+        
         Bind(TextureUnit.Texture0, sceneTex);
         Bind(TextureUnit.Texture1, depthTex);
         Bind(TextureUnit.Texture2, normalTex);
@@ -73,6 +74,7 @@ public sealed class SSRPass : IDisposable
         _gl.BindVertexArray(0);
 
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        
         _gl.Enable(EnableCap.DepthTest);
     }
 

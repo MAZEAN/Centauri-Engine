@@ -1,10 +1,11 @@
 #version 330 core
 
-// Screen-space reflections. Everything happens in view space: reconstruct the fragment
-// position from the prepass depth, reflect the view ray about the view-space normal, then
-// linearly march that ray, projecting each step back to screen to compare against stored
-// depth. On a hit, binary-refine and sample the resolved HDR scene. The result is weighted
-// by Fresnel + a roughness/edge/distance fade and output as an additive reflection term.
+// Screen-space reflections. Reconstruct the fragment's view-space position from the prepass
+// depth, reflect the view ray about the view-space normal, then march that ray IN SCREEN
+// SPACE (uniform steps in pixels, perspective-correct depth via linear 1/w interpolation).
+// Screen-space marching keeps sampling density uniform across the frame — uniform view-space
+// steps undersample at grazing angles and break the reflection into stretched blocks. On a
+// hit, binary-refine and sample the resolved HDR scene, weighted by Fresnel + fades.
 
 in  vec2 vUv;
 out vec4 FragColor;
@@ -33,11 +34,17 @@ vec3 viewPos(vec2 uv)
     return v.xyz / v.w;
 }
 
-// project a view-space point to screen uv
-vec2 toUv(vec3 viewP)
+// view-space z (negative, in front of camera) of a point on the ray at screen fraction s,
+// given the endpoints' reciprocal-w. 1/w is linear in screen space, so this is exact.
+float rayViewZ(float invWStart, float invWEnd, float s)
 {
-    vec4 clip = uProjection * vec4(viewP, 1.0);
-    return (clip.xy / clip.w) * 0.5 + 0.5;
+    return -1.0 / mix(invWStart, invWEnd, s);   // w = -viewZ for the engine projection
+}
+
+// cheap per-pixel hash for dithering the ray start (breaks step banding into noise)
+float hash(vec2 p)
+{
+    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
 }
 
 void main()
@@ -56,42 +63,59 @@ void main()
     vec3 V = normalize(P);                                  // camera→fragment (cam at origin)
     vec3 R = normalize(reflect(V, N));                      // reflection direction
 
-    // ── linear march ──
-    float stepLen = uMaxDistance / float(uMaxSteps);
-    vec3  rayPos  = P;
-    vec3  prevPos = P;
-    bool  hit     = false;
-    vec2  hitUv   = vec2(0.0);
+    // clamp the ray so it never crosses in front of the camera (view z must stay negative)
+    float rayLen = uMaxDistance;
+    if (R.z > 0.0)
+    rayLen = min(rayLen, (-0.05 - P.z) / R.z);
+    if (rayLen <= 0.0) { FragColor = vec4(0.0); return; }
 
-    for (int i = 0; i < uMaxSteps; i++)
+    vec3 Q = P + R * rayLen;                                // ray end, view space
+
+    // project both endpoints to screen
+    vec4 clipP = uProjection * vec4(P, 1.0);
+    vec4 clipQ = uProjection * vec4(Q, 1.0);
+    vec2 uvP   = (clipP.xy / clipP.w) * 0.5 + 0.5;
+    vec2 uvQ   = (clipQ.xy / clipQ.w) * 0.5 + 0.5;
+    float invWP = 1.0 / clipP.w;
+    float invWQ = 1.0 / clipQ.w;
+
+    // ── uniform screen-space march ──
+    float steps  = float(uMaxSteps);
+    float stepS  = 1.0 / steps;
+    float jitter = hash(gl_FragCoord.xy) * stepS;           // dither start within one step
+
+    bool  hit    = false;
+    vec2  hitUv  = vec2(0.0);
+    float prevS  = 0.0;
+
+    for (int i = 1; i <= uMaxSteps; i++)
     {
-        rayPos += R * stepLen;
+        float s  = float(i) * stepS - jitter;
+        if (s <= 0.0) continue;
 
-        vec4 clip = uProjection * vec4(rayPos, 1.0);
-        if (clip.w <= 0.0) break;
-        vec2 uv = (clip.xy / clip.w) * 0.5 + 0.5;
+        vec2  uv = mix(uvP, uvQ, s);
         if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) break;
 
-        // view z is negative; geometry "in front of" the ray has a larger (less negative) z
-        float sceneZ = viewPos(uv).z;
-        float diff   = sceneZ - rayPos.z;
+        float rayZ   = rayViewZ(invWP, invWQ, s);           // ray depth here (perspective-correct)
+        float sceneZ = viewPos(uv).z;                       // geometry depth here
+        float diff   = sceneZ - rayZ;                       // >0 → ray went behind a surface
 
         if (diff > 0.0 && diff < uThickness)
         {
-            // ── binary refine between the last two samples ──
-            vec3 lo = prevPos, hi = rayPos;
+            // ── binary refine in screen fraction between prevS and s ──
+            float lo = prevS, hi = s;
             for (int j = 0; j < uRefineSteps; j++)
             {
-                vec3 mid  = (lo + hi) * 0.5;
-                vec2 muv  = toUv(mid);
-                float sz  = viewPos(muv).z;
-                if (sz - mid.z > 0.0) hi = mid; else lo = mid;
+                float midS = (lo + hi) * 0.5;
+                vec2  muv  = mix(uvP, uvQ, midS);
+                float mz   = rayViewZ(invWP, invWQ, midS);
+                if (viewPos(muv).z - mz > 0.0) hi = midS; else lo = midS;
                 hitUv = muv;
             }
             hit = true;
             break;
         }
-        prevPos = rayPos;
+        prevS = s;
     }
 
     if (!hit) { FragColor = vec4(0.0); return; }
@@ -102,7 +126,7 @@ void main()
     float edgeFade  = ef.x * ef.y;
     // roughness: ramp off toward the cutoff
     float roughFade = 1.0 - smoothstep(uRoughnessCutoff * 0.5, uRoughnessCutoff, roughness);
-    // distance: fade the far end of the ray where steps are coarsest
+    // distance: fade the far end of the ray where data is least reliable
     float distFade  = 1.0 - clamp(length(viewPos(hitUv) - P) / uMaxDistance, 0.0, 1.0);
 
     // ── Fresnel weight (metal reflects strongly, dielectric only at grazing) ──
