@@ -41,12 +41,6 @@ float rayViewZ(float invWStart, float invWEnd, float s)
     return -1.0 / mix(invWStart, invWEnd, s);   // w = -viewZ for the engine projection
 }
 
-// cheap per-pixel hash for dithering the ray start (breaks step banding into noise)
-float hash(vec2 p)
-{
-    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
-}
-
 void main()
 {
     float depth = texture(uDepth, vUv).r;
@@ -66,7 +60,7 @@ void main()
     // clamp the ray so it never crosses in front of the camera (view z must stay negative)
     float rayLen = uMaxDistance;
     if (R.z > 0.0)
-    rayLen = min(rayLen, (-0.05 - P.z) / R.z);
+        rayLen = min(rayLen, (-0.05 - P.z) / R.z);
     if (rayLen <= 0.0) { FragColor = vec4(0.0); return; }
 
     vec3 Q = P + R * rayLen;                                // ray end, view space
@@ -80,9 +74,7 @@ void main()
     float invWQ = 1.0 / clipQ.w;
 
     // ── uniform screen-space march ──
-    float steps  = float(uMaxSteps);
-    float stepS  = 1.0 / steps;
-    float jitter = hash(gl_FragCoord.xy) * stepS;           // dither start within one step
+    float stepS = 1.0 / float(uMaxSteps);
 
     bool  hit    = false;
     vec2  hitUv  = vec2(0.0);
@@ -90,8 +82,7 @@ void main()
 
     for (int i = 1; i <= uMaxSteps; i++)
     {
-        float s  = float(i) * stepS - jitter;
-        if (s <= 0.0) continue;
+        float s  = float(i) * stepS;
 
         vec2  uv = mix(uvP, uvQ, s);
         if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) break;
