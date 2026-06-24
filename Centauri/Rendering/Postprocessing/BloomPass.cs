@@ -8,7 +8,7 @@ using Graphics.Resources;
 using Utils.Misc;
 using Targets;
 
-// Physically-flavoured bloom via a mip pyramid (Jimenez / CoD "Next Generation Post
+// Physically-flavored bloom via a mip pyramid (Jimenez / CoD "Next Generation Post
 // Processing"): threshold + downsample the resolved HDR scene into progressively smaller
 // mips, then upsample back up additively. The accumulated mip0 is the bloom the tonemap
 // pass adds to the scene. All mips are half-or-smaller resolution, so this is cheap.
@@ -18,9 +18,11 @@ public sealed class BloomPass : IDisposable
 
     private readonly GL _gl;
     private readonly BloomConfig _config;
+    
     private readonly GLShader _prefilter;
     private readonly GLShader _down;
     private readonly GLShader _up;
+    
     private readonly uint _vao;
 
     private readonly RenderTarget[] _mips = new RenderTarget[MipCount];
@@ -59,8 +61,7 @@ public sealed class BloomPass : IDisposable
     // state beyond what it sets (caller rebinds the default framebuffer for the tonemap).
     public void Render(uint hdrResolved)
     {
-        _gl.Disable(EnableCap.DepthTest);
-        _gl.Disable(EnableCap.Blend);
+        SetRenderState();
 
         // ── prefilter: resolved HDR → mip0 (threshold + box downsample) ──
         _mips[0].Bind();
@@ -87,9 +88,11 @@ public sealed class BloomPass : IDisposable
         // ── upsample chain: mip[i+1] → add onto mip[i] ──
         _gl.Enable(EnableCap.Blend);
         _gl.BlendFunc(BlendingFactor.One, BlendingFactor.One);   // additive
+        
         _up.Use();
         _up.SetUniform("uSrc", 0);
         _up.SetUniform("uRadius", _config.Radius);
+        
         for (var i = MipCount - 2; i >= 0; i--)
         {
             _mips[i].Bind();
@@ -97,12 +100,11 @@ public sealed class BloomPass : IDisposable
             Bind(TextureUnit.Texture0, _mips[i + 1].ColorTextures[0]);
             DrawFullscreen();
         }
-        _gl.Disable(EnableCap.Blend);
-
-        _gl.Enable(EnableCap.DepthTest);
+        
+        ResetRenderState();
     }
 
-    private void SetTexel(GLShader shader, Vector2 sourceSize) =>
+    private static void SetTexel(GLShader shader, Vector2 sourceSize) =>
         shader.SetUniform("uTexel", new Vector2(1f / sourceSize.X, 1f / sourceSize.Y));
 
     // mip0 downsamples from the full-res resolved scene; its "source" is double its own size.
@@ -131,13 +133,27 @@ public sealed class BloomPass : IDisposable
         _gl.BindVertexArray(0);
     }
 
+    private void SetRenderState()
+    {
+        _gl.Disable(EnableCap.DepthTest);
+        _gl.Disable(EnableCap.Blend);
+    }
+    
+    private void ResetRenderState()
+    {
+        _gl.Disable(EnableCap.Blend);
+        _gl.Enable(EnableCap.DepthTest);
+    }
+
     public void Dispose()
     {
         _prefilter.Dispose();
         _down.Dispose();
         _up.Dispose();
+        
         foreach (var mip in _mips)
             mip.Dispose();
+        
         _gl.DeleteVertexArray(_vao);
     }
 }

@@ -42,7 +42,7 @@ public sealed class PostProcessor : IDisposable
         _bloom.Resize(width, height);
     }
 
-    public void BeginScene() => _hdr.Bind();   // bind HDR target + clear
+    public void BeginScene() => _hdr.Bind();
 
     public void Composite()
     {
@@ -61,6 +61,7 @@ public sealed class PostProcessor : IDisposable
         _tonemap.Use();
         _gl.ActiveTexture(TextureUnit.Texture0);
         _gl.BindTexture(TextureTarget.Texture2D, _hdr.ResolvedTexture);
+        
         _tonemap.SetUniform("uHdr",        0);
         _tonemap.SetUniform("uExposure",   _grading.Exposure);
         _tonemap.SetUniform("uBlackLevel", _grading.BlackLevel);
@@ -70,6 +71,7 @@ public sealed class PostProcessor : IDisposable
         // Bloom
         _gl.ActiveTexture(TextureUnit.Texture1);
         _gl.BindTexture(TextureTarget.Texture2D, bloomActive ? _bloom.BloomTexture : 0);
+        
         _tonemap.SetUniform("uBloom",          1);
         _tonemap.SetUniform("uHasBloom",       bloomActive ? 1 : 0);
         _tonemap.SetUniform("uBloomIntensity", _bloomConfig.Intensity);
