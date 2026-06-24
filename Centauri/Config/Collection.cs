@@ -234,3 +234,15 @@ public sealed class SSRConfig : IJsonOnDeserialized
         AuthoredRoughnessCutoff = RoughnessCutoff;
     }
 }
+
+public sealed class TAAConfig : IJsonOnDeserialized
+{
+    [JsonPropertyName("enabled")]  public bool  Enabled  { get; set; } = true;
+    [JsonPropertyName("feedback")] public float Feedback { get; set; } = 0.9f;   // history weight (0..1)
+
+    [JsonIgnore] public float AuthoredFeedback { get; private set; }
+
+    public TAAConfig() => OnDeserialized();
+
+    public void OnDeserialized() => AuthoredFeedback = Feedback;
+}

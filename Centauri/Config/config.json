@@ -84,5 +84,9 @@
     "maxSteps": 48,
     "refineSteps": 6,
     "roughnessCutoff": 0.6
+  },
+  "taa": {
+    "enabled": true,
+    "feedback": 0.9
   }
 }

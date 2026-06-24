@@ -7,6 +7,7 @@ using Utils.Misc;
 using Config;
 using World;
 using SSR;
+using TAA;
 
 public sealed class PostProcessor : IDisposable
 {
@@ -14,6 +15,9 @@ public sealed class PostProcessor : IDisposable
     private readonly HDRFramebuffer _hdr;
     private readonly AppConfig _config;
     private readonly SSRPass _ssr;
+    private readonly TAAConfig _taaConfig;
+    private readonly TAAPass _taa;
+    
     private uint _width, _height;
     
     private readonly GLShader _tonemap;
@@ -33,6 +37,7 @@ public sealed class PostProcessor : IDisposable
             PathResolver.Resolve("Assets/Shaders/Post/post.frag"));
         _bloom = new BloomPass(gl, _config.Bloom, width, height);
         _ssr = new SSRPass(gl, _config.SSR, width, height);
+        _taa = new TAAPass(gl, _config.TAA, width, height);
         _emptyVao = gl.GenVertexArray();
     }
 
@@ -43,22 +48,35 @@ public sealed class PostProcessor : IDisposable
         _hdr.Resize(width, height);
         _bloom.Resize(width, height);
         _ssr.Resize(width, height);
+        _taa.Resize(width, height);
     }
 
     public void BeginScene() => _hdr.Bind();
+    
+    public System.Numerics.Vector2 NextTaaJitter() => _taa.NextJitter(_width, _height);
 
-    public void Composite(Camera camera, uint depthTex, uint normalTex, uint materialTex, bool ssrAvailable)
+    public void Composite(Camera camera, uint depthTex, uint normalTex, uint materialTex,
+        bool ssrAvailable, bool taaAvailable)
     {
         _hdr.Resolve();
         
+        var sceneColor = _hdr.ResolvedTexture;
+        
         var ssrActive = ssrAvailable && _config.SSR.Enabled;
         if (ssrActive)
-            _ssr.Render(_hdr.ResolvedTexture, depthTex, normalTex, materialTex, camera);
+            _ssr.Render(sceneColor, depthTex, normalTex, materialTex, camera);
+        
+        var taaActive = taaAvailable && _taaConfig.Enabled;
+        if (taaActive)
+        {
+            _taa.Render(sceneColor, depthTex, camera);
+            sceneColor = _taa.OutputTexture;
+        }
         
         var bloomActive = _config.Bloom.Enabled;
         if (bloomActive)
-            _bloom.Render(_hdr.ResolvedTexture);
-
+            _bloom.Render(sceneColor);
+        
         // back to the screen for the tonemap (bloom left its own mip FBOs bound)
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         _gl.Viewport(0, 0, _width, _height);
@@ -67,7 +85,7 @@ public sealed class PostProcessor : IDisposable
 
         _tonemap.Use();
         _gl.ActiveTexture(TextureUnit.Texture0);
-        _gl.BindTexture(TextureTarget.Texture2D, _hdr.ResolvedTexture);
+        _gl.BindTexture(TextureTarget.Texture2D, sceneColor);
         
         _tonemap.SetUniform("uHdr",        0);
         _tonemap.SetUniform("uExposure",   _config.ColorGrading.Exposure);
@@ -112,6 +130,8 @@ public sealed class PostProcessor : IDisposable
         _tonemap.Dispose();
         _bloom.Dispose();
         _ssr.Dispose();
+        _taa.Dispose();
+        
         _gl.DeleteVertexArray(_emptyVao);
     }
 }

@@ -40,8 +40,9 @@ public class RenderingSystem : IDisposable
     
     // Flags
     private bool _ssaoActive;   // SSAO ran this frame → bind/apply its result
-    private bool? _skyIsDay;
     private bool _ssrActive;
+    private bool _taaActive;    // TAA enabled → prepass ran, scene reprojected
+    private bool? _skyIsDay;
     
     private float _fpsTimer;
     private int   _frameCount;
@@ -97,6 +98,8 @@ public class RenderingSystem : IDisposable
     {
         scene.Lighting.Collect(scene.Entities);
         
+        scene.Cameras.Active.JitterNdc = _post.NextTaaJitter();
+        
         RenderPrePostComponents(scene, deltaTime);
         
         _post.BeginScene();
@@ -104,7 +107,7 @@ public class RenderingSystem : IDisposable
         
         using (_profiler.Measure("Post"))
             _post.Composite(scene.Cameras.Active, _prepass.DepthTexture, _prepass.NormalTexture,
-                _prepass.MaterialTexture, _ssrActive);
+                _prepass.MaterialTexture, _ssrActive, _taaActive);
         
         RenderAfterPostComponents(scene, deltaTime);
     }
@@ -148,8 +151,9 @@ public class RenderingSystem : IDisposable
         // SSAO (and the Normals/Depth/AO debug views) all need the prepass buffers
         _ssaoActive = _config.SSAO.Enabled || _config.Debug.Shading == ShadingMode.AmbientOcclusion;
         _ssrActive  = _config.SSR.Enabled;
-        var needPrepass = _ssaoActive || _ssrActive || _config.Debug.Shading != ShadingMode.Shaded;
-
+        _taaActive  = _config.TAA.Enabled;
+        var needPrepass = _ssaoActive || _ssrActive || _taaActive || _config.Debug.Shading != ShadingMode.Shaded;
+        
         if (needPrepass)
             using (_profiler.Measure("Prepass"))
                 _prepass.Render(scene);

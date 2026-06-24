@@ -31,6 +31,7 @@ public class PropertiesPanel
             new ShadowSection(config),
             new SSAOSection(config),
             new SSRSection(config),
+            new TAASection(config),
             new BloomSection(config),
             new ColorGradingSection(grading),
             new IBLSection(config),

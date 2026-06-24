@@ -16,4 +16,5 @@ public class AppConfig
     [JsonPropertyName("ssao")]    public SSAOConfig   SSAO { get; init; } = new();
     [JsonPropertyName("bloom")]   public BloomConfig  Bloom { get; init; } = new();
     [JsonPropertyName("ssr")]     public SSRConfig    SSR { get; init; } = new();
+    [JsonPropertyName("taa")]     public TAAConfig    TAA { get; init; } = new();
 }

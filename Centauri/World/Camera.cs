@@ -119,7 +119,19 @@ public class Camera
         return Matrix4x4.CreateLookAt(Position, Position + Forward, Up);
     }
     
+    public Vector2 JitterNdc { get; set; } = Vector2.Zero;
+    
     public Matrix4x4 GetProjectionMatrix()
+    {
+        var proj = GetProjectionMatrixRaw();
+        proj.M31 += JitterNdc.X;   // shifts clip.x by jitter*w → constant NDC offset after divide
+        proj.M32 += JitterNdc.Y;
+        return proj;
+    }
+
+    // Unjittered projection — used for culling/frustum and for TAA motion vectors so the
+    // per-frame jitter doesn't leak into reprojection.
+    public Matrix4x4 GetProjectionMatrixRaw()
     {
         if (AspectRatio <= 0)
             throw new InvalidOperationException("Aspect ratio has not been set.");
