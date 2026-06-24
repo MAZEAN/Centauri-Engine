@@ -10,29 +10,21 @@ out vec4 FragColor;
 
 uniform sampler2D uCurrent;
 uniform sampler2D uHistory;
-uniform sampler2D uVelocity;
-uniform sampler2D uSsr;
-uniform int   uHasSsr;
+uniform sampler2D uVelocity;    
+
 uniform vec2  uTexel;
 uniform float uFeedback;
 
-vec3 sceneAt(vec2 uv)
-{
-    vec3 c = texture(uCurrent, uv).rgb;
-    if (uHasSsr == 1) c += texture(uSsr, uv).rgb;
-    return c;
-}
-
 void main()
 {
-    vec3 current = sceneAt(vUv);
+    vec3 current = texture(uCurrent, vUv).rgb;
 
     vec3 nmin = current;
     vec3 nmax = current;
     for (int x = -1; x <= 1; x++)
     for (int y = -1; y <= 1; y++)
     {
-        vec3 c = sceneAt(vUv + vec2(x, y) * uTexel);
+        vec3 c = texture(uCurrent, vUv + vec2(x, y) * uTexel).rgb;
         nmin = min(nmin, c);
         nmax = max(nmax, c);
     }

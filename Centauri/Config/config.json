@@ -76,15 +76,6 @@
     "intensity": 0.05,
     "radius": 1.0
   },
-  "ssr": {
-    "enabled": false,
-    "intensity": 1.0,
-    "maxDistance": 15.0,
-    "thickness": 1.0,
-    "maxSteps": 48,
-    "refineSteps": 6,
-    "roughnessCutoff": 0.6
-  },
   "taa": {
     "enabled": true,
     "feedback": 0.5

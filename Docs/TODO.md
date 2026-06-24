@@ -13,7 +13,6 @@
 * [x] Cascaded shadow maps (CSM)
 * [x] Day/Night cycle
 * [x] Screen Space Ambient Occlusion (SSAO)
-* [ ] Screen Space Reflections (SSR) (with ray tracing or PBR Accumulation)
 * [ ] Reflection Probes
 * [ ] GTAO (Ground-Truth AO)
 * [ ] Contact-hardening / PCSS

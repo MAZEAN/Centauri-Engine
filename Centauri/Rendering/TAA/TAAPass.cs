@@ -76,7 +76,7 @@ public sealed class TAAPass : IDisposable
 
     // Resolve TAA into the current history target; OutputTexture then holds the result and
     // serves as next frame's history.
-    public void Render(uint sceneColor, uint ssrTex, bool hasSsr, uint depthTex, Camera camera)
+    public void Render(uint sceneColor, uint depthTex, Camera camera)
     {
         var viewProj = camera.GetViewMatrix() * camera.GetProjectionMatrix();
         Matrix4x4.Invert(viewProj, out var invViewProj);
@@ -106,15 +106,12 @@ public sealed class TAAPass : IDisposable
         _resolve.SetUniform("uCurrent",  0);
         _resolve.SetUniform("uHistory",  1);
         _resolve.SetUniform("uVelocity", 2);
-        _resolve.SetUniform("uSsr",      3);
-        _resolve.SetUniform("uHasSsr",   hasSsr ? 1 : 0);
         _resolve.SetUniform("uTexel", new Vector2(1f / write.Width, 1f / write.Height));
         _resolve.SetUniform("uFeedback", _hasHistory ? _config.Feedback : 0f);
         
         Bind(TextureUnit.Texture0, sceneColor);
         Bind(TextureUnit.Texture1, read.ColorTextures[0]);
         Bind(TextureUnit.Texture2, _velocityTarget.ColorTextures[0]);
-        Bind(TextureUnit.Texture3, hasSsr ? ssrTex : 0);
         DrawFullscreen();
 
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
