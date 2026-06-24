@@ -15,7 +15,6 @@ public sealed class PostProcessor : IDisposable
     private readonly HDRFramebuffer _hdr;
     private readonly AppConfig _config;
     private readonly SSRPass _ssr;
-    private readonly TAAConfig _taaConfig;
     private readonly TAAPass _taa;
     
     private uint _width, _height;
@@ -66,10 +65,11 @@ public sealed class PostProcessor : IDisposable
         if (ssrActive)
             _ssr.Render(sceneColor, depthTex, normalTex, materialTex, camera);
         
-        var taaActive = taaAvailable && _taaConfig.Enabled;
+        var taaActive = taaAvailable && _config.TAA.Enabled;
+        var ssrInTonemap = ssrActive && !taaActive;
         if (taaActive)
         {
-            _taa.Render(sceneColor, depthTex, camera);
+            _taa.Render(sceneColor, ssrActive ? _ssr.ReflectionTexture : 0, ssrActive, depthTex, camera);
             sceneColor = _taa.OutputTexture;
         }
         
@@ -102,11 +102,11 @@ public sealed class PostProcessor : IDisposable
         _tonemap.SetUniform("uBloomIntensity", _config.Bloom.Intensity);
         
         _gl.ActiveTexture(TextureUnit.Texture2);
-        _gl.BindTexture(TextureTarget.Texture2D, ssrActive ? _ssr.ReflectionTexture : 0);
+        _gl.BindTexture(TextureTarget.Texture2D, ssrInTonemap ? _ssr.ReflectionTexture : 0);
         
         _tonemap.SetUniform("uSsr",    2);
-        _tonemap.SetUniform("uHasSsr", ssrActive ? 1 : 0);
-
+        _tonemap.SetUniform("uHasSsr", ssrInTonemap ? 1 : 0);
+        
         _gl.BindVertexArray(_emptyVao);
         _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
         _gl.BindVertexArray(0);

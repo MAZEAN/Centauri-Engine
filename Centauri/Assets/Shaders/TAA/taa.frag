@@ -12,12 +12,22 @@ out vec4 FragColor;
 uniform sampler2D uCurrent;    // this frame's resolved HDR (jittered)
 uniform sampler2D uHistory;    // previous TAA output
 uniform sampler2D uVelocity;   // screen-space motion vectors
+uniform sampler2D uSsr;        // screen-space reflections (pre-weighted, additive)
+uniform int   uHasSsr;
 uniform vec2  uTexel;          // 1 / size
 uniform float uFeedback;       // history weight (e.g. 0.9)
 
+vec3 sceneAt(vec2 uv)
+{
+    vec3 c = texture(uCurrent, uv).rgb;
+    if (uHasSsr == 1) c += texture(uSsr, uv).rgb;
+    
+    return c;
+}
+
 void main()
 {
-    vec3 current = texture(uCurrent, vUv).rgb;
+    vec3 current = sceneAt(vUv);
 
     // ── neighbourhood colour box (for clamping history) ──
     vec3 nmin = current;
@@ -25,14 +35,14 @@ void main()
     for (int x = -1; x <= 1; x++)
         for (int y = -1; y <= 1; y++)
         {
-            vec3 c = texture(uCurrent, vUv + vec2(x, y) * uTexel).rgb;
+            vec3 c = sceneAt(vUv + vec2(x, y) * uTexel);
             nmin = min(nmin, c);
             nmax = max(nmax, c);
         }
 
     // ── reproject history ──
-    vec2 vel     = texture(uVelocity, vUv).xy;
-    vec2 histUv  = vUv - vel;
+    vec2 vel      = texture(uVelocity, vUv).xy;
+    vec2 histUv   = vUv - vel;
     bool onScreen = histUv.x >= 0.0 && histUv.x <= 1.0 && histUv.y >= 0.0 && histUv.y <= 1.0;
 
     vec3 hist = texture(uHistory, histUv).rgb;

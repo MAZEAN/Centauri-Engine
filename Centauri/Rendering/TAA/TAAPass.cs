@@ -31,8 +31,7 @@ public sealed class TAAPass : IDisposable
     private bool _hasHistory;
 
     private int _frame;
-    private Matrix4x4 _prevView;
-    private Matrix4x4 _prevProj;
+    private Matrix4x4 _prevViewProj;
 
     public uint OutputTexture => _history[_output].ColorTextures[0];
 
@@ -77,19 +76,14 @@ public sealed class TAAPass : IDisposable
 
     // Resolve TAA into the current history target; OutputTexture then holds the result and
     // serves as next frame's history.
-    public void Render(uint sceneColor, uint depthTex, Camera camera)
+    public void Render(uint sceneColor, uint ssrTex, bool hasSsr, uint depthTex, Camera camera)
     {
-        var view = camera.GetViewMatrix();
-        var proj = camera.GetProjectionMatrix();
-        
-        Matrix4x4.Invert(proj, out var invProj);
-        Matrix4x4.Invert(view, out var invView);
+        var viewProj = camera.GetViewMatrix() * camera.GetProjectionMatrix();
+        Matrix4x4.Invert(viewProj, out var invViewProj);
 
         if (!_hasHistory)
-        {
-            _prevView = view;
-            _prevProj = proj;
-        }
+            _prevViewProj = viewProj;
+
 
         _gl.Disable(EnableCap.DepthTest);
 
@@ -98,10 +92,8 @@ public sealed class TAAPass : IDisposable
         _velocityTarget.Clear(0f, 0f, 0f, 0f);
         _velocity.Use();
         _velocity.SetUniform("uDepth", 0);
-        _velocity.SetUniform("uInvProjection",  invProj);
-        _velocity.SetUniform("uInvView",        invView);
-        _velocity.SetUniform("uPrevView",       _prevView);
-        _velocity.SetUniform("uPrevProjection", _prevProj);
+        _velocity.SetUniform("uInvViewProj",  invViewProj);
+        _velocity.SetUniform("uPrevViewProj", _prevViewProj);
         Bind(TextureUnit.Texture0, depthTex);
         DrawFullscreen();
 
@@ -114,21 +106,24 @@ public sealed class TAAPass : IDisposable
         _resolve.SetUniform("uCurrent",  0);
         _resolve.SetUniform("uHistory",  1);
         _resolve.SetUniform("uVelocity", 2);
+        _resolve.SetUniform("uSsr",      3);
+        _resolve.SetUniform("uHasSsr",   hasSsr ? 1 : 0);
         _resolve.SetUniform("uTexel", new Vector2(1f / write.Width, 1f / write.Height));
         _resolve.SetUniform("uFeedback", _hasHistory ? _config.Feedback : 0f);
+        
         Bind(TextureUnit.Texture0, sceneColor);
         Bind(TextureUnit.Texture1, read.ColorTextures[0]);
         Bind(TextureUnit.Texture2, _velocityTarget.ColorTextures[0]);
+        Bind(TextureUnit.Texture3, hasSsr ? ssrTex : 0);
         DrawFullscreen();
 
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         _gl.Enable(EnableCap.DepthTest);
 
-        _output     = _write;
-        _write     ^= 1;
-        _prevView   = view;
-        _prevProj   = proj;
-        _hasHistory = true;
+        _output       = _write;
+        _write       ^= 1;
+        _prevViewProj = viewProj;
+        _hasHistory   = true;
     }
 
     private static float Halton(int index, int b)
