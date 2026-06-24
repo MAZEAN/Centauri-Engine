@@ -79,6 +79,7 @@ void main()
     bool  hit    = false;
     vec2  hitUv  = vec2(0.0);
     float prevS  = 0.0;
+    float prevDiff = 0.0;
 
     for (int i = 1; i <= uMaxSteps; i++)
     {
@@ -91,7 +92,7 @@ void main()
         float sceneZ = viewPos(uv).z;                       // geometry depth here
         float diff   = sceneZ - rayZ;                       // >0 → ray went behind a surface
 
-        if (diff > 0.0 && diff < uThickness)
+        if (i > 1 && prevDiff < 0.0 && diff > 0.0 && diff < uThickness)
         {
             // ── binary refine in screen fraction between prevS and s ──
             float lo = prevS, hi = s;
@@ -107,6 +108,7 @@ void main()
             break;
         }
         prevS = s;
+        prevDiff = diff;
     }
 
     if (!hit) { FragColor = vec4(0.0); return; }

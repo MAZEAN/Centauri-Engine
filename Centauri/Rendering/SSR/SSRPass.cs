@@ -15,6 +15,8 @@ using Targets;
 // folds into the scene before tonemapping. See Assets/Shaders/SSR/ssr.frag for the march.
 public sealed class SSRPass : IDisposable
 {
+    private const uint ResDivisor = 2;
+    
     private readonly GL _gl;
     private readonly SSRConfig _config;
     private readonly GLShader _shader;
@@ -36,18 +38,17 @@ public sealed class SSRPass : IDisposable
         _blur = new GLShader(gl,
             PathResolver.Resolve("Assets/Shaders/Post/post.vert"),
             PathResolver.Resolve("Assets/Shaders/SSR/ssr_blur.frag"));
-        // Linear so the additive composite upsamples smoothly if we ever run sub-res
-        _target = new RenderTarget(gl, width, height, [InternalFormat.Rgba16f],
-            withDepth: false, filter: GLEnum.Linear);
-        _blurTarget = new RenderTarget(gl, width, height, [InternalFormat.Rgba16f],
-            withDepth: false, filter: GLEnum.Linear);
+        _target = new RenderTarget(gl, width / ResDivisor, height / ResDivisor,
+            [InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Linear);
+        _blurTarget = new RenderTarget(gl, width / ResDivisor, height / ResDivisor,
+            [InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Linear);
         _vao = gl.GenVertexArray();
     }
 
     public void Resize(uint width, uint height)
     {
-        _target.Resize(width, height);
-        _blurTarget.Resize(width, height);
+        _target.Resize(width / ResDivisor, height / ResDivisor);
+        _blurTarget.Resize(width / ResDivisor, height / ResDivisor);
     }
 
     public void Render(uint sceneTex, uint depthTex, uint normalTex, uint materialTex, Camera camera)
