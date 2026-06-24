@@ -24,8 +24,5 @@
         <None Update="Assets\**\*">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
-        <None Update="Assets\Shaders\SSR\ssr.frag">
-          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
     </ItemGroup>
 </Project>

@@ -1,27 +1,25 @@
 #version 330 core
 
-// Temporal anti-aliasing resolve. Each frame the scene is rendered with a sub-pixel jitter;
-// we blend the current frame with the reprojected history so those jittered samples
-// accumulate into a supersampled image. History is reprojected via motion vectors and
-// constrained to the current 3x3 neighbourhood colour box (variance clipping) so it can't
-// ghost across disocclusions or moving edges.
+// Temporal anti-aliasing resolve. The scene is rendered with a per-frame sub-pixel jitter;
+// we blend the current frame with reprojected history so those samples accumulate into a
+// supersampled, stable image. SSR is folded into "current" so its per-frame ray noise
+// accumulates too.
 
 in  vec2 vUv;
 out vec4 FragColor;
 
-uniform sampler2D uCurrent;    // this frame's resolved HDR (jittered)
-uniform sampler2D uHistory;    // previous TAA output
-uniform sampler2D uVelocity;   // screen-space motion vectors
-uniform sampler2D uSsr;        // screen-space reflections (pre-weighted, additive)
+uniform sampler2D uCurrent;
+uniform sampler2D uHistory;
+uniform sampler2D uVelocity;
+uniform sampler2D uSsr;
 uniform int   uHasSsr;
-uniform vec2  uTexel;          // 1 / size
-uniform float uFeedback;       // history weight (e.g. 0.9)
+uniform vec2  uTexel;
+uniform float uFeedback;
 
 vec3 sceneAt(vec2 uv)
 {
     vec3 c = texture(uCurrent, uv).rgb;
     if (uHasSsr == 1) c += texture(uSsr, uv).rgb;
-    
     return c;
 }
 
@@ -29,26 +27,32 @@ void main()
 {
     vec3 current = sceneAt(vUv);
 
-    // ── neighbourhood colour box (for clamping history) ──
     vec3 nmin = current;
     vec3 nmax = current;
     for (int x = -1; x <= 1; x++)
-        for (int y = -1; y <= 1; y++)
-        {
-            vec3 c = sceneAt(vUv + vec2(x, y) * uTexel);
-            nmin = min(nmin, c);
-            nmax = max(nmax, c);
-        }
+    for (int y = -1; y <= 1; y++)
+    {
+        vec3 c = sceneAt(vUv + vec2(x, y) * uTexel);
+        nmin = min(nmin, c);
+        nmax = max(nmax, c);
+    }
 
-    // ── reproject history ──
     vec2 vel      = texture(uVelocity, vUv).xy;
     vec2 histUv   = vUv - vel;
     bool onScreen = histUv.x >= 0.0 && histUv.x <= 1.0 && histUv.y >= 0.0 && histUv.y <= 1.0;
 
     vec3 hist = texture(uHistory, histUv).rgb;
-    hist = clamp(hist, nmin, nmax);                 // variance clip — kills ghosting
 
-    float feedback = onScreen ? uFeedback : 0.0;    // disocclusion → fall back to current
+    // Widen the clamp box before clipping. A tight box clips accumulated history to the
+    // current frame's local extremes every frame, defeating convergence for high-contrast
+    // structured noise (SSR moiré). Higher = cleaner when still, more ghosting when moving.
+    const float CLAMP_GAMMA = 4.0;
+    vec3 boxCenter = 0.5 * (nmax + nmin);
+    vec3 boxHalf   = 0.5 * (nmax - nmin) * CLAMP_GAMMA;
+    
+    hist = clamp(hist, boxCenter - boxHalf, boxCenter + boxHalf);
+
+    float feedback = onScreen ? uFeedback : 0.0;
     vec3  result   = mix(current, hist, feedback);
 
     FragColor = vec4(result, 1.0);
