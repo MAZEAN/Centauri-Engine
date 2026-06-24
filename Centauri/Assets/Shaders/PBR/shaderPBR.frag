@@ -168,6 +168,23 @@ vec3 FresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness) {
     return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
+// Geometric specular antialiasing (Kaplanyan / Frostbite). A near-mirror highlight is
+// sub-pixel sharp, so it flickers as the camera moves. Widen roughness to cover how much
+// the shading normal varies across this pixel, filtering the highlight instead of aliasing.
+float SpecularAARoughness(float roughness, vec3 N)
+{
+    const float SIGMA2 = 0.25;   // screen-space variance of the pixel footprint
+    const float KAPPA  = 0.18;   // clamp so the added roughness stays bounded
+
+    vec3  dndu     = dFdx(N);
+    vec3  dndv     = dFdy(N);
+    float variance = SIGMA2 * (dot(dndu, dndu) + dot(dndv, dndv));
+
+    float a2       = roughness * roughness * roughness * roughness;   // alpha²
+    float filtered = clamp(a2 + min(2.0 * variance, KAPPA), 0.0, 1.0);
+    return sqrt(sqrt(filtered));                                      // back to roughness
+}
+
 // ─── per-light PBR calculation ────────────────────────────────────────────────
 vec3 CalcPBR(vec3 L, vec3 radiance, vec3 N, vec3 V, vec3 albedo, float roughness, float metallic)
 {
@@ -238,6 +255,8 @@ void main()
     vec3 N = (uHasNormal == 1 && dot(T, T) > 1e-5)
         ? normalize(fTBN * (texture(uNormalMap, fUv).rgb * 2.0 - 1.0))
         : normalize(fNormal);
+
+    roughness = SpecularAARoughness(roughness, N);
 
     vec3 V  = normalize(uCameraPos - fFragPos);
     vec3 Lo = vec3(0.0);

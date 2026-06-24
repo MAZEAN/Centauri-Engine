@@ -68,5 +68,12 @@
     "bias": 0.025,
     "power": 1.5,
     "sampleCount": 24
+  },
+  "bloom": {
+    "enabled": true,
+    "threshold": 1.0,
+    "knee": 0.5,
+    "intensity": 0.02,
+    "radius": 1.0
   }
 }
