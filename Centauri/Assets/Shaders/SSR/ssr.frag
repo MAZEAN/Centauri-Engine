@@ -92,19 +92,33 @@ void main()
         float sceneZ = viewPos(uv).z;                       // geometry depth here
         float diff   = sceneZ - rayZ;                       // >0 → ray went behind a surface
 
-        if (i > 1 && prevDiff < 0.0 && diff > 0.0 && diff < uThickness)
+        // A sign crossing (in-front → behind) IS the intersection. Accept it and refine to
+        // the exact point — do NOT gate the coarse step on thickness: at grazing/curved hits
+        // the per-step depth jump exceeds thickness, which would wrongly reject the hit and
+        // leave a black miss. Thickness is applied AFTER refine, where the gap is ~0.
+        if (i > 1 && prevDiff < 0.0 && diff > 0.0)
         {
             // ── binary refine in screen fraction between prevS and s ──
             float lo = prevS, hi = s;
+            vec2  muv = uv;
             for (int j = 0; j < uRefineSteps; j++)
             {
                 float midS = (lo + hi) * 0.5;
-                vec2  muv  = mix(uvP, uvQ, midS);
+                muv        = mix(uvP, uvQ, midS);
                 float mz   = rayViewZ(invWP, invWQ, midS);
+                
                 if (viewPos(muv).z - mz > 0.0) hi = midS; else lo = midS;
                 hitUv = muv;
             }
-            hit = true;
+            
+            // reject only if even the refined point is far behind the surface (ray passed
+            // behind a thin object into empty space, rather than landing on it)
+            float refS = (lo + hi) * 0.5;
+            if (viewPos(muv).z - rayViewZ(invWP, invWQ, refS) < uThickness)
+            {
+                hitUv = muv;
+                hit   = true;
+            }
             break;
         }
         prevS = s;
