@@ -5,13 +5,14 @@ using System.Numerics;
 
 using World;
 using Graphics.Resources;
+using Graphics.Resources.Materials;
 using Utils.Misc;
 using Targets;
 using Config;
 
-// Renders view-space normals + depth into single-sample textures before the lit pass.
-// These are the inputs the screen-space effects need (SSAO first, then SSR). Nothing
-// consumes them yet — this is the Phase 1 keystone the rest of the track builds on.
+// Renders view-space normals + depth + material (roughness/metallic) into single-sample
+// textures before the lit pass. These are the inputs the screen-space effects need: SSAO
+// reads normals+depth, SSR additionally reads the material buffer to weight reflections.
 public sealed class GeometryPrepass : IDisposable
 {
     private readonly GL _gl;
@@ -19,8 +20,9 @@ public sealed class GeometryPrepass : IDisposable
     private readonly GLShader _shader;
     private readonly RenderTarget _target;
 
-    public uint NormalTexture => _target.ColorTextures[0];
-    public uint DepthTexture  => _target.DepthTexture;
+    public uint NormalTexture   => _target.ColorTextures[0];
+    public uint MaterialTexture => _target.ColorTextures[1];
+    public uint DepthTexture    => _target.DepthTexture;
 
     public GeometryPrepass(GL gl, AppConfig config, uint width, uint height)
     {
@@ -29,7 +31,8 @@ public sealed class GeometryPrepass : IDisposable
         _shader = new GLShader(gl,
             PathResolver.Resolve("Assets/Shaders/Prepass/prepass.vert"),
             PathResolver.Resolve("Assets/Shaders/Prepass/prepass.frag"));
-        _target = new RenderTarget(gl, width, height, [InternalFormat.Rgba16f], withDepth: true);
+        _target = new RenderTarget(gl, width, height,
+            [InternalFormat.Rgba16f, InternalFormat.Rgba8], withDepth: true);
     }
 
     public void Resize(uint width, uint height) => _target.Resize(width, height);
@@ -52,6 +55,8 @@ public sealed class GeometryPrepass : IDisposable
         _shader.Use();
         _shader.SetUniform("uView",       camera.GetViewMatrix());
         _shader.SetUniform("uProjection", camera.GetProjectionMatrix());
+        _shader.SetUniform("uRoughnessMap", 2);
+        _shader.SetUniform("uMetallicMap",  3);
 
         foreach (var entity in scene.Entities)
         {
@@ -63,6 +68,8 @@ public sealed class GeometryPrepass : IDisposable
             _shader.SetUniform("uModel", world);
             _shader.SetUniformMat3X3("uNormalMatrix",
                 Matrix4x4.Transpose(Matrix4x4.Invert(world, out var inv) ? inv : world));
+            
+            BindMaterial(entity);
 
             foreach (var mesh in model.Meshes)
             {
@@ -76,6 +83,31 @@ public sealed class GeometryPrepass : IDisposable
         }
 
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+    }
+    
+    private void BindMaterial(Entity entity)
+    {
+        _shader.SetUniform("uUvScale",  entity.UvScale);
+        _shader.SetUniform("uUvOffset", entity.UvOffset);
+
+        if (entity.Material is not { } mat)
+        {
+            _shader.SetUniform("uHasRoughness",  0);
+            _shader.SetUniform("uHasMetallic",   0);
+            _shader.SetUniform("uRoughnessValue", 1.0f);
+            _shader.SetUniform("uMetallicValue",  0.0f);
+            return;
+        }
+
+        _shader.SetUniform("uHasRoughness",  mat.Roughness != null ? 1 : 0);
+        _shader.SetUniform("uHasMetallic",   mat.Metallic  != null ? 1 : 0);
+        _shader.SetUniform("uRoughnessValue", mat.RoughnessValue);
+        _shader.SetUniform("uMetallicValue",  mat.MetallicValue);
+
+        _gl.ActiveTexture(TextureUnit.Texture2);
+        _gl.BindTexture(TextureTarget.Texture2D, mat.Roughness?.Handle ?? 0);
+        _gl.ActiveTexture(TextureUnit.Texture3);
+        _gl.BindTexture(TextureTarget.Texture2D, mat.Metallic?.Handle ?? 0);
     }
 
     public void Dispose()

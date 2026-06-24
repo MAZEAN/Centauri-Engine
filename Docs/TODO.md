@@ -12,8 +12,8 @@
 * [x] Shadow Maps
 * [x] Cascaded shadow maps (CSM)
 * [x] Day/Night cycle
-* [ ] Screen Space Reflections (SSR) (with ray tracing or PBR Accumulation)
 * [x] Screen Space Ambient Occlusion (SSAO)
+* [ ] Screen Space Reflections (SSR) (with ray tracing or PBR Accumulation)
 * [ ] Reflection Probes
 * [ ] GTAO (Ground-Truth AO)
 * [ ] Contact-hardening / PCSS
@@ -29,7 +29,9 @@
 
 * [x] Performance graphs
 * [x] Light editing
-* [ ] bloom + auto-exposure + volumetric fog
+* [x] bloom 
+* [ ] auto-exposure 
+* [ ] volumetric fog
 * [ ] Multithreading (async asset loading etc.)
 * [ ] Instancing & LOD system
 * [ ] Keybindings

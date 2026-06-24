@@ -16,6 +16,9 @@ uniform sampler2D uBloom;          // accumulated bloom pyramid (mip0)
 uniform int       uHasBloom;
 uniform float     uBloomIntensity; // additive strength
 
+uniform sampler2D uSsr;            // screen-space reflections (pre-weighted, additive)
+uniform int       uHasSsr;
+
 vec3 ACESFilm(vec3 x)
 {
     const float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;
@@ -25,6 +28,9 @@ vec3 ACESFilm(vec3 x)
 void main()
 {
     vec3 color = texture(uHdr, vUv).rgb;
+
+    if (uHasSsr == 1)
+        color += texture(uSsr, vUv).rgb;
     
     // ── add bloom in linear HDR space, before tonemapping ──
     if (uHasBloom == 1)

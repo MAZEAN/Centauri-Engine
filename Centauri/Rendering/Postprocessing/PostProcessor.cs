@@ -5,6 +5,8 @@ using Silk.NET.OpenGL;
 using Graphics.Resources;
 using Utils.Misc;
 using Config;
+using World;
+using SSR;
 
 public sealed class PostProcessor : IDisposable
 {
@@ -12,18 +14,21 @@ public sealed class PostProcessor : IDisposable
     private readonly HDRFramebuffer _hdr;
     private readonly ColorGrading _grading;
     private readonly BloomConfig _bloomConfig;
+    private readonly SSRConfig _ssrConfig;
+    private readonly SSRPass _ssr;
     private uint _width, _height;
     
     private readonly GLShader _tonemap;
     private readonly uint _emptyVao;   // core profile needs a bound VAO for attribute-less draws
     private readonly BloomPass _bloom;
 
-    public PostProcessor(GL gl, HDRFramebuffer hdr, ColorGrading grading, BloomConfig bloomConfig, uint width, uint height)
+    public PostProcessor(GL gl, HDRFramebuffer hdr, ColorGrading grading, BloomConfig bloomConfig, SSRConfig ssrConfig, uint width, uint height)
     {
         _gl = gl;
         _hdr = hdr;
         _grading = grading;
         _bloomConfig = bloomConfig;
+        _ssrConfig = ssrConfig;
         _width = width;
         _height = height;
         
@@ -31,6 +36,7 @@ public sealed class PostProcessor : IDisposable
             PathResolver.Resolve("Assets/Shaders/Post/post.vert"),
             PathResolver.Resolve("Assets/Shaders/Post/post.frag"));
         _bloom = new BloomPass(gl, bloomConfig, width, height);
+        _ssr = new SSRPass(gl, ssrConfig, width, height);
         _emptyVao = gl.GenVertexArray();
     }
 
@@ -40,13 +46,18 @@ public sealed class PostProcessor : IDisposable
         _height = height;
         _hdr.Resize(width, height);
         _bloom.Resize(width, height);
+        _ssr.Resize(width, height);
     }
 
     public void BeginScene() => _hdr.Bind();
 
-    public void Composite()
+    public void Composite(Camera camera, uint depthTex, uint normalTex, uint materialTex, bool ssrAvailable)
     {
         _hdr.Resolve();
+        
+        var ssrActive = ssrAvailable && _ssrConfig.Enabled;
+        if (ssrActive)
+            _ssr.Render(_hdr.ResolvedTexture, depthTex, normalTex, materialTex, camera);
         
         var bloomActive = _bloomConfig.Enabled;
         if (bloomActive)
@@ -75,6 +86,12 @@ public sealed class PostProcessor : IDisposable
         _tonemap.SetUniform("uBloom",          1);
         _tonemap.SetUniform("uHasBloom",       bloomActive ? 1 : 0);
         _tonemap.SetUniform("uBloomIntensity", _bloomConfig.Intensity);
+        
+        _gl.ActiveTexture(TextureUnit.Texture2);
+        _gl.BindTexture(TextureTarget.Texture2D, ssrActive ? _ssr.ReflectionTexture : 0);
+        
+        _tonemap.SetUniform("uSsr",    2);
+        _tonemap.SetUniform("uHasSsr", ssrActive ? 1 : 0);
 
         _gl.BindVertexArray(_emptyVao);
         _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
@@ -88,6 +105,7 @@ public sealed class PostProcessor : IDisposable
         _hdr.Dispose();
         _tonemap.Dispose();
         _bloom.Dispose();
+        _ssr.Dispose();
         _gl.DeleteVertexArray(_emptyVao);
     }
 }
