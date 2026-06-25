@@ -120,6 +120,7 @@ public class MainRenderer : IDisposable
         _instanceBuffer.Upload(_instances);
 
         stats.DrawnEntities += _instances.Count;
+        stats.Batches++;
 
         foreach (var mesh in batch.Model.Meshes)
         {
@@ -194,6 +195,7 @@ public class MainRenderer : IDisposable
         stats.TextureBinds   = 0;
         stats.TotalIndices   = 0;
         stats.TotalVertices  = 0;
+        stats.Batches        = 0;
     }
 
     public void Dispose()

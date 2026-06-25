@@ -101,6 +101,14 @@ public class StatsOverlay
             Row("Total Vertices", stats.TotalVertices.ToString());
         });
         
+        Section("Instancing", ColorPalette.Green, () =>
+        {
+            Row("Batches",       stats.Batches.ToString());
+            Row("Instances",     stats.DrawnEntities.ToString());
+            RowColored("Inst/Draw", Widgets.Float(stats.InstancesPerDraw),
+                stats.InstancesPerDraw > 1f ? ColorPalette.Green : ColorPalette.White);
+        });
+        
         var cam = scene.Cameras.Active;
         Section("Camera", ColorPalette.Red, () =>
         {

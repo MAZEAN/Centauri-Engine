@@ -11,6 +11,10 @@ public struct FrameStats
     public int   TextureBinds   { get; set; }
     public int   TotalIndices   { get; set; }
     public int   TotalVertices  { get; set; }
+    
+    public int   Batches        { get; set; }
+    public float InstancesPerDraw => DrawCalls > 0 ? (float)DrawnEntities / DrawCalls : 0f;
+    
     public int ShadowTotal => ShadowCasters + ShadowCulled;
     public int ShadowCasters { get; set; }   // depth-pass draws, summed across cascades
     public int ShadowCulled  { get; set; }   // frustum-culled per cascade, summed
