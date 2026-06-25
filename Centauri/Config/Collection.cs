@@ -62,7 +62,7 @@ public class DebugConfig
         Shading = (ShadingMode)(((int)Shading + 1) % Enum.GetValues<ShadingMode>().Length);
 }
 
-public enum ShadingMode { Shaded, Normals, Depth, AmbientOcclusion }
+public enum ShadingMode { Shaded, Normals, Depth, AmbientOcclusion, Velocity }
 
 public enum ViewMode { Fly, Edit }
 

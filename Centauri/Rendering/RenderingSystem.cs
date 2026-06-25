@@ -164,7 +164,7 @@ public class RenderingSystem : IDisposable
     private void RenderAfterPostComponents(Scene scene, float deltaTime)
     {
         _bufferDebug.Render(_config.Debug.Shading, _prepass.NormalTexture, _prepass.DepthTexture,
-            _ssao.AoTexture, _config.Camera.Near, _config.Camera.Far);
+            _ssao.AoTexture, _post.VelocityTexture, _config.Camera.Near, _config.Camera.Far);
         
         _ui.Render(scene, in _stats, _profiler.Results);
     }

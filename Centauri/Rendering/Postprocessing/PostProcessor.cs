@@ -49,6 +49,7 @@ public sealed class PostProcessor : IDisposable
     public void BeginScene() => _hdr.Bind();
     
     public System.Numerics.Vector2 NextTaaJitter() => _taa.NextJitter(_width, _height);
+    public uint VelocityTexture => _taa.VelocityTexture;   // TAA motion vectors, for the debug view
 
     public void Composite(Camera camera, uint depthTex, bool taaAvailable)
     {

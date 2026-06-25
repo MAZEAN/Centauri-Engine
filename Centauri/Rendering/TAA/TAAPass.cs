@@ -24,8 +24,9 @@ public sealed class TAAPass : IDisposable
     private readonly GLShader _resolve;
     private readonly uint _vao;
 
-    private RenderTarget _velocityTarget;
+    private readonly RenderTarget _velocityTarget;
     private readonly RenderTarget[] _history = new RenderTarget[2];
+        
     private int  _write;     // slot to render into this frame
     private int  _output;    // slot holding the latest resolved result
     private bool _hasHistory;
@@ -34,6 +35,7 @@ public sealed class TAAPass : IDisposable
     private Matrix4x4 _prevViewProj;
 
     public uint OutputTexture => _history[_output].ColorTextures[0];
+    public uint VelocityTexture => _velocityTarget.ColorTextures[0];   // for the debug view
 
     public TAAPass(GL gl, TAAConfig config, uint width, uint height)
     {
@@ -61,9 +63,7 @@ public sealed class TAAPass : IDisposable
         _history[1].Resize(width, height);
         _hasHistory = false;   // previous frames are invalid at the new resolution
     }
-
-    // Advance the jitter sequence and return the sub-pixel NDC offset to set on the camera
-    // BEFORE rendering the scene this frame. Returns zero jitter when disabled.
+    
     public Vector2 NextJitter(uint width, uint height)
     {
         if (!_config.Enabled) return Vector2.Zero;
@@ -73,9 +73,7 @@ public sealed class TAAPass : IDisposable
         var jy = Halton(_frame + 1, 3) - 0.5f;
         return new Vector2(jx * 2f / width, jy * 2f / height);
     }
-
-    // Resolve TAA into the current history target; OutputTexture then holds the result and
-    // serves as next frame's history.
+    
     public void Render(uint sceneColor, uint depthTex, Camera camera)
     {
         var viewProj = camera.GetViewMatrix() * camera.GetProjectionMatrix();
