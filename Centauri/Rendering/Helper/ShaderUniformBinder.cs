@@ -1,7 +1,5 @@
 namespace Centauri.Rendering.Helper;
 
-using System.Numerics;
-
 using Config;
 using World;
 using Graphics.Resources;
@@ -80,19 +78,5 @@ public sealed class ShaderUniformBinder
         shader.SetUniform("uRoughnessValue", mat.RoughnessValue);
         shader.SetUniform("uMetallicValue",  mat.MetallicValue);
         shader.SetUniform("uColor",          mat.Color);
-    }
-
-    public static void UploadTransform(GLShader shader, Entity entity)
-    {
-        var model = entity.Transform.WorldMatrix;
-        shader.SetUniform("uModel", model);
-
-        shader.SetUniform("uUvScale",  entity.UvScale);
-        shader.SetUniform("uUvOffset", entity.UvOffset);
-
-        if (Matrix4x4.Invert(model, out var invModel))
-            shader.SetUniformMat3X3("uNormalMatrix", Matrix4x4.Transpose(invModel));
-        else
-            shader.SetUniformMat3X3("uNormalMatrix", Matrix4x4.Transpose(model));
     }
 }

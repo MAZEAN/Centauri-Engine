@@ -10,7 +10,7 @@ using HighDynamicRange;
 public class GLTexture : GLResource
 {
     private const GLEnum               MaxSupportedAniso = (GLEnum)0x84FF;
-    private const TextureParameterName TextureMaxAniso = (TextureParameterName)0x84FE;
+    private const TextureParameterName TextureMaxAniso   = (TextureParameterName)0x84FE;
     private const float                AnisoRequest      = 8f;
     
     private static readonly List<GLTexture> Anisotropic = new();
@@ -90,14 +90,12 @@ public class GLTexture : GLResource
 
     private void SetParameters(bool hdr)
     {
-        // Horizontal axis always wraps (the 360° seam); equirect panoramas clamp the
-        // vertical axis so the poles don't bleed. HDR samples mip 0 only (no chain);
-        // LDR gets a trilinear mip chain.
         GLSampler.Set(Gl, TextureTarget.Texture2D,
             wrapS: GLEnum.Repeat,
             wrapT: hdr ? GLEnum.ClampToEdge : GLEnum.Repeat,
             minFilter: hdr ? GLEnum.Linear : GLEnum.LinearMipmapLinear,
-            magFilter: GLEnum.Linear);
+            magFilter: GLEnum.Linear
+        );
 
         if (!hdr)
         {

@@ -11,24 +11,25 @@ layout (location = 0) in vec3 vPos;      // world position of vertex
 layout (location = 1) in vec3 vNormal;   // surface direction at vertex
 layout (location = 2) in vec2 vUv;       // texture coordinate
 layout (location = 3) in vec3 vTangent;  // tangent direction, for normal mapping
+layout (location = 4) in mat4 iModel;          // entity world transform (occupies 4..7)
+layout (location = 8) in vec4 iUvScaleOffset;
 
-uniform mat4 uModel;        // entity's world transform (position/rotation/scale)
 uniform mat4 uView;         // camera transform — moves world relative to camera
 uniform mat4 uProjection;   // perspective — makes far things smaller
-uniform vec2 uUvScale;      // texture tiling
-uniform vec2 uUvOffset;     // texture offset
-uniform mat3 uNormalMatrix; // transposed inverse of uModel
 
 void main()
 {
-    vec4 viewPos = uView * uModel * vec4(vPos, 1.0);
-    fViewDepth   = -viewPos.z;
-    
-    fUv         = vUv * uUvScale + uUvOffset;
-    fFragPos    = vec3(uModel * vec4(vPos, 1.0));
+    mat3 normalMatrix = transpose(inverse(mat3(iModel)));
 
-    vec3 T = normalize(uNormalMatrix * vTangent);
-    vec3 N = normalize(uNormalMatrix * vNormal);
+    vec4 worldPos = iModel * vec4(vPos, 1.0);
+    vec4 viewPos  = uView * worldPos;
+    fViewDepth    = -viewPos.z;
+
+    fUv         = vUv * iUvScaleOffset.xy + iUvScaleOffset.zw;
+    fFragPos    = worldPos.xyz;
+
+    vec3 T = normalize(normalMatrix * vTangent);
+    vec3 N = normalize(normalMatrix * vNormal);
     T      = normalize(T - dot(T, N) * N); // re-orthogonalize
     vec3 B = cross(N, T);
 

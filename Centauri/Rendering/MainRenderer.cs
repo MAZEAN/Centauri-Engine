@@ -34,6 +34,9 @@ public class MainRenderer : IDisposable
     private readonly TextureBinder _textures;
     private readonly ShaderBatcher _batcher = new();
     private readonly ShaderUniformBinder _uniforms;
+    
+    private readonly InstanceBuffer _instanceBuffer;
+    private readonly List<InstanceData> _instances = new();
 
     private bool _iblActive;
 
@@ -47,6 +50,7 @@ public class MainRenderer : IDisposable
         _lightBuffer = new LightBuffer(gl);
         _textures    = new TextureBinder(gl);
         _uniforms    = new ShaderUniformBinder(config, ibl, shadows);
+        _instanceBuffer = new InstanceBuffer(gl);
     }
 
     public void Render(Scene scene, float deltaTime, ref FrameStats stats, uint ssaoTexture, bool ssaoActive)
@@ -75,7 +79,8 @@ public class MainRenderer : IDisposable
         BindIbl(scene);
         BindShadows();
 
-        foreach (var (shader, entities) in _batcher.GetGroups(scene))
+        var cull = _config.Debug.EnableCulling;
+        foreach (var (shader, batches) in _batcher.GetGroups(scene))
         {
             shader.Use();
 
@@ -87,41 +92,43 @@ public class MainRenderer : IDisposable
 
             _uniforms.UploadGlobals(shader, viewCamera, _iblActive, iblScale, ssaoActive);
 
-            foreach (var entity in entities)
-            {
-                if (!entity.Enabled) continue;
-                if (entity.Model is not { } model || entity.Material is not { } mat) continue;
-
-                if (_config.Debug.EnableCulling && !cullingCamera.Frustum.IsVisibleAABB(entity.GetWorldBounds()))
-                {
-                    stats.CulledEntities++;
-                    continue;
-                }
-
-                stats.TextureBinds += _textures.BindMaterial(mat);
-                stats.DrawnEntities++;
-
-                DrawEntity(entity, shader, mat, model, ref stats);
-            }
+            foreach (var batch in batches)
+                DrawBatch(batch, shader, cullingCamera, cull, ref stats);
         }
     }
 
-    private void DrawEntity(Entity entity, GLShader shader, Material mat, Model model, ref FrameStats stats)
+    private void DrawBatch(Batch batch, GLShader shader, Camera cullCamera, bool cull, ref FrameStats stats)
     {
-        ShaderUniformBinder.UploadMaterial(shader, mat);
-        ShaderUniformBinder.UploadTransform(shader, entity);
+        _instances.Clear();
 
-        foreach (var mesh in model.Meshes)
+        foreach (var entity in batch.Entities)
         {
-            mesh.Bind();
-            unsafe
+            if (!entity.Enabled) continue;
+            
+            if (cull && !cullCamera.Frustum.IsVisibleAABB(entity.GetWorldBounds()))
             {
-                _gl.DrawElements(PrimitiveType.Triangles, mesh.IndexCount,
-                    DrawElementsType.UnsignedInt, (void*)0);
+                stats.CulledEntities++;
+                continue;
             }
-            stats.DrawCalls++;
-            stats.TotalIndices  += (int) mesh.IndexCount;
-            stats.TotalVertices += (int) mesh.VertexCount;
+            _instances.Add(new InstanceData(entity.Transform.WorldMatrix, entity.UvScale, entity.UvOffset));
+        }
+        
+        if (_instances.Count == 0) return;
+
+        stats.TextureBinds += _textures.BindMaterial(batch.Material);
+        ShaderUniformBinder.UploadMaterial(shader, batch.Material);
+        _instanceBuffer.Upload(_instances);
+
+        stats.DrawnEntities += _instances.Count;
+
+        foreach (var mesh in batch.Model.Meshes)
+        {
+            mesh.ConfigureInstancing(_instanceBuffer.Handle);
+            mesh.DrawInstanced(_instances.Count);
+
+            stats.DrawCalls     += 1;
+            stats.TotalIndices  += (int)mesh.IndexCount  * _instances.Count;
+            stats.TotalVertices += (int)mesh.VertexCount * _instances.Count;
         }
     }
 
@@ -189,5 +196,9 @@ public class MainRenderer : IDisposable
         stats.TotalVertices  = 0;
     }
 
-    public void Dispose() => _lightBuffer.Dispose();
+    public void Dispose()
+    {
+        _lightBuffer.Dispose();
+        _instanceBuffer.Dispose();
+    }
 }

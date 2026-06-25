@@ -12,6 +12,8 @@ public class Mesh : IDisposable
     private readonly VertexArrayObject<float, uint> _vao;
     private readonly BufferObject<float>            _vbo;
     private readonly BufferObject<uint>             _ebo;
+    
+    private bool _instancingReady;
 
     public uint        VertexCount { get; }
     public uint        IndexCount  { get; }
@@ -55,6 +57,32 @@ public class Mesh : IDisposable
         }
 
         return new BoundingBox(min, max);
+    }
+    
+    // Wire the shared instance buffer into this mesh's VAO once: a mat4 over locations 4–7
+    // and a vec4 (uv scale/offset) at location 8, all advancing per instance. Idempotent —
+    // the binding is captured in VAO state, so subsequent frames just re-fill the buffer.
+    public void ConfigureInstancing(uint instanceVbo)
+    {
+        if (_instancingReady) return;
+
+        _vao.Bind();
+        _gl.BindBuffer(BufferTargetARB.ArrayBuffer, instanceVbo);
+
+        for (uint col = 0; col < 4; col++)
+            _vao.InstancedAttribute(4 + col, 4, InstanceData.Floats, (int)(col * 4)); // mat4 columns
+        _vao.InstancedAttribute(8, 4, InstanceData.Floats, 16);                       // uv scale/offset
+
+        _gl.BindVertexArray(0);
+        _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
+        _instancingReady = true;
+    }
+
+    public unsafe void DrawInstanced(int instanceCount)
+    {
+        _vao.Bind();
+        _gl.DrawElementsInstanced(PrimitiveType.Triangles, IndexCount,
+            DrawElementsType.UnsignedInt, (void*)0, (uint)instanceCount);
     }
 
     public void Bind() => _vao.Bind();

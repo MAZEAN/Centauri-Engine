@@ -60,12 +60,23 @@ public class VertexArrayObject<TVertexType, TIndexType> : IDisposable
         vbo.Bind();
         ebo.Bind();
     }
-
+    
+    // Like VertexAttributePointer, but advances once per instance (divisor 1) instead of
+    // per vertex. The instance buffer must be bound to GL_ARRAY_BUFFER at call time so the
+    // pointer associates with it. vertexSize/offSet are in TVertexType units.
     public unsafe void VertexAttributePointer(uint index, int count, VertexAttribPointerType type, uint vertexSize, int offSet)
     {
         _gl.VertexAttribPointer(index, count, type, false, vertexSize * (uint) sizeof(TVertexType), (void*) (offSet * sizeof(TVertexType)));
         _gl.EnableVertexAttribArray(index);
     }
+    
+    public unsafe void InstancedAttribute(uint index, int count, uint vertexSize, int offSet)
+    {
+        _gl.VertexAttribPointer(index, count, VertexAttribPointerType.Float, false, vertexSize * (uint) sizeof(TVertexType), (void*) (offSet * sizeof(TVertexType)));
+        _gl.EnableVertexAttribArray(index);
+        _gl.VertexAttribDivisor(index, 1);
+    }
+
 
     public void Bind()
     {
