@@ -13,10 +13,10 @@
 * [x] Cascaded shadow maps (CSM)
 * [x] Day/Night cycle
 * [x] Screen Space Ambient Occlusion (SSAO)
+* [x] Temporal Anti-Aliasing (TAA)
 * [ ] Reflection Probes
 * [ ] GTAO (Ground-Truth AO)
 * [ ] Contact-hardening / PCSS
-* [ ] Temporal Anti-Aliasing (TAA)
 * [ ] Raytracing with BVH (only experimental, not real-time)
 * [ ] Physics engine integration (BEPUphysics2)
 * [ ] Game-Simulation

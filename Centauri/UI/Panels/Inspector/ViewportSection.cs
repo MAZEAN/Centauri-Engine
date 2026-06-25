@@ -21,6 +21,7 @@ public sealed class ViewportSection : IInspectorSection
         Widgets.CheckRow("Skybox",          d.ShowSkybox,        v => d.ShowSkybox        = v);
         Widgets.CheckRow("Stats Overlay",   d.ShowStatsOverlay,  v => d.ShowStatsOverlay  = v);
         Widgets.CheckRow("Frustum Culling", d.EnableCulling,     v => d.EnableCulling     = v);
+        Widgets.CheckRow("Anisotropic",     d.AnisotropicFilter, v => d.AnisotropicFilter = v);
 
         Widgets.CheckRow("Bounding Boxes",  d.ShowBoundingBoxes, v => d.ShowBoundingBoxes = v);
         Widgets.CheckRow("Cameras",         d.ShowCameras,       v => d.ShowCameras       = v);

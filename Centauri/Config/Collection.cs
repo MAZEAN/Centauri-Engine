@@ -54,7 +54,7 @@ public class DebugConfig
     [JsonPropertyName("showStatsOverlay")]  public bool ShowStatsOverlay  { get; set; } = true;
     [JsonPropertyName("showSkybox")]        public bool ShowSkybox        { get; set; } = true;
     [JsonPropertyName("showGPUTimings")]    public bool ShowGPUTimings    { get; set; } = true;
-
+    [JsonPropertyName("showAnisotropicFilter")] public bool AnisotropicFilter { get; set; } = true;
     [JsonIgnore] public ShadingMode Shading { get; set; } = ShadingMode.Shaded;
 
     public void ToggleShowStatsOverlay()  => ShowStatsOverlay = !ShowStatsOverlay;

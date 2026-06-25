@@ -95,8 +95,8 @@ public class RenderingSystem : IDisposable
 
     public void Render(Scene scene, float deltaTime)
     {
+        Graphics.Resources.GLTexture.SetAnisotropy(_gl, _config.Debug.AnisotropicFilter);
         scene.Lighting.Collect(scene.Entities);
-        
         scene.Cameras.Active.JitterNdc = _post.NextTaaJitter();
         
         RenderPrePostComponents(scene, deltaTime);

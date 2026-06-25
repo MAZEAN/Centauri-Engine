@@ -77,7 +77,7 @@
     "radius": 1.0
   },
   "taa": {
-    "enabled": false,
+    "enabled": true,
     "feedback": 0.5
   }
 }

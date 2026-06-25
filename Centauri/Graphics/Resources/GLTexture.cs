@@ -9,13 +9,16 @@ using HighDynamicRange;
 
 public class GLTexture : GLResource
 {
-    // True when the texture holds linear floating-point radiance (loaded from
-    // a <c>.hdr</c> / <c>.exr</c> panorama) rather than 8-bit sRGB data.
-    // Consumers such as the skybox use this to decide whether to tonemap.
-    public bool IsHdr { get; }
+    private const GLEnum               MaxSupportedAniso = (GLEnum)0x84FF;
+    private const TextureParameterName TextureMaxAniso = (TextureParameterName)0x84FE;
+    private const float                AnisoRequest      = 8f;
+    
+    private static readonly List<GLTexture> Anisotropic = new();
+    private static bool _anisoEnabled = true;
 
-    // Loads from disk: .hdr / .exr decode to a linear float panorama, everything
-    // else to 8-bit sRGB.
+    private float _maxAniso = 1f;   // driver-clamped per-texture ceiling (>= 1)
+    public bool IsHdr { get; }
+    
     public GLTexture(GL gl, string path) : base(gl)
     {
         var fullPath = Path.GetFullPath(path);
@@ -100,11 +103,29 @@ public class GLTexture : GLResource
         {
             Gl.GenerateMipmap(TextureTarget.Texture2D);
             
-            Gl.GetFloat((GLEnum)0x84FF, out float maxAniso); 
-            Gl.TexParameter(TextureTarget.Texture2D, (TextureParameterName)0x84FE,
-                Math.Max(1f, Math.Min(8f, maxAniso))); 
+            Gl.GetFloat(MaxSupportedAniso, out float maxAniso);
+            _maxAniso = Math.Max(1f, Math.Min(AnisoRequest, maxAniso));   // 1 = off, if unsupported
+            
+            Gl.TexParameter(TextureTarget.Texture2D, TextureMaxAniso, _anisoEnabled ? _maxAniso : 1f);
+            Anisotropic.Add(this);
         }
     }
 
-    protected override void DeleteGL() => Gl.DeleteTexture(Handle);
+    public static void SetAnisotropy(GL gl, bool enabled)
+    {
+        if (enabled == _anisoEnabled) return;
+        _anisoEnabled = enabled;
+
+        foreach (var tex in Anisotropic)
+        {
+            gl.BindTexture(TextureTarget.Texture2D, tex.Handle);
+            gl.TexParameter(TextureTarget.Texture2D, TextureMaxAniso, enabled ? tex._maxAniso : 1f);
+        }
+    }
+
+    protected override void DeleteGL()
+    {
+        Anisotropic.Remove(this);
+        Gl.DeleteTexture(Handle);
+    }
 }
