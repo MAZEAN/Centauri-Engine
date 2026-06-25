@@ -47,9 +47,9 @@ public class SceneLoader
             
             // Set default material if not a pure light source
             var material = !string.IsNullOrEmpty(e.Material)
-                ? LoadMaterialFile(e.Material)
-                : model is not null 
-                    ? _resourceSystem.CreateDefaultMaterial() : null;
+                ? _resourceSystem.GetMaterial(e.Material)
+                : model is not null
+                    ? _resourceSystem.DefaultMaterial : null;
             
             Light? light = null;
             if (e.Light is { } l)
@@ -137,29 +137,6 @@ public class SceneLoader
         // primary (culling) camera — honor `primary`, fall back to the active camera
         var primary = def.Cameras.FirstOrDefault(c => c.Primary) ?? active;
         _scene.Cameras.SetPrimary(primary.Name);
-    }
-
-    private Material LoadMaterialFile(string path)
-    {
-        var fullPath = PathResolver.Resolve(path);
-        var json = File.ReadAllText(fullPath);
-        var def  = JsonSerializer.Deserialize<MaterialDefinition>(json, JsonDefaults.Options)
-                   ?? throw new Exception($"Failed to deserialize material file: {path}");
-
-        var shader = _resourceSystem.Shaders.Get(def.Shader);
-
-        return new Material(shader)
-        {
-            Albedo    = def.Albedo    != null ? _resourceSystem.Textures.Get(def.Albedo)    : null,
-            Normal    = def.Normal    != null ? _resourceSystem.Textures.Get(def.Normal)    : null,
-            Roughness = def.Roughness != null ? _resourceSystem.Textures.Get(def.Roughness) : null,
-            Metallic  = def.Metallic  != null ? _resourceSystem.Textures.Get(def.Metallic)  : null,
-            AO        = def.AO        != null ? _resourceSystem.Textures.Get(def.AO)         : _resourceSystem.DefaultTexture, 
-            RoughnessValue = def.RoughnessValue,
-            MetallicValue  = def.MetallicValue,
-            Color          = new Vector4(def.Color[0], def.Color[1], def.Color[2], def.Color[3]),
-            TwoSided       = def.TwoSided
-        };
     }
     
     private void LoadSkyboxes(SceneDefinition def)

@@ -5,6 +5,7 @@ using System.Numerics;
 
 using World;
 using Common;
+using Graphics.Resources.Materials;
 
 // The selected-entity inspector: name/enabled header plus the Transform / Material / Light
 // sub-panels. Holds the transient rotation-edit state. Shows a placeholder when nothing
@@ -29,7 +30,7 @@ public sealed class EntityInspectorSection : IInspectorSection
         ImGui.Spacing();
 
         DrawTransform(entity);
-        DrawMaterial(entity);
+        DrawMaterial(entity, scene);
         DrawLight(entity);
     }
 
@@ -57,16 +58,16 @@ public sealed class EntityInspectorSection : IInspectorSection
             0.01f, "%.3f", scaleReset);
     }
 
-    private static void DrawMaterial(Entity e)
+    private static void DrawMaterial(Entity e, Scene scene)
     {
         if (e.Material is not { } mat) return;
 
         using var s = Widgets.Section("Material");
         if (!s.Open) return;
 
-        Widgets.ColorRow4("Base Color", mat.Color, v => mat.Color = v);
-        Widgets.SliderRow("Roughness", mat.RoughnessValue, v => mat.RoughnessValue = v, 0f, 1f, 0.5f);
-        Widgets.SliderRow("Metallic",  mat.MetallicValue,  v => mat.MetallicValue  = v, 0f, 1f, 0.1f);
+        Widgets.ColorRow4("Base Color", mat.Color, v => EditMaterial(e, scene, m => m.Color = v));
+        Widgets.SliderRow("Roughness", mat.RoughnessValue, v => EditMaterial(e, scene, m => m.RoughnessValue = v), 0f, 1f, 0.5f);
+        Widgets.SliderRow("Metallic",  mat.MetallicValue,  v => EditMaterial(e, scene, m => m.MetallicValue  = v), 0f, 1f, 0.1f);
     }
 
     private static void DrawLight(Entity e)
@@ -113,6 +114,12 @@ public sealed class EntityInspectorSection : IInspectorSection
                     0.001f, 0f, 1f, "%.3f", 0.032f);
                 break;
         }
+    }
+    
+    private static void EditMaterial(Entity e, Scene scene, Action<Material> apply)
+    {
+        if (e.MakeMaterialUnique()) scene.MarkDirty();
+        apply(e.Material!);
     }
 
     private static Light CreateLight(int typeIndex, Light? from)

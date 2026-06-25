@@ -26,6 +26,19 @@ public class Material
         Shader = shader;
     }
     
+    public Material Clone() => new(Shader)
+    {
+        Albedo    = Albedo,
+        Normal    = Normal,
+        Roughness = Roughness,
+        Metallic  = Metallic,
+        AO        = AO,
+        Color          = Color,
+        RoughnessValue = RoughnessValue,
+        MetallicValue  = MetallicValue,
+        TwoSided       = TwoSided
+    };
+    
     public ulong SortKey
     {
         get

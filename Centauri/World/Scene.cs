@@ -17,6 +17,8 @@ public class Scene
     public Entity? Selected { get; private set; }
     public void Select(Entity? entity) => Selected = entity;
     public void ClearSelection()       => Selected = null;
+    
+    public void MarkDirty() => Revision++;
 
     public void AddEntity(Entity entity)
     {

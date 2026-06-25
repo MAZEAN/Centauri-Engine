@@ -12,9 +12,14 @@ public readonly record struct TransformSnapshot(Vector3 Position, Vector3 Euler,
 public class Entity : IDisposable
 {
     public string    Name    { get; set; }
+    public bool      Enabled { get; set; } = true;
     public Model?    Model    { get; }
-    public Material? Material { get; }
+    public Material? Material { get; private set; }
     public Light?    Light    { get; set; }
+    public Vector2   UvScale  { get; set; } = Vector2.One;
+    public Vector2   UvOffset { get; set; } = Vector2.Zero;
+    
+    private bool _ownsMaterial;
     
     private readonly List<Component> _components = new();
     public IReadOnlyList<Component> Components => _components;
@@ -22,11 +27,7 @@ public class Entity : IDisposable
     private BoundingBox _worldBounds;
     private bool _boundsDirty = true;
     private Transform _transform = new();
-
-    public Vector2 UvScale  { get; set; } = Vector2.One;
-    public Vector2 UvOffset { get; set; } = Vector2.Zero;
-
-    public bool Enabled { get; set; } = true;
+    
     public TransformSnapshot? Authored { get; set; }
 
     public Transform Transform
@@ -68,6 +69,15 @@ public class Entity : IDisposable
         for (var i = 0; i < _components.Count; i++)
             if (_components[i].Enabled)
                 _components[i].Update(dt);
+    }
+    
+    public bool MakeMaterialUnique()
+    {
+        if (_ownsMaterial || Material is null) return false;
+
+        Material      = Material.Clone();
+        _ownsMaterial = true;
+        return true;
     }
 
     public BoundingBox GetWorldBounds()
