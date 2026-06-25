@@ -207,8 +207,8 @@ public sealed class BloomConfig : IJsonOnDeserialized
 
 public sealed class TAAConfig : IJsonOnDeserialized
 {
-    [JsonPropertyName("enabled")]  public bool  Enabled  { get; set; } = true;
-    [JsonPropertyName("feedback")] public float Feedback { get; set; } = 0.9f;   // history weight (0..1)
+    [JsonPropertyName("enabled")]  public bool  Enabled  { get; set; } = false;
+    [JsonPropertyName("feedback")] public float Feedback { get; set; } = 0.9f;
 
     [JsonIgnore] public float AuthoredFeedback { get; private set; }
 

@@ -97,7 +97,13 @@ public class GLTexture : GLResource
             magFilter: GLEnum.Linear);
 
         if (!hdr)
+        {
             Gl.GenerateMipmap(TextureTarget.Texture2D);
+            
+            Gl.GetFloat((GLEnum)0x84FF, out float maxAniso); 
+            Gl.TexParameter(TextureTarget.Texture2D, (TextureParameterName)0x84FE,
+                Math.Max(1f, Math.Min(8f, maxAniso))); 
+        }
     }
 
     protected override void DeleteGL() => Gl.DeleteTexture(Handle);
