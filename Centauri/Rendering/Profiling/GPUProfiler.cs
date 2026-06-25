@@ -8,7 +8,7 @@ public readonly record struct GpuTiming(string Name, double Milliseconds);
 // stall: each frame issues queries into one set while reading last frame's other set, and
 // only reads a result once the driver reports it available. GL_TIME_ELAPSED can't nest, so
 // zones must be sequential — Begin/End pairs with no overlap (overlapping calls are ignored).
-public sealed class GpuProfiler : IDisposable
+public sealed class GPUProfiler : IDisposable
 {
     private const int Sets     = 3;
     private const int MaxZones = 16;
@@ -28,7 +28,7 @@ public sealed class GpuProfiler : IDisposable
     private readonly List<GpuTiming> _results = new();
     public IReadOnlyList<GpuTiming> Results => _results;
 
-    public GpuProfiler(GL gl)
+    public GPUProfiler(GL gl)
     {
         _gl = gl;
         for (var s = 0; s < Sets; s++)
@@ -104,8 +104,8 @@ public sealed class GpuProfiler : IDisposable
     // using-scope around a pass: BeginQuery on enter, EndQuery on exit.
     public readonly ref struct Scope
     {
-        private readonly GpuProfiler _p;
-        public Scope(GpuProfiler p, string name) { _p = p; p.Begin(name); }
+        private readonly GPUProfiler _p;
+        public Scope(GPUProfiler p, string name) { _p = p; p.Begin(name); }
         public void Dispose() => _p.End();
     }
 }

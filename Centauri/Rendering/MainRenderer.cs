@@ -40,7 +40,7 @@ public class MainRenderer : IDisposable
 
     private bool _iblActive;
 
-    public MainRenderer(GL gl, AppConfig config, IBLBaker ibl, ShadowMapper shadows)
+    public MainRenderer(GL gl, AppConfig config, IBLBaker ibl, ShadowMapper shadows, InstanceBuffer instances)
     {
         _gl = gl;
         _config = config;
@@ -50,7 +50,7 @@ public class MainRenderer : IDisposable
         _lightBuffer = new LightBuffer(gl);
         _textures    = new TextureBinder(gl);
         _uniforms    = new ShaderUniformBinder(config, ibl, shadows);
-        _instanceBuffer = new InstanceBuffer(gl);
+        _instanceBuffer = instances;
     }
 
     public void Render(Scene scene, float deltaTime, ref FrameStats stats, uint ssaoTexture, bool ssaoActive)
@@ -201,6 +201,5 @@ public class MainRenderer : IDisposable
     public void Dispose()
     {
         _lightBuffer.Dispose();
-        _instanceBuffer.Dispose();
     }
 }

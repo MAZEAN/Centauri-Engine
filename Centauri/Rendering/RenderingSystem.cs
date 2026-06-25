@@ -8,6 +8,7 @@ using Config;
 using Renderers;
 using World;
 using World.Components;
+using Graphics.Geometry;
 using Utils.Misc;
 using UI;
 using IBL;
@@ -28,7 +29,8 @@ public class RenderingSystem : IDisposable
     private readonly SkyboxRenderer _skyboxRenderer;
     private readonly ShadowMapper _shadows;
     private readonly IBLBaker _ibl;
-    private readonly GpuProfiler _profiler;
+    private readonly GPUProfiler _profiler;
+    private readonly InstanceBuffer _instances;
     
     private UISystem _ui = null!;
     private PostProcessor _post = null!;
@@ -56,9 +58,10 @@ public class RenderingSystem : IDisposable
         
         _shadows = new ShadowMapper(gl, _config);
         _ibl = new IBLBaker(gl, _config.IBLConfig);
-        _profiler = new GpuProfiler(gl);
+        _profiler = new GPUProfiler(gl);
+        _instances = new InstanceBuffer(gl);
         
-        _mainRenderer   = new MainRenderer(gl, config, _ibl, _shadows);
+        _mainRenderer   = new MainRenderer(gl, config, _ibl, _shadows, _instances);
         _gridRenderer   = new GridRenderer(gl);
         _debugRenderer  = new DebugRenderer(gl, config);
         _skyboxRenderer = new SkyboxRenderer(gl);
@@ -73,7 +76,7 @@ public class RenderingSystem : IDisposable
         
         _post = new PostProcessor(_gl, hdr, _config, (uint)framebufferSize.X, (uint)framebufferSize.Y);
         _ui   = new UISystem(_gl, _config, window, input, _config.ColorGrading);
-        _prepass = new GeometryPrepass(_gl, _config, (uint)framebufferSize.X, (uint)framebufferSize.Y);
+        _prepass = new GeometryPrepass(_gl, _config, (uint)framebufferSize.X, (uint)framebufferSize.Y, _instances);
         _ssao    = new SsaoPass(_gl, _config.SSAO, (uint)framebufferSize.X, (uint)framebufferSize.Y);
         _bufferDebug = new BufferDebugView(_gl);
     }
@@ -208,6 +211,7 @@ public class RenderingSystem : IDisposable
         _mainRenderer.Dispose();
         _debugRenderer.Dispose();
         _skyboxRenderer.Dispose();
+        
         _ui.Dispose();
         _post.Dispose();
         _prepass.Dispose();
@@ -216,5 +220,6 @@ public class RenderingSystem : IDisposable
         _ibl.Dispose();
         _shadows.Dispose();
         _profiler.Dispose();
+        _instances.Dispose();
     }
 }

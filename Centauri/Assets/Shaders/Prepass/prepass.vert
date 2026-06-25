@@ -4,16 +4,17 @@ out vec3 vViewNormal;
 
 layout (location = 0) in vec3 vPos;
 layout (location = 1) in vec3 vNormal;
+layout (location = 4) in mat4 iModel;
 
-uniform mat4 uModel;
 uniform mat4 uView;
 uniform mat4 uProjection;
-uniform mat3 uNormalMatrix;   // transpose(inverse(model)) — world-space normal basis
 
 void main()
 {
-    vec3 worldN = normalize(uNormalMatrix * vNormal);
+    mat3 normalMatrix = transpose(inverse(mat3(iModel)));
+    vec3 worldN = normalize(normalMatrix * vNormal);
+    
     vViewNormal = mat3(uView) * worldN;             // world -> view space
 
-    gl_Position = uProjection * uView * uModel * vec4(vPos, 1.0);
+    gl_Position = uProjection * uView * iModel * vec4(vPos, 1.0);
 }

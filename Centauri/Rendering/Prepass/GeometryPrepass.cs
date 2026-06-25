@@ -1,11 +1,10 @@
 namespace Centauri.Rendering.Prepass;
 
 using Silk.NET.OpenGL;
-using System.Numerics;
 
 using World;
 using Graphics.Resources;
-using Graphics.Resources.Materials;
+using Graphics.Geometry;
 using Utils.Misc;
 using Targets;
 using Config;
@@ -19,14 +18,18 @@ public sealed class GeometryPrepass : IDisposable
     private readonly AppConfig _config;
     private readonly GLShader _shader;
     private readonly RenderTarget _target;
+    private readonly InstanceBuffer _instances;
+    
+    private readonly Dictionary<Model, List<InstanceData>> _groups = new();
 
     public uint NormalTexture   => _target.ColorTextures[0];
     public uint DepthTexture    => _target.DepthTexture;
 
-    public GeometryPrepass(GL gl, AppConfig config, uint width, uint height)
+    public GeometryPrepass(GL gl, AppConfig config, uint width, uint height, InstanceBuffer instances)
     {
         _gl = gl;
         _config = config;
+        _instances = instances;
         _shader = new GLShader(gl,
             PathResolver.Resolve("Assets/Shaders/Prepass/prepass.vert"),
             PathResolver.Resolve("Assets/Shaders/Prepass/prepass.frag"));
@@ -53,6 +56,9 @@ public sealed class GeometryPrepass : IDisposable
         _shader.Use();
         _shader.SetUniform("uView",       camera.GetViewMatrix());
         _shader.SetUniform("uProjection", camera.GetProjectionMatrix());
+        
+        foreach (var list in _groups.Values)
+            list.Clear();
 
         foreach (var entity in scene.Entities)
         {
@@ -60,19 +66,21 @@ public sealed class GeometryPrepass : IDisposable
             if (cull && !cullingCamera.Frustum.IsVisibleAABB(entity.GetWorldBounds()))
                 continue;
 
-            var world = entity.Transform.WorldMatrix;
-            _shader.SetUniform("uModel", world);
-            _shader.SetUniformMat3X3("uNormalMatrix",
-                Matrix4x4.Transpose(Matrix4x4.Invert(world, out var inv) ? inv : world));
-            
+            if (!_groups.TryGetValue(model, out var list))
+                _groups[model] = list = new List<InstanceData>();
+
+            list.Add(new InstanceData(entity.Transform.WorldMatrix, entity.UvScale, entity.UvOffset));
+        }
+        
+        foreach (var (model, list) in _groups)
+        {
+            if (list.Count == 0) continue;
+
+            _instances.Upload(list);
             foreach (var mesh in model.Meshes)
             {
-                mesh.Bind();
-                unsafe
-                {
-                    _gl.DrawElements(PrimitiveType.Triangles, mesh.IndexCount,
-                        DrawElementsType.UnsignedInt, (void*)0);
-                }
+                mesh.ConfigureInstancing(_instances.Handle);
+                mesh.DrawInstanced(list.Count);
             }
         }
 
