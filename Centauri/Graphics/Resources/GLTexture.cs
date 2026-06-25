@@ -7,6 +7,16 @@ using SixLabors.ImageSharp.Processing;
 
 using HighDynamicRange;
 
+public sealed class TextureData
+{
+    public bool    IsHdr;
+    public int     Width;
+    public int     Height;
+    
+    public byte[]?  Ldr;   // RGBA8, vertically flipped
+    public float[]? Hdr;   // RGB float
+}
+
 public class GLTexture : GLResource
 {
     private const GLEnum               MaxSupportedAniso = (GLEnum)0x84FF;
@@ -19,24 +29,50 @@ public class GLTexture : GLResource
     private float _maxAniso = 1f;   // driver-clamped per-texture ceiling (>= 1)
     public bool IsHdr { get; }
     
-    public GLTexture(GL gl, string path) : base(gl)
+    public unsafe GLTexture(GL gl, TextureData data) : base(gl)
     {
-        var fullPath = Path.GetFullPath(path);
-
         Handle = Gl.GenTexture();
         Gl.BindTexture(TextureTarget.Texture2D, Handle);
 
-        if (HDRLoader.IsHDRPath(fullPath))
+        if (data.IsHdr)
         {
-            LoadHDR(fullPath);
             IsHdr = true;
+            fixed (float* p = data.Hdr)
+                Gl.TexImage2D(
+                    TextureTarget.Texture2D, 0, InternalFormat.Rgb16f,
+                    (uint)data.Width, (uint)data.Height, 0,
+                    PixelFormat.Rgb, PixelType.Float, p);
         }
         else
         {
-            LoadLdr(fullPath);
+            fixed (byte* p = data.Ldr)
+                Gl.TexImage2D(
+                    TextureTarget.Texture2D, 0, InternalFormat.Rgba8,
+                    (uint)data.Width, (uint)data.Height, 0,
+                    PixelFormat.Rgba, PixelType.UnsignedByte, p);
         }
 
         SetParameters(IsHdr);
+    }
+    
+    public GLTexture(GL gl, string path) : this(gl, Decode(path)) { }
+    
+    public static TextureData Decode(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+
+        if (HDRLoader.IsHDRPath(fullPath))
+        {
+            var img = HDRLoader.Load(fullPath);
+            return new TextureData { IsHdr = true, Width = img.Width, Height = img.Height, Hdr = img.Pixels };
+        }
+
+        using var image = Image.Load<Rgba32>(fullPath);
+        image.Mutate(x => x.Flip(FlipMode.Vertical));
+
+        var pixels = new byte[image.Width * image.Height * 4];
+        image.CopyPixelDataTo(pixels);
+        return new TextureData { IsHdr = false, Width = image.Width, Height = image.Height, Ldr = pixels };
     }
 
     // Wraps an in-memory 8-bit RGBA buffer (e.g. the 1×1 default texture).
@@ -54,38 +90,6 @@ public class GLTexture : GLResource
         }
 
         SetParameters(hdr: false);
-    }
-
-    private unsafe void LoadLdr(string fullPath)
-    {
-        using var img = Image.Load<Rgba32>(fullPath);
-        img.Mutate(x => x.Flip(FlipMode.Vertical));
-
-        Span<byte> pixels = new byte[img.Width * img.Height * 4];
-        img.CopyPixelDataTo(pixels);
-
-        fixed (void* data = pixels)
-        {
-            Gl.TexImage2D(
-                TextureTarget.Texture2D, 0, InternalFormat.Rgba8,
-                (uint)img.Width, (uint)img.Height, 0,
-                PixelFormat.Rgba, PixelType.UnsignedByte, data);
-        }
-    }
-
-    // Float panorama uploaded as RGB16F so the full dynamic range is kept on the
-    // GPU; tonemapping/exposure happens later in the skybox shader.
-    private unsafe void LoadHDR(string fullPath)
-    {
-        var image = HDRLoader.Load(fullPath);
-
-        fixed (void* data = image.Pixels)
-        {
-            Gl.TexImage2D(
-                TextureTarget.Texture2D, 0, InternalFormat.Rgb16f,
-                (uint)image.Width, (uint)image.Height, 0,
-                PixelFormat.Rgb, PixelType.Float, data);
-        }
     }
 
     private void SetParameters(bool hdr)

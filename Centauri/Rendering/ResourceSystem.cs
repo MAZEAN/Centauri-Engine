@@ -14,8 +14,9 @@ using Graphics.Geometry;
 
 public class ResourceSystem : IDisposable
 {
-    
+    private readonly GL _gl;
     private readonly AppConfig _config;
+    
     public AssetCache<GLTexture> Textures { get; }
     public AssetCache<GLShader> Shaders { get; }
     public AssetCache<Model> Models { get; }
@@ -26,6 +27,7 @@ public class ResourceSystem : IDisposable
 
     public ResourceSystem(GL gl, AppConfig config)
     {
+        _gl = gl;
         _config = config;
         
         Textures = new AssetCache<GLTexture>(
@@ -61,13 +63,62 @@ public class ResourceSystem : IDisposable
         _materials[path] = material;
         return material;
     }
+    
+    public void PreloadScene(SceneDefinition def)
+    {
+        var modelPaths = def.Entities
+            .Where(e => !string.IsNullOrEmpty(e.Model))
+            .Select(e => e.Model!)
+            .Distinct()
+            .ToList();
+
+        var texturePaths = new HashSet<string>();
+        foreach (var e in def.Entities)
+        {
+            if (string.IsNullOrEmpty(e.Material)) continue;
+            var m = ReadMaterialDef(e.Material);
+            AddPath(texturePaths, m.Albedo);
+            AddPath(texturePaths, m.Normal);
+            AddPath(texturePaths, m.Roughness);
+            AddPath(texturePaths, m.Metallic);
+            AddPath(texturePaths, m.AO);
+        }
+        foreach (var s in def.Skyboxes)
+            AddPath(texturePaths, s.Panorama);
+
+        // CPU decode off the GL thread
+        var textureJob = Task.WhenAll(texturePaths.Select(key =>
+            Task.Run(() => (key, data: GLTexture.Decode(PathResolver.Resolve(key))))));
+
+        var modelJob = Task.Run(() => modelPaths
+            .Select(key => (key, data: Model.Decode(PathResolver.Resolve(key))))
+            .ToList());
+
+        Task.WaitAll(textureJob, modelJob);
+
+        // GL creation on the calling (main) thread
+        foreach (var (key, data) in textureJob.Result)
+            Textures.Insert(key, new GLTexture(_gl, data));
+
+        foreach (var (key, data) in modelJob.Result)
+            Models.Insert(key, new Model(_gl, data));
+    }
+
+    private static void AddPath(HashSet<string> set, string? path)
+    {
+        if (!string.IsNullOrEmpty(path)) set.Add(path);
+    }
+
+    private static MaterialDefinition ReadMaterialDef(string path)
+    {
+        var json = File.ReadAllText(PathResolver.Resolve(path));
+        return JsonSerializer.Deserialize<MaterialDefinition>(json, JsonDefaults.Options)
+               ?? throw new Exception($"Failed to deserialize material file: {path}");
+    }
 
     private Material LoadMaterial(string path)
     {
-        var fullPath = PathResolver.Resolve(path);
-        var json = File.ReadAllText(fullPath);
-        var def  = JsonSerializer.Deserialize<MaterialDefinition>(json, JsonDefaults.Options)
-                   ?? throw new Exception($"Failed to deserialize material file: {path}");
+        var def = ReadMaterialDef(path);
 
         var shader = Shaders.Get(def.Shader);
 

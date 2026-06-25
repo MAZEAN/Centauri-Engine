@@ -19,6 +19,8 @@ public sealed class AssetCache<T> : IDisposable where T : class, IDisposable
         _assets[key] = asset;
         return asset;
     }
+    
+    public void Insert(string key, T value) => _assets[key] = value;
 
     public void Dispose()
     {

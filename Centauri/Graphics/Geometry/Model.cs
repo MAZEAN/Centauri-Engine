@@ -8,65 +8,92 @@ using Utils.Geometry;
 
 using AssimpMesh = Silk.NET.Assimp.Mesh;
 
+public sealed class MeshData
+{
+    public MeshData(float[] vertices, uint[] indices)
+    {
+        Vertices = vertices;
+        Indices  = indices;
+    }
+
+    public float[] Vertices { get; }
+    public uint[]  Indices  { get; }
+}
+
+public sealed class ModelData
+{
+    public List<MeshData> Meshes         { get; } = new();
+    public string         AssetDirectory { get; set; } = string.Empty;
+}
+
 public class Model : IDisposable
 {
     private readonly GL      _gl;
     private readonly Assimp? _assimp;
 
     public string      AssetDirectory { get; private set; } = string.Empty;
-    public List<Mesh>  Meshes    { get; private set; } = new();
-    public BoundingBox Bounds    { get; private set; }
+    
+    public List<Mesh>  Meshes { get; private set; } = new();
+    public BoundingBox Bounds { get; private set; }
 
     // constructor for file-loaded models
-    public Model(GL gl, string path)
+    public Model(GL gl, ModelData data)
     {
-        _gl     = gl;
-        _assimp = Assimp.GetApi();
-        LoadModel(path);
+        AssetDirectory = data.AssetDirectory;
+        Meshes = data.Meshes.Select(m => new Mesh(gl, m.Vertices, m.Indices)).ToList();
+        Bounds = ComputeBounds(Meshes);
     }
+    
+    public Model(GL gl, string path) : this(gl, Decode(path)) { }
 
     // constructor for code-generated models (floor plane, terrain etc.)
     public Model(GL gl, IEnumerable<Mesh> meshes)
     {
-        _gl    = gl;
         Meshes = meshes.ToList();
         Bounds = ComputeBounds(Meshes); // compute bounds from provided meshes
     }
 
-    private unsafe void LoadModel(string path)
+    public static unsafe ModelData Decode(string path)
     {
         if (!System.IO.File.Exists(path))
             throw new FileNotFoundException($"Model file not found: {path}");
 
-        var scene = _assimp!.ImportFile(path, (uint)(
-            PostProcessSteps.Triangulate            |
-            PostProcessSteps.GenerateNormals        |
-            PostProcessSteps.CalculateTangentSpace  |
-            PostProcessSteps.JoinIdenticalVertices
-        ));
-
-        if (scene == null
-            || scene->MFlags == Assimp.SceneFlagsIncomplete
-            || scene->MRootNode == null)
+        var assimp = Assimp.GetApi();
+        try
         {
-            throw new Exception($"Assimp failed to load '{path}': {_assimp.GetErrorStringS()}");
-        }
+            var scene = assimp.ImportFile(path, (uint)(
+                PostProcessSteps.Triangulate            |
+                PostProcessSteps.GenerateNormals        |
+                PostProcessSteps.CalculateTangentSpace  |
+                PostProcessSteps.JoinIdenticalVertices
+            ));
 
-        AssetDirectory = Path.GetDirectoryName(path) ?? string.Empty;
-        ProcessNode(scene->MRootNode, scene);
-        Bounds = ComputeBounds(Meshes); // assign after all meshes are loaded
+            if (scene == null
+                || scene->MFlags == Assimp.SceneFlagsIncomplete
+                || scene->MRootNode == null)
+            {
+                throw new Exception($"Assimp failed to load '{path}': {assimp.GetErrorStringS()}");
+            }
+            var data = new ModelData { AssetDirectory = Path.GetDirectoryName(path) ?? string.Empty };
+            ProcessNode(scene->MRootNode, scene, data.Meshes);
+            return data;
+        }
+        finally
+        {
+            assimp.Dispose();
+        }
     }
 
-    private unsafe void ProcessNode(Node* node, Scene* scene)
+    private static unsafe void ProcessNode(Node* node, Scene* scene, List<MeshData> meshes)
     {
         for (var i = 0; i < node->MNumMeshes; i++)
-            Meshes.Add(ProcessMesh(scene->MMeshes[node->MMeshes[i]]));
+            meshes.Add(ProcessMesh(scene->MMeshes[node->MMeshes[i]]));
 
         for (var i = 0; i < node->MNumChildren; i++)
-            ProcessNode(node->MChildren[i], scene);
+            ProcessNode(node->MChildren[i], scene, meshes);
     }
 
-    private unsafe Mesh ProcessMesh(AssimpMesh* mesh)
+    private static unsafe MeshData ProcessMesh(AssimpMesh* mesh)
     {
         var vertices = new List<Vertex>(capacity: (int)mesh->MNumVertices);
         var indices  = new List<uint>();
@@ -92,7 +119,7 @@ public class Model : IDisposable
                 indices.Add(face.MIndices[j]);
         }
 
-        return new Mesh(_gl, BuildVertices(vertices), BuildIndices(indices));
+        return new MeshData(BuildVertices(vertices), BuildIndices(indices));
     }
 
     private static float[] BuildVertices(List<Vertex> vertexCollection)
@@ -142,7 +169,5 @@ public class Model : IDisposable
     {
         foreach (var mesh in Meshes)
             mesh.Dispose();
-
-        _assimp?.Dispose(); // null-safe — not created for code-generated models
     }
 }

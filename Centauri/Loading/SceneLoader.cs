@@ -31,7 +31,9 @@ public class SceneLoader
         var json = File.ReadAllText(fullPath);
         var def  = JsonSerializer.Deserialize<SceneDefinition>(json, JsonDefaults.Options)
                    ?? throw new Exception($"Failed to deserialize scene file: {_path}");
-
+        
+        _resourceSystem.PreloadScene(def);
+        
         LoadEntities(def);
         LoadCameras(def);
         LoadSkyboxes(def);
