@@ -27,6 +27,9 @@ public sealed class ShaderBatcher
     // A run of entities sharing shader + model + material → one instanced draw per mesh.
     private readonly Dictionary<GLShader, List<Batch>> _groups = new();
     private int _revision = -1;
+    
+    public int RenderableEntities { get; private set; }
+    public int TwoSidedEntities   { get; private set; }
 
     public IReadOnlyDictionary<GLShader, List<Batch>> GetGroups(Scene scene)
     {
@@ -35,8 +38,6 @@ public sealed class ShaderBatcher
 
         _groups.Clear();
         
-        // (shader) -> (model, material) -> batch, so identical instances coalesce. Models
-        // and materials are cached/shared, so reference equality groups them correctly.
         var index = new Dictionary<GLShader, Dictionary<(Model, Material), Batch>>();
 
         foreach (var entity in scene.Entities)
@@ -62,10 +63,21 @@ public sealed class ShaderBatcher
 
             batch.Entities.Add(entity);
         }
-
-        // sort each group by material so texture binds are minimized
+        
+        RenderableEntities = 0;
+        TwoSidedEntities   = 0;
         foreach (var batches in _groups.Values)
+        {
             batches.Sort((a, b) => a.Material.SortKey.CompareTo(b.Material.SortKey));
+
+            foreach (var batch in batches)
+            {
+                RenderableEntities += batch.Entities.Count;
+                if (batch.Material.TwoSided)
+                    TwoSidedEntities += batch.Entities.Count;
+            }
+        }
+
 
         _revision = scene.Revision;
         return _groups;

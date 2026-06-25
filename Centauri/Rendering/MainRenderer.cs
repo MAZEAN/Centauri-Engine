@@ -80,7 +80,12 @@ public class MainRenderer : IDisposable
         BindShadows();
 
         var cull = _config.Debug.EnableCulling;
-        foreach (var (shader, batches) in _batcher.GetGroups(scene))
+        var groups = _batcher.GetGroups(scene);
+
+        stats.RenderableEntities = _batcher.RenderableEntities;
+        stats.TwoSidedEntities   = _batcher.TwoSidedEntities;
+
+        foreach (var (shader, batches) in groups)
         {
             shader.Use();
 
@@ -127,9 +132,10 @@ public class MainRenderer : IDisposable
             mesh.ConfigureInstancing(_instanceBuffer.Handle);
             mesh.DrawInstanced(_instances.Count);
 
-            stats.DrawCalls     += 1;
-            stats.TotalIndices  += (int)mesh.IndexCount  * _instances.Count;
-            stats.TotalVertices += (int)mesh.VertexCount * _instances.Count;
+            stats.DrawCalls      += 1;
+            stats.NaiveDrawCalls += _instances.Count;
+            stats.TotalIndices   += (int)mesh.IndexCount  * _instances.Count;
+            stats.TotalVertices  += (int)mesh.VertexCount * _instances.Count;
         }
     }
 
@@ -192,6 +198,7 @@ public class MainRenderer : IDisposable
         stats.DrawnEntities  = 0;
         stats.CulledEntities = 0;
         stats.DrawCalls      = 0;
+        stats.NaiveDrawCalls = 0;
         stats.TextureBinds   = 0;
         stats.TotalIndices   = 0;
         stats.TotalVertices  = 0;

@@ -51,6 +51,12 @@
       "position": [0, 5, 0]
     },
     {
+      "name":     "Sphere6",
+      "model":    "Assets/Objects/sphere.glb",
+      "position": [5, 1, -6],
+      "scale":    [0.5, 0.5, 0.5]
+    },
+    {
       "name":     "Torus",
       "model":    "Assets/Objects/torus.glb",
       "material": "Assets/Materials/WoodFloorDeck.mat",

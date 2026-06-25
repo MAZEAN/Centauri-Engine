@@ -15,6 +15,13 @@ public struct FrameStats
     public int   Batches        { get; set; }
     public float InstancesPerDraw => DrawCalls > 0 ? (float)DrawnEntities / DrawCalls : 0f;
     
+    public int   NaiveDrawCalls { get; set; }   
+    public float DrawCallReduction => NaiveDrawCalls > 0 ? (1f - DrawCalls / (float)NaiveDrawCalls) * 100f : 0f;
+
+    public int   RenderableEntities { get; set; }
+    public int   TwoSidedEntities   { get; set; }
+    public float TwoSidedPercent => RenderableEntities > 0 ? TwoSidedEntities / (float)RenderableEntities * 100f : 0f;
+    
     public int ShadowTotal => ShadowCasters + ShadowCulled;
     public int ShadowCasters { get; set; }   // depth-pass draws, summed across cascades
     public int ShadowCulled  { get; set; }   // frustum-culled per cascade, summed

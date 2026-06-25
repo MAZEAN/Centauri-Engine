@@ -107,6 +107,9 @@ public class StatsOverlay
             Row("Instances",     stats.DrawnEntities.ToString());
             RowColored("Inst/Draw", Widgets.Float(stats.InstancesPerDraw),
                 stats.InstancesPerDraw > 1f ? ColorPalette.Green : ColorPalette.White);
+            RowColored("Saved", $"{Widgets.Float(stats.DrawCallReduction)} %",
+                stats.DrawCallReduction > 0f ? ColorPalette.Green : ColorPalette.White);
+            Row("Two-Sided", $"{stats.TwoSidedEntities}/{stats.RenderableEntities} ({Widgets.Float(stats.TwoSidedPercent)} %)");
         });
         
         var cam = scene.Cameras.Active;
