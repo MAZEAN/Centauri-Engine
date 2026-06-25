@@ -56,10 +56,11 @@ public class RenderingSystem : IDisposable
         _gl            = gl;
         _config        = config;
         
-        _shadows = new ShadowMapper(gl, _config);
+        _instances = new InstanceBuffer(gl);
+        
+        _shadows = new ShadowMapper(gl, _config, _instances);
         _ibl = new IBLBaker(gl, _config.IBLConfig);
         _profiler = new GPUProfiler(gl);
-        _instances = new InstanceBuffer(gl);
         
         _mainRenderer   = new MainRenderer(gl, config, _ibl, _shadows, _instances);
         _gridRenderer   = new GridRenderer(gl);

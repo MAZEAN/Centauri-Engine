@@ -124,7 +124,7 @@ public class StatsOverlay
         {
             ConfigRow("VSync",   _config.Window.EnableVSync);
             ConfigRow("Culling", _config.Debug.EnableCulling);
-        });
+        }, defaultOpen:false);
     }
 
     private static void SetupWindow()
@@ -139,10 +139,11 @@ public class StatsOverlay
         ImGui.SetNextWindowBgAlpha(BgAlpha);
     }
 
-    private static void Section(string title, Vector4 accent, Action rows)
+    private static void Section(string title, Vector4 accent, Action rows, bool defaultOpen = true)
     {
-        var open = Widgets.BeginPanel(title, accent);   // colored, collapsible header
-        if (open) rows();
+        var open = Widgets.BeginPanel(title, accent, defaultOpen);   // colored, collapsible header
+        if (open) 
+            rows();
         
         Widgets.EndPanel(open);
     }

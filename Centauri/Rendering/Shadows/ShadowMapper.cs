@@ -7,28 +7,35 @@ using Config;
 using World;
 using Utils.Misc;
 using Graphics.Resources;
+using Graphics.Geometry;
 using Utils.Geometry;
 
 public sealed class ShadowMapper : IDisposable
 {
     private readonly GL _gl;
     private readonly AppConfig _config;
+    private readonly InstanceBuffer _instances;
+    
     private ShadowArray _maps;
     private readonly GLShader _depth;
     private readonly Frustum _cull = new();
     private readonly CascadeBuilder _cascadeBuilder;
+    
+    private readonly Dictionary<Model, List<InstanceData>> _solid    = new();
+    private readonly Dictionary<Model, List<InstanceData>> _twoSided = new();
 
     public bool Active { get; private set; }
     public uint DepthTexture => _maps.DepthTexture;
 
     public Cascade[] Cascades { get; private set; } = [];
 
-    public ShadowMapper(GL gl, AppConfig config)
+    public ShadowMapper(GL gl, AppConfig config, InstanceBuffer instances)
     {
         _gl = gl;
         _config = config;
+        _instances = instances;
+        
         _cascadeBuilder = new CascadeBuilder(config);
-        // pre-allocate every layer up front — cascade-count changes never re-alloc (no frame stall)
         _maps = new ShadowArray(gl, config.Shadows.Size, config.Shadows.MaxCascades);
         _depth = new GLShader(gl,
             PathResolver.Resolve("Assets/Shaders/Shadow/depth.vert"),
@@ -65,45 +72,60 @@ public sealed class ShadowMapper : IDisposable
             _depth.Use();
             _depth.SetUniform("uLightMatrix", Cascades[c].Matrix);
             _cull.Update(Cascades[c].Matrix);
-
-            foreach (var entity in scene.Entities)
-            {
-                if (!entity.Enabled || entity.Model is not { } model)
-                    continue;
-
-                if (!_cull.IsVisibleAABB(entity.GetWorldBounds()))
-                {
-                    stats.ShadowCulled++;
-                    continue;
-                }       
-                
-                // solid casters record BACK-face depth (cull front) to avoid self-shadow
-                // acne; two-sided casters have no back face, so draw both sides
-                if (entity.Material is { TwoSided: true })
-                    _gl.Disable(EnableCap.CullFace);
-                else
-                {
-                    _gl.Enable(EnableCap.CullFace);
-                    _gl.CullFace(TriangleFace.Front);
-                }
-
-                stats.ShadowCasters++;
-                
-                _depth.SetUniform("uModel", entity.Transform.WorldMatrix);
-                foreach (var mesh in model.Meshes)
-                {
-                    mesh.Bind();
-                    unsafe
-                    {
-                        _gl.DrawElements(PrimitiveType.Triangles, mesh.IndexCount,
-                            DrawElementsType.UnsignedInt, (void*)0);
-                    }
-                }
-            }
+            
+            BucketCasters(scene, ref stats);
+            
+            _gl.Enable(EnableCap.CullFace);
+            _gl.CullFace(TriangleFace.Front);
+            DrawGroups(_solid, ref stats);
+            
+            _gl.Disable(EnableCap.CullFace);
+            DrawGroups(_twoSided, ref stats);
         }
 
         ResetRenderState();
         Active = true;
+    }
+    
+    private void BucketCasters(Scene scene, ref FrameStats stats)
+    {
+        foreach (var list in _solid.Values)    list.Clear();
+        foreach (var list in _twoSided.Values) list.Clear();
+
+        foreach (var entity in scene.Entities)
+        {
+            if (!entity.Enabled || entity.Model is not { } model)
+                continue;
+
+            if (!_cull.IsVisibleAABB(entity.GetWorldBounds()))
+            {
+                stats.ShadowCulled++;
+                continue;
+            }
+
+            var groups = entity.Material is { TwoSided: true } ? _twoSided : _solid;
+            if (!groups.TryGetValue(model, out var list))
+                groups[model] = list = new List<InstanceData>();
+
+            list.Add(new InstanceData(entity.Transform.WorldMatrix, entity.UvScale, entity.UvOffset));
+        }
+    }
+    
+    private void DrawGroups(Dictionary<Model, List<InstanceData>> groups, ref FrameStats stats)
+    {
+        foreach (var (model, list) in groups)
+        {
+            if (list.Count == 0) continue;
+
+            _instances.Upload(list);
+            stats.ShadowCasters += list.Count;
+
+            foreach (var mesh in model.Meshes)
+            {
+                mesh.ConfigureInstancing(_instances.Handle);
+                mesh.DrawInstanced(list.Count);
+            }
+        }
     }
     
     private static BoundingBox ComputeSceneBounds(Scene scene)
