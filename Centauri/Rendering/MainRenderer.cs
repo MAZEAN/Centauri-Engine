@@ -156,25 +156,15 @@ public class MainRenderer : IDisposable
         if (_twoSided == twoSided) return;
         _twoSided = twoSided;
 
-        if (twoSided)
-        {
+        if (twoSided) 
             _gl.Disable(EnableCap.CullFace);
-            _gl.Disable(EnableCap.Blend);
-            _gl.Enable(EnableCap.SampleAlphaToCoverage);
-        }
-        else
-        {
+        else          
             _gl.Enable(EnableCap.CullFace);
-            _gl.Enable(EnableCap.Blend);
-            _gl.Disable(EnableCap.SampleAlphaToCoverage);
-        }
     }
 
     private void RestoreSurfaceState()
     {
         _gl.Enable(EnableCap.CullFace);
-        _gl.Enable(EnableCap.Blend);
-        _gl.Disable(EnableCap.SampleAlphaToCoverage);
     }
 
     

@@ -249,7 +249,7 @@ void main()
     float ao           = texture(uAOMap, fUv).r;
 
     vec3 albedo = pow(albedoSample.rgb, vec3(2.2));
-    if (albedoSample.a < 0.1) discard;
+    if (albedoSample.a < 0.5) discard;
 
     vec3 T = fTBN[0];
     vec3 N = (uHasNormal == 1 && dot(T, T) > 1e-5)
