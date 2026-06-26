@@ -1,6 +1,7 @@
 namespace Centauri.Rendering;
 
 using Silk.NET.OpenGL;
+using System.Numerics;
 
 using Config;
 using World;
@@ -39,6 +40,12 @@ public class MainRenderer : IDisposable
     private readonly List<InstanceData> _instances = new();
 
     private bool _iblActive;
+    private GLShader? _activeShader;
+    private Camera    _viewCamera = null!;
+    private Matrix4x4 _view;
+    private Vector3   _cameraPosition;
+    private float     _iblScale;
+    private bool      _ssaoActive;
 
     public MainRenderer(GL gl, AppConfig config, IBLBaker ibl, ShadowMapper shadows, InstanceBuffer instances)
     {
@@ -58,51 +65,40 @@ public class MainRenderer : IDisposable
         ResetFrameStats(ref stats);
         _textures.Reset();
         
+        _activeShader = null;
+        
         if (ssaoActive)
         {
             _gl.ActiveTexture(TextureUnit.Texture9);
             _gl.BindTexture(TextureTarget.Texture2D, ssaoTexture);
         }
 
-        var viewCamera    = scene.Cameras.Active;
+        _viewCamera = scene.Cameras.Active;
         var cullingCamera = scene.Cameras.Primary;
 
         cullingCamera.UpdateFrustum();
 
-        var view           = viewCamera.GetViewMatrix();
-        var cameraPosition = viewCamera.Position;
+        _view           = _viewCamera.GetViewMatrix();
+        _cameraPosition = _viewCamera.Position;
+        _iblScale       = DaylightIblScale(scene);
+        _ssaoActive     = ssaoActive;
 
         UploadLights(scene.Lighting);
-
-        var iblScale = DaylightIblScale(scene);
 
         BindIbl(scene);
         BindShadows();
 
         var cull = _config.Debug.EnableCulling;
-        var groups = _batcher.GetGroups(scene);
+        var batches = _batcher.GetBatches(scene);
 
         stats.RenderableEntities = _batcher.RenderableEntities;
         stats.TwoSidedEntities   = _batcher.TwoSidedEntities;
 
-        foreach (var (shader, batches) in groups)
-        {
-            shader.Use();
-
-            if (_lightBlockBound.Add(shader))
-                shader.BindUniformBlock("Lights", LightBuffer.BindingPoint);
-
-            shader.SetUniform("uView",      view);
-            shader.SetUniform("uCameraPos", cameraPosition);
-
-            _uniforms.UploadGlobals(shader, viewCamera, _iblActive, iblScale, ssaoActive);
-
-            foreach (var batch in batches)
-                DrawBatch(batch, shader, cullingCamera, cull, ref stats);
-        }
+        foreach (var batch in batches)
+            DrawBatch(batch, cullingCamera, cull, ref stats);
     }
 
-    private void DrawBatch(Batch batch, GLShader shader, Camera cullCamera, bool cull, ref FrameStats stats)
+    private void DrawBatch(Batch batch, Camera cullCamera, bool cull, ref FrameStats stats)
     {
         _instances.Clear();
 
@@ -119,16 +115,24 @@ public class MainRenderer : IDisposable
         }
         
         if (_instances.Count == 0) return;
-
-        stats.TextureBinds += _textures.BindMaterial(batch.Material);
-        ShaderUniformBinder.UploadMaterial(shader, batch.Material);
+        
         _instanceBuffer.Upload(_instances);
 
         stats.DrawnEntities += _instances.Count;
         stats.Batches++;
 
-        foreach (var mesh in batch.Model.Meshes)
+        var meshes = batch.Model.Meshes;
+        for (var i = 0; i < meshes.Count; i++)
         {
+            if (i >= batch.Materials.Length || batch.Materials[i] is not { } material)
+                continue;
+
+            var shader = EnsureShader(material.Shader);
+
+            stats.TextureBinds += _textures.BindMaterial(material);
+            ShaderUniformBinder.UploadMaterial(shader, material);
+
+            var mesh = meshes[i];
             mesh.ConfigureInstancing(_instanceBuffer.Handle);
             mesh.DrawInstanced(_instances.Count);
 
@@ -137,6 +141,22 @@ public class MainRenderer : IDisposable
             stats.TotalIndices   += (int)mesh.IndexCount  * _instances.Count;
             stats.TotalVertices  += (int)mesh.VertexCount * _instances.Count;
         }
+    }
+    
+    private GLShader EnsureShader(GLShader shader)
+    {
+        if (ReferenceEquals(shader, _activeShader)) return shader;
+
+        shader.Use();
+        if (_lightBlockBound.Add(shader))
+            shader.BindUniformBlock("Lights", LightBuffer.BindingPoint);
+
+        shader.SetUniform("uView",      _view);
+        shader.SetUniform("uCameraPos", _cameraPosition);
+        _uniforms.UploadGlobals(shader, _viewCamera, _iblActive, _iblScale, _ssaoActive);
+
+        _activeShader = shader;
+        return shader;
     }
 
     // -----------------------------

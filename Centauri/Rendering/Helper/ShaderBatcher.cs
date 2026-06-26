@@ -1,64 +1,52 @@
 namespace Centauri.Rendering.Helper;
 
-using Graphics.Resources;
 using Graphics.Resources.Materials;
 using Graphics.Geometry;
 using World;
 
 public sealed class Batch
 {
-    public Batch(Model model, Material material)
+    public Batch(Model model, Material?[] materials)
     {
         Model    = model;
-        Material = material;
+        Materials = materials;
     }
 
-    public Model    Model    { get; }
-    public Material Material { get; }
+    public Model       Model     { get; }
+    public Material?[] Materials { get; }
     public List<Entity> Entities { get; } = new();
 }
 
-// Groups scene entities for instanced drawing: first by shader, then coalesced by
-// (model, material) so every entity sharing all three is drawn in one instanced call per
-// mesh. Within a shader, batches are sorted by material so consecutive draws reuse texture
-// binds. Rebuilt only when the scene changes (tracked by Scene.Revision).
 public sealed class ShaderBatcher
 {
-    // A run of entities sharing shader + model + material → one instanced draw per mesh.
-    private readonly Dictionary<GLShader, List<Batch>> _groups = new();
+    private readonly List<Batch> _batches = new();
     private int _revision = -1;
     
     public int RenderableEntities { get; private set; }
     public int TwoSidedEntities   { get; private set; }
 
-    public IReadOnlyDictionary<GLShader, List<Batch>> GetGroups(Scene scene)
+    public IReadOnlyList<Batch> GetBatches(Scene scene)
     {
         if (scene.Revision == _revision)
-            return _groups;
+            return _batches;
 
-        _groups.Clear();
-        
-        var index = new Dictionary<GLShader, Dictionary<(Model, Material), Batch>>();
+        _batches.Clear();
+        var byModel = new Dictionary<Model, List<Batch>>();
 
         foreach (var entity in scene.Entities)
         {
-            if (entity.Material is not { } material) continue;   // light-only / mesh-less
-            if (entity.Model    is not { } model)    continue;
+            if (entity.Model is not { } model) continue;   // light-only / mesh-less
+            if (entity.Materials.Count == 0)    continue;
             
-            var shader = material.Shader;
-            if (!index.TryGetValue(shader, out var byKey))
-            {
-                byKey           = new Dictionary<(Model, Material), Batch>();
-                index[shader]   = byKey;
-                _groups[shader] = new List<Batch>();
-            }
+            if (!byModel.TryGetValue(model, out var perModel))
+                byModel[model] = perModel = new List<Batch>();
 
-            var key = (model, material);
-            if (!byKey.TryGetValue(key, out var batch))
+            var batch = Find(perModel, entity);
+            if (batch is null)
             {
-                batch = new Batch(model, material);
-                byKey[key] = batch;
-                _groups[shader].Add(batch);
+                batch = new Batch(model, entity.Materials.ToArray());
+                perModel.Add(batch);
+                _batches.Add(batch);
             }
 
             batch.Entities.Add(entity);
@@ -66,20 +54,34 @@ public sealed class ShaderBatcher
         
         RenderableEntities = 0;
         TwoSidedEntities   = 0;
-        foreach (var batches in _groups.Values)
+        foreach (var batch in _batches)
         {
-            batches.Sort((a, b) => a.Material.SortKey.CompareTo(b.Material.SortKey));
-
-            foreach (var batch in batches)
-            {
-                RenderableEntities += batch.Entities.Count;
-                if (batch.Material.TwoSided)
-                    TwoSidedEntities += batch.Entities.Count;
-            }
+            RenderableEntities += batch.Entities.Count;
+            if (batch.Entities[0].AnyTwoSided)
+                TwoSidedEntities += batch.Entities.Count;
         }
-
+        _batches.Sort((a, b) => SortKey(a).CompareTo(SortKey(b)));
 
         _revision = scene.Revision;
-        return _groups;
+        return _batches;
     }
+    
+    private static Batch? Find(List<Batch> perModel, Entity entity)
+    {
+        foreach (var batch in perModel)
+            if (MaterialsMatch(batch.Materials, entity.Materials))
+                return batch;
+        return null;
+    }
+
+    private static bool MaterialsMatch(Material?[] a, IReadOnlyList<Material?> b)
+    {
+        if (a.Length != b.Count) return false;
+        for (var i = 0; i < a.Length; i++)
+            if (!ReferenceEquals(a[i], b[i])) return false;
+        return true;
+    }
+
+    private static ulong SortKey(Batch b) =>
+        b.Materials.Length > 0 && b.Materials[0] is { } m ? m.SortKey : 0;
 }

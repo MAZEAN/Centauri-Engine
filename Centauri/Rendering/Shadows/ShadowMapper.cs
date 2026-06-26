@@ -103,7 +103,7 @@ public sealed class ShadowMapper : IDisposable
                 continue;
             }
 
-            var groups = entity.Material is { TwoSided: true } ? _twoSided : _solid;
+            var groups = entity.AnyTwoSided ? _twoSided : _solid;
             if (!groups.TryGetValue(model, out var list))
                 groups[model] = list = new List<InstanceData>();
 

@@ -14,22 +14,23 @@ public class Entity : IDisposable
     public string    Name    { get; set; }
     public bool      Enabled { get; set; } = true;
     public Model?    Model    { get; }
-    public Material? Material { get; private set; }
     public Light?    Light    { get; set; }
     public Vector2   UvScale  { get; set; } = Vector2.One;
     public Vector2   UvOffset { get; set; } = Vector2.Zero;
     
-    private bool _ownsMaterial;
+    // Materials
+    private readonly Material?[] _materials;
+    private readonly bool[]      _ownsMaterial;   // per-submesh copy-on-write tracking
+    public IReadOnlyList<Material?> Materials => _materials;
     
+    // Components
     private readonly List<Component> _components = new();
     public IReadOnlyList<Component> Components => _components;
-
+    
+    // Geometry
     private BoundingBox _worldBounds;
     private bool _boundsDirty = true;
     private Transform _transform = new();
-    
-    public TransformSnapshot? Authored { get; set; }
-
     public Transform Transform
     {
         get => _transform;
@@ -41,12 +42,15 @@ public class Entity : IDisposable
             _boundsDirty          = true;
         }
     }
+    
+    public TransformSnapshot? Authored { get; set; }
 
-    public Entity(Model? model = null, Material? material = null, Light? light = null)
+    public Entity(Model? model = null, Material?[]? materials = null, Light? light = null)
     {
-        Model    = model;
-        Material = material;
-        Light    = light;
+        Model         = model;
+        _materials    = materials ?? Array.Empty<Material?>();
+        _ownsMaterial = new bool[_materials.Length];
+        Light         = light;
         _transform.OnChanged += OnTransformChanged;
     }
     
@@ -71,12 +75,23 @@ public class Entity : IDisposable
                 _components[i].Update(dt);
     }
     
-    public bool MakeMaterialUnique()
+    public bool AnyTwoSided
     {
-        if (_ownsMaterial || Material is null) return false;
+        get
+        {
+            foreach (var m in _materials)
+                if (m is { TwoSided: true }) return true;
+            return false;
+        }
+    }
+    
+    public bool MakeMaterialUnique(int index)
+    {
+        if ((uint)index >= (uint)_materials.Length || _ownsMaterial[index] || _materials[index] is null)
+            return false;
 
-        Material      = Material.Clone();
-        _ownsMaterial = true;
+        _materials[index]    = _materials[index]!.Clone();
+        _ownsMaterial[index] = true;
         return true;
     }
 

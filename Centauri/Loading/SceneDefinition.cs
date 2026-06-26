@@ -13,8 +13,9 @@ public class SceneDefinition
 public class EntityDefinition
 {
     [JsonPropertyName("name")]     public string  Name     { get; set; } = "Entity";
-    [JsonPropertyName("model")]    public string? Model    { get; set; }   // optional
-    [JsonPropertyName("material")] public string? Material { get; set; }   // optional
+    [JsonPropertyName("model")]    public string? Model    { get; set; }
+    [JsonPropertyName("material")] public string? Material { get; set; } 
+    [JsonPropertyName("materials")] public string[]? Materials { get; set; }
     [JsonPropertyName("position")] public float[] Position { get; set; } = [0f, 0f, 0f];
     [JsonPropertyName("scale")]    public float[] Scale    { get; set; } = [1f, 1f, 1f];
     [JsonPropertyName("rotation")] public float[]? Rotation { get; set; }

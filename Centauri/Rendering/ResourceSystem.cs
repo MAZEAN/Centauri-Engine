@@ -70,13 +70,14 @@ public class ResourceSystem : IDisposable
             .Select(e => e.Model!)
             .Distinct()
             .ToList();
-
+        
+        var materialPaths = def.Entities.SelectMany(MaterialPaths).Distinct();
         var texturePaths = new HashSet<string>();
-        foreach (var e in def.Entities)
+        
+        foreach (var matPath in materialPaths)
         {
-            if (string.IsNullOrEmpty(e.Material)) continue;
             
-            var m = ReadMaterialDef(e.Material);
+            var m = ReadMaterialDef(matPath);
             AddPath(texturePaths, m.Albedo);
             AddPath(texturePaths, m.Normal);
             AddPath(texturePaths, m.Roughness);
@@ -112,6 +113,15 @@ public class ResourceSystem : IDisposable
             foreach (var (key, data) in modelTask.Result)
                 Models.Insert(key, new Model(_gl, data));
         });
+    }
+    
+    private static IEnumerable<string> MaterialPaths(EntityDefinition e)
+    {
+        if (e.Materials is { Length: > 0 }) 
+            return e.Materials;
+        if (!string.IsNullOrEmpty(e.Material)) 
+            return [e.Material!];
+        return [];
     }
 
     private static void AddPath(HashSet<string> set, string? path)

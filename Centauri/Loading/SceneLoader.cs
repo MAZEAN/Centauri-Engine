@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Numerics;
 
 using Graphics.Resources.Materials;
+using Graphics.Geometry;
 using Config;
 using Rendering;
 using Utils.Misc;
@@ -47,17 +48,13 @@ public class SceneLoader
                 ? _resourceSystem.Models.Get(e.Model)
                 : null;
             
-            // Set default material if not a pure light source
-            var material = !string.IsNullOrEmpty(e.Material)
-                ? _resourceSystem.GetMaterial(e.Material)
-                : model is not null
-                    ? _resourceSystem.DefaultMaterial : null;
+            var materials = ResolveMaterials(e, model);
             
             Light? light = null;
             if (e.Light is { } l)
                 light = CreateLight(l);
 
-            var entity = new Entity(model, material, light);
+            var entity = new Entity(model, materials, light);
 
             entity.Name = e.Name;
 
@@ -84,6 +81,25 @@ public class SceneLoader
 
             _scene.AddEntity(entity);
         }
+    }
+    
+    private Material?[] ResolveMaterials(EntityDefinition e, Model? model)
+    {
+        if (model is null) return Array.Empty<Material?>();
+
+        var count = model.Meshes.Count;
+        var result = new Material?[count];
+
+        var paths = e.Materials is { Length: > 0 } ? e.Materials
+            : !string.IsNullOrEmpty(e.Material) ? new[] { e.Material! }
+            : null;
+
+        for (var i = 0; i < count; i++)
+            result[i] = paths is null
+                ? _resourceSystem.DefaultMaterial
+                : _resourceSystem.GetMaterial(paths[Math.Min(i, paths.Length - 1)]);
+
+        return result;
     }
     
     private static Light CreateLight(LightDefinition l)

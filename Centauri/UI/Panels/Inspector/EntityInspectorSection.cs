@@ -60,14 +60,24 @@ public sealed class EntityInspectorSection : IInspectorSection
 
     private static void DrawMaterial(Entity e, Scene scene)
     {
-        if (e.Material is not { } mat) return;
+        if (e.Materials.Count == 0) return;
 
         using var s = Widgets.Section("Material");
         if (!s.Open) return;
 
-        Widgets.ColorRow4("Base Color", mat.Color, v => EditMaterial(e, scene, m => m.Color = v));
-        Widgets.SliderRow("Roughness", mat.RoughnessValue, v => EditMaterial(e, scene, m => m.RoughnessValue = v), 0f, 1f, 0.5f);
-        Widgets.SliderRow("Metallic",  mat.MetallicValue,  v => EditMaterial(e, scene, m => m.MetallicValue  = v), 0f, 1f, 0.1f);
+        for (var i = 0; i < e.Materials.Count; i++)
+        {
+            if (e.Materials[i] is not { } mat) continue;
+            var index = i;   // capture for the edit closures
+
+            ImGui.PushID(i);
+            if (e.Materials.Count > 1) ImGui.TextDisabled($"Submesh {i}");
+
+            Widgets.ColorRow4("Base Color", mat.Color, v => EditMaterial(e, scene, index, m => m.Color = v));
+            Widgets.SliderRow("Roughness", mat.RoughnessValue, v => EditMaterial(e, scene, index, m => m.RoughnessValue = v), 0f, 1f, 0.5f);
+            Widgets.SliderRow("Metallic",  mat.MetallicValue,  v => EditMaterial(e, scene, index, m => m.MetallicValue  = v), 0f, 1f, 0.1f);
+            ImGui.PopID();
+        }
     }
 
     private static void DrawLight(Entity e)
@@ -116,10 +126,11 @@ public sealed class EntityInspectorSection : IInspectorSection
         }
     }
     
-    private static void EditMaterial(Entity e, Scene scene, Action<Material> apply)
+    private static void EditMaterial(Entity e, Scene scene, int index, Action<Material> apply)
     {
-        if (e.MakeMaterialUnique()) scene.MarkDirty();
-        apply(e.Material!);
+        if (e.MakeMaterialUnique(index)) 
+            scene.MarkDirty();
+        apply(e.Materials[index]!);
     }
 
     private static Light CreateLight(int typeIndex, Light? from)
