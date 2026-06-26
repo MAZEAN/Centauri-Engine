@@ -78,5 +78,6 @@ public sealed class ShaderUniformBinder
         shader.SetUniform("uRoughnessValue", mat.RoughnessValue);
         shader.SetUniform("uMetallicValue",  mat.MetallicValue);
         shader.SetUniform("uColor",          mat.Color);
+        shader.SetUniform("uFoliage",        mat.TwoSided ? 1 : 0);
     }
 }

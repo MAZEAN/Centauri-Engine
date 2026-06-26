@@ -29,10 +29,12 @@
 * [x] Performance graphs
 * [x] Light editing
 * [x] bloom 
+* [x] Instancing
+* [x] Async asset loading
+* [x] Sub-mesh materials
+* [ ] LOD system (Impostor)
 * [ ] auto-exposure 
 * [ ] volumetric fog
-* [ ] Multithreading (async asset loading etc.)
-* [ ] Instancing & LOD system
 * [ ] Keybindings
 * [ ] UI improvements (DPI-scaling etc.)
 

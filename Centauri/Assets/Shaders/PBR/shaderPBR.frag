@@ -66,6 +66,7 @@ uniform float uIblIntensity;
 // SSAO
 uniform sampler2D uSsaoMap;   // unit 9
 uniform int       uHasSSAO;
+uniform int uFoliage;   // 1 = two-sided foliage: add leaf transmission, skip screen-space AO
 
 // Shadows
 uniform sampler2DArrayShadow uShadowMap;         // unit 8 (now an array)
@@ -272,6 +273,12 @@ void main()
         vec3 radiance = uDir.color.xyz * uDir.params.x;
         float shadow  = uHasShadow == 1 ? ShadowFactor(N, L) : 0.0;
         Lo += CalcPBR(L, radiance, N, V, albedo, roughness, metallic) * (1.0 - shadow);
+
+        if (uFoliage == 1)
+        {
+            float backlit = pow(max(dot(V, -L), 0.0), 2.0);
+            Lo += albedo * radiance * (backlit + 0.25) * (1.0 - shadow * 0.5);
+        }
     }
 
     // point lights
@@ -291,7 +298,7 @@ void main()
 
     // spotlights
     for (int i = 0; i < uCounts.y; i++)
-    Lo += CalcSpotLight(uSpots[i], N, V, albedo, roughness, metallic);
+        Lo += CalcSpotLight(uSpots[i], N, V, albedo, roughness, metallic);
     
     // ambient lighting
     vec3 F0 = mix(vec3(0.04), albedo, metallic);
@@ -312,7 +319,7 @@ void main()
         ambient = vec3(0.03) * mix(albedo, F0, metallic) * ao;   // fallback
     }
 
-    if (uHasSSAO == 1)
+    if (uHasSSAO == 1 && uFoliage == 0)
     {
         vec2 ssaoUv = (fClipPos.xy / fClipPos.w) * 0.5 + 0.5;
         ambient *= texture(uSsaoMap, ssaoUv).r;
