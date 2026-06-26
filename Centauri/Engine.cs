@@ -41,16 +41,25 @@ public class Engine : IWindowCallbacks
     {
         try
         {
-            InitializeOpenGL();
-            InitializeSystems();
-            LoadScene();
-            InitializeInput();
+            var total = System.Diagnostics.Stopwatch.StartNew();
+            Time("OpenGL init", InitializeOpenGL);
+            Time("Systems",     InitializeSystems);
+            Time("Scene load",  LoadScene);
+            Time("Input",       InitializeInput);
+            Console.WriteLine($"[Engine] Startup total: {total.Elapsed.TotalMilliseconds:F1} ms");
         }
         catch (Exception ex)
         {
             Console.WriteLine($"OnLoad failed: {ex}");
             throw;
         }
+    }
+    
+    private static void Time(string label, Action phase)
+    {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        phase();
+        Console.WriteLine($"[Engine]   {label}: {stopwatch.Elapsed.TotalMilliseconds:F1} ms");
     }
 
     private void InitializeSystems()
@@ -63,9 +72,9 @@ public class Engine : IWindowCallbacks
     private void LoadScene()
     {
         _sceneLoader = new SceneLoader(_resourceSystem, _scene, _config);
-        _sceneLoader.Load();
+        Time("scene assets + entities", _sceneLoader.Load);
         _scene.Cameras.InitializeAspect(_window);
-        _renderingSystem.BakeEnvironments(_scene);
+        Time("IBL bake", () => _renderingSystem.BakeEnvironments(_scene));
     }
 
     private void InitializeInput()

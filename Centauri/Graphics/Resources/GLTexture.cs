@@ -75,7 +75,6 @@ public class GLTexture : GLResource
         return new TextureData { IsHdr = false, Width = image.Width, Height = image.Height, Ldr = pixels };
     }
 
-    // Wraps an in-memory 8-bit RGBA buffer (e.g. the 1×1 default texture).
     public unsafe GLTexture(GL gl, Span<byte> data, uint width, uint height) : base(gl)
     {
         Handle = Gl.GenTexture();

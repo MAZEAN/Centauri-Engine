@@ -76,6 +76,7 @@ public class ResourceSystem : IDisposable
         foreach (var e in def.Entities)
         {
             if (string.IsNullOrEmpty(e.Material)) continue;
+            
             var m = ReadMaterialDef(e.Material);
             AddPath(texturePaths, m.Albedo);
             AddPath(texturePaths, m.Normal);
@@ -83,18 +84,27 @@ public class ResourceSystem : IDisposable
             AddPath(texturePaths, m.Metallic);
             AddPath(texturePaths, m.AO);
         }
+        
         foreach (var s in def.Skyboxes)
             AddPath(texturePaths, s.Panorama);
+
+        DecodeAssetsInParallelAndUpload(modelPaths, texturePaths);
+    }
+
+    private void DecodeAssetsInParallelAndUpload
+        (List<string> modelPaths, HashSet<string> texturePaths)
+    {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         // CPU decode off the GL thread
         var textureJob = Task.WhenAll(texturePaths.Select(key =>
             Task.Run(() => (key, data: GLTexture.Decode(PathResolver.Resolve(key))))));
 
-        var modelJob = Task.Run(() => modelPaths
-            .Select(key => (key, data: Model.Decode(PathResolver.Resolve(key))))
-            .ToList());
+        var modelJob = Task.WhenAll(modelPaths.Select(key =>
+            Task.Run(() => (key, data: Model.Decode(PathResolver.Resolve(key))))));
 
         Task.WaitAll(textureJob, modelJob);
+        var decodeMs = stopwatch.Elapsed.TotalMilliseconds;
 
         // GL creation on the calling (main) thread
         foreach (var (key, data) in textureJob.Result)
@@ -102,11 +112,16 @@ public class ResourceSystem : IDisposable
 
         foreach (var (key, data) in modelJob.Result)
             Models.Insert(key, new Model(_gl, data));
+        
+        Console.WriteLine(
+            $"[ResourceSystem] Preloaded {texturePaths.Count} textures + {modelPaths.Count} models — " +
+            $"parallel decode {decodeMs:F1} ms, GL upload {stopwatch.Elapsed.TotalMilliseconds - decodeMs:F1} ms");
     }
 
     private static void AddPath(HashSet<string> set, string? path)
     {
-        if (!string.IsNullOrEmpty(path)) set.Add(path);
+        if (!string.IsNullOrEmpty(path)) 
+            set.Add(path);
     }
 
     private static MaterialDefinition ReadMaterialDef(string path)

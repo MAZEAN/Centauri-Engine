@@ -28,12 +28,9 @@ public sealed class ModelData
 
 public class Model : IDisposable
 {
-    private readonly GL      _gl;
-    private readonly Assimp? _assimp;
-
     public string      AssetDirectory { get; private set; } = string.Empty;
     
-    public List<Mesh>  Meshes { get; private set; } = new();
+    public List<Mesh>  Meshes { get; private set; }
     public BoundingBox Bounds { get; private set; }
 
     // constructor for file-loaded models
@@ -74,8 +71,10 @@ public class Model : IDisposable
             {
                 throw new Exception($"Assimp failed to load '{path}': {assimp.GetErrorStringS()}");
             }
+            
             var data = new ModelData { AssetDirectory = Path.GetDirectoryName(path) ?? string.Empty };
             ProcessNode(scene->MRootNode, scene, data.Meshes);
+            
             return data;
         }
         finally
@@ -126,7 +125,7 @@ public class Model : IDisposable
     {
         // 11 floats per vertex: pos(3) + normal(3) + uv(2) + tangent(3)
         var vertices = new float[vertexCollection.Count * 11];
-        int i = 0;
+        var i = 0;
 
         foreach (var v in vertexCollection)
         {
