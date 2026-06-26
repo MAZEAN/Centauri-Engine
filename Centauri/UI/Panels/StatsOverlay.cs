@@ -170,10 +170,12 @@ public class StatsOverlay
         ImGui.SetCursorPosX(startX + LabelWidth);
 
         var tinted = color.W > 0f;
-        if (tinted) ImGui.PushStyleColor(ImGuiCol.Text, color);
+        if (tinted) 
+            ImGui.PushStyleColor(ImGuiCol.Text, color);
         
         ImGui.TextUnformatted(value);
-        if (tinted) ImGui.PopStyleColor();
+        if (tinted) 
+            ImGui.PopStyleColor();
     }
 
     private static ImGuiWindowFlags GetModeDependentFlags(ViewMode activeMode)

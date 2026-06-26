@@ -17,11 +17,14 @@ internal sealed class GpuTimingGraph
     private const float LeftPad = 36f;   // Y tick-label gutter
     private const float BotPad  = 20f;   // X label gutter
     private const float TopPad  = 20f;
+    private const float IconSize = 10f;
 
     private const int   Capacity         = 200;    // samples retained
     private const float SampleIntervalMs = 50f;    // one plotted point per 50 ms
     private const float WindowSeconds    = Capacity * SampleIntervalMs / 1000f;
     private const int   MaxZones         = 8;
+    
+    private enum HeaderAlign { Left, Right }
 
     private static readonly Vector4[] Palette =
     [
@@ -155,11 +158,128 @@ internal sealed class GpuTimingGraph
         dl.AddText(new Vector2(p0.X, p1.Y + 2f), tick, $"-{WindowSeconds:0}s");
         var nowSz = ImGui.CalcTextSize("now");
         dl.AddText(new Vector2(p1.X - nowSz.X, p1.Y + 2f), tick, "now");
-
+        
         DrawLegend();
     }
 
     private void DrawLegend()
+    {
+        var last  = (_head - 1 + Capacity) % Capacity;
+        var total = GetTotal();
+
+        if (!BeginLegendTable())
+            return;
+
+        for (var z = 0; z < _zoneCount; z++)
+            DrawLegendRow(z, last, total);
+
+        DrawTotalRow(total);
+
+        ImGui.EndTable();
+    }
+    
+    private static bool BeginLegendTable()
+    {
+        const ImGuiTableFlags flags =
+            ImGuiTableFlags.SizingStretchProp |
+            ImGuiTableFlags.BordersInnerV |
+            ImGuiTableFlags.NoHostExtendX;
+
+        if (!ImGui.BeginTable("GpuLegend", 3, flags))
+            return false;
+
+        ImGui.TableSetupColumn("Pass", ImGuiTableColumnFlags.WidthStretch);
+        ImGui.TableSetupColumn("Time (ms)", ImGuiTableColumnFlags.WidthFixed, 90f);
+        ImGui.TableSetupColumn("%", ImGuiTableColumnFlags.WidthFixed, 70f);
+
+        ImGui.TableNextRow(ImGuiTableRowFlags.Headers);
+
+        DrawHeaderCell(0, "Pass", HeaderAlign.Left);
+        DrawHeaderCell(1, "Time (ms)", HeaderAlign.Right);
+        DrawHeaderCell(2, "%", HeaderAlign.Right);
+
+        return true;
+    }
+
+    private static void DrawHeaderCell(int column, string text, HeaderAlign align = HeaderAlign.Right)
+    {
+        ImGui.TableSetColumnIndex(column);
+
+        var width = ImGui.CalcTextSize(text).X;
+        var avail = ImGui.GetContentRegionAvail().X;
+
+        if (align == HeaderAlign.Right && avail > width)
+            ImGui.SetCursorPosX(ImGui.GetCursorPosX() + avail - width);
+
+        if (align == HeaderAlign.Left)
+            ImGui.SetCursorPosX(ImGui.GetCursorPosX());
+
+        ImGui.TextUnformatted(text);
+    }
+    
+    private void DrawLegendRow(int zone, int last, float total)
+    {
+        var ms = _count > 0 ? _samples[last, zone] : 0f;
+
+        var percentage = total > 0.00001f
+            ? ms / total * 100f
+            : 0f;
+
+        ImGui.TableNextRow();
+
+        DrawPassCell(zone);
+        DrawRightAlignedCell(1, $"{ms:0.000}");
+        DrawRightAlignedCell(2, $"{percentage:0.0}%");
+    }
+    
+    private static void DrawTotalRow(float total)
+    {
+        ImGui.TableNextRow();
+
+        ImGui.TableSetColumnIndex(0);
+        ImGui.TextDisabled("Total");
+
+        DrawRightAlignedCell(1, $"{total:0.000}");
+        DrawRightAlignedCell(2, "100.0%");
+    }
+    
+    private void DrawPassCell(int zone)
+    {
+        ImGui.TableSetColumnIndex(0);
+        
+        // vertical centering inside row
+        const float yOffset = IconSize * 0.5f;
+        if (yOffset > 0f)
+            ImGui.SetCursorPosY(ImGui.GetCursorPosY() + yOffset);
+
+        ImGui.ColorButton(
+            $"##gpu{zone}",
+            Palette[zone % Palette.Length],
+            ImGuiColorEditFlags.NoTooltip | ImGuiColorEditFlags.NoBorder,
+            new Vector2(IconSize, IconSize));
+
+        ImGui.SameLine(0f, 6f);
+
+        // reset Y so text aligns with row baseline nicely
+        ImGui.SetCursorPosY(ImGui.GetCursorPosY() - yOffset);
+
+        ImGui.TextUnformatted(_names[zone]);
+    }
+    
+    private static void DrawRightAlignedCell(int column, string text)
+    {
+        ImGui.TableSetColumnIndex(column);
+
+        var width = ImGui.CalcTextSize(text).X;
+        var avail = ImGui.GetContentRegionAvail().X;
+
+        if (avail > width)
+            ImGui.SetCursorPosX(ImGui.GetCursorPosX() + avail - width);
+
+        ImGui.TextUnformatted(text);
+    }
+
+    private float GetTotal()
     {
         var last  = (_head - 1 + Capacity) % Capacity;
         var total = 0f;
@@ -168,21 +288,13 @@ internal sealed class GpuTimingGraph
         {
             var ms = _count > 0 ? _samples[last, z] : 0f;
             total += ms;
-
-            ImGui.ColorButton($"##gpu{z}", Palette[z % Palette.Length],
-                ImGuiColorEditFlags.NoTooltip | ImGuiColorEditFlags.NoBorder, new Vector2(10f, 10f));
-            ImGui.SameLine();
-            ImGui.TextUnformatted($"{_names[z]}: {ms:0.000} ms");
         }
-
-        ImGui.Separator();
-        ImGui.TextUnformatted($"Total: {total:0.000} ms");
+        return total;
     }
 
     private static float Y(float baseY, float h, float value, float yMax) =>
         baseY - h * MathF.Min(value / yMax, 1f);
 
-    // Round up to a tidy axis maximum (… 1, 2, 2.5, 5 × 10ⁿ …), min 1 ms.
     private static float NiceCeil(float v)
     {
         if (v <= 1f) return 1f;
