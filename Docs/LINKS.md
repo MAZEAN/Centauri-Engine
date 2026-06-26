@@ -4,3 +4,7 @@
 - [RGB 0-1 Color Picker] (https://rgbcolorpicker.com/0-1)
 - [HDRI to CubeMap] (https://matheowis.github.io/HDRI-to-CubeMap)
 - [NASA Night Sky] (https://svs.gsfc.nasa.gov/4451/) & (https://svs.gsfc.nasa.gov/4856/)
+- [Quaternius Assets] (https://quaternius.com/)
+- [Kenney Assets] (https://kenney.nl/)
+- [Sketchfab Assets] (https://sketchfab.com/)
+- [Itch.io Assets] (https://itch.io/)

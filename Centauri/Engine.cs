@@ -5,6 +5,7 @@ using Silk.NET.Windowing;
 using Silk.NET.Maths;
 
 using Config;
+using Utils.Misc;
 using World;
 using Rendering;
 using Input;
@@ -41,25 +42,19 @@ public class Engine : IWindowCallbacks
     {
         try
         {
-            var total = System.Diagnostics.Stopwatch.StartNew();
-            Time("OpenGL init", InitializeOpenGL);
-            Time("Systems",     InitializeSystems);
-            Time("Scene load",  LoadScene);
-            Time("Input",       InitializeInput);
-            Console.WriteLine($"[Engine] Startup total: {total.Elapsed.TotalMilliseconds:F1} ms");
+            using (Time.Measure("Startup total"))
+            {
+                Time.Run("OpenGL init", InitializeOpenGL);
+                Time.Run("Systems",     InitializeSystems);
+                Time.Run("Scene load",  LoadScene);
+                Time.Run("Input",       InitializeInput);
+            }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"OnLoad failed: {ex}");
             throw;
         }
-    }
-    
-    private static void Time(string label, Action phase)
-    {
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        phase();
-        Console.WriteLine($"[Engine]   {label}: {stopwatch.Elapsed.TotalMilliseconds:F1} ms");
     }
 
     private void InitializeSystems()
@@ -72,9 +67,10 @@ public class Engine : IWindowCallbacks
     private void LoadScene()
     {
         _sceneLoader = new SceneLoader(_resourceSystem, _scene, _config);
-        Time("scene assets + entities", _sceneLoader.Load);
+        Time.Run("Scene assets + entities", _sceneLoader.Load);
+        
         _scene.Cameras.InitializeAspect(_window);
-        Time("IBL bake", () => _renderingSystem.BakeEnvironments(_scene));
+        Time.Run("IBL bake", () => _renderingSystem.BakeEnvironments(_scene));
     }
 
     private void InitializeInput()
@@ -90,44 +86,32 @@ public class Engine : IWindowCallbacks
     private void InitializeOpenGL()
     {
         _gl = GL.GetApi(_window);
-
-        // background color when clearing the frame
+        
         var c = _config.Window.ClearColor;
         _gl.ClearColor(c[0], c[1], c[2], c[3]);
-
-        // discard fragments that are behind already-drawn geometry
+        
         _gl.Enable(EnableCap.DepthTest);
         _gl.DepthFunc(DepthFunction.Less);
-
-        // smooth jagged edges — sample count set in WindowConfig.Samples
+        
         _gl.Enable(GLEnum.Multisample);
-
-        // define the render region — important for high-DPI displays
+        
         _gl.Viewport(_window.FramebufferSize);
-
-        // enable alpha transparency
+        
         _gl.Enable(EnableCap.Blend);
-
-        // blend color and alpha channels separately:
-        // color: srcAlpha * src + (1 - srcAlpha) * dst  — standard transparency
-        // alpha: 1 * src + 0 * dst                      — preserve source alpha
+        
         _gl.BlendFuncSeparate(
             BlendingFactor.SrcAlpha,
             BlendingFactor.OneMinusSrcAlpha,
             BlendingFactor.One,
             BlendingFactor.Zero
         );
-
-        // skip rendering triangles facing away from camera — halves fragment work
-        // requires consistent counter-clockwise winding in exported meshes (Blender default)
+        
         _gl.Enable(EnableCap.CullFace);
         _gl.CullFace(TriangleFace.Back);
         _gl.FrontFace(FrontFaceDirection.Ccw);
-
-        // needed if you add skybox or reflections later — removes seams on cubemap edges
+        
         _gl.Enable(EnableCap.TextureCubeMapSeamless);
-
-        // default fill mode — change to PolygonMode.Line for wireframe debugging
+        
         _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Fill);
     }
 

@@ -22,7 +22,6 @@ public class ResourceSystem : IDisposable
     public AssetCache<Model> Models { get; }
     
     private readonly Dictionary<string, Material> _materials = new();
-    private Material? _defaultMaterial;
     public GLTexture DefaultTexture { get; private set; }
 
     public ResourceSystem(GL gl, AppConfig config)
@@ -52,7 +51,7 @@ public class ResourceSystem : IDisposable
     }
     
     public Material DefaultMaterial
-        => _defaultMaterial ??= new(Shaders.Get(_config.Render.DefaultShader)) { AO = DefaultTexture };
+        => field ??= new(Shaders.Get(_config.Render.DefaultShader)) { AO = DefaultTexture };
     
     public Material GetMaterial(string path)
     {
@@ -94,28 +93,25 @@ public class ResourceSystem : IDisposable
     private void DecodeAssetsInParallelAndUpload
         (List<string> modelPaths, HashSet<string> texturePaths)
     {
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         // CPU decode off the GL thread
-        var textureJob = Task.WhenAll(texturePaths.Select(key =>
+        var textureTask = Task.WhenAll(texturePaths.Select(key =>
             Task.Run(() => (key, data: GLTexture.Decode(PathResolver.Resolve(key))))));
 
-        var modelJob = Task.WhenAll(modelPaths.Select(key =>
+        var modelTask = Task.WhenAll(modelPaths.Select(key =>
             Task.Run(() => (key, data: Model.Decode(PathResolver.Resolve(key))))));
 
-        Task.WaitAll(textureJob, modelJob);
-        var decodeMs = stopwatch.Elapsed.TotalMilliseconds;
+        Time.Run($"Parallel decode ({texturePaths.Count} textures + {modelPaths.Count} models)",
+            () => Task.WaitAll(textureTask, modelTask));
 
-        // GL creation on the calling (main) thread
-        foreach (var (key, data) in textureJob.Result)
-            Textures.Insert(key, new GLTexture(_gl, data));
+        Time.Run("GL upload", () =>
+        {
+            foreach (var (key, data) in textureTask.Result)
+                Textures.Insert(key, new GLTexture(_gl, data));
 
-        foreach (var (key, data) in modelJob.Result)
-            Models.Insert(key, new Model(_gl, data));
-        
-        Console.WriteLine(
-            $"[ResourceSystem] Preloaded {texturePaths.Count} textures + {modelPaths.Count} models — " +
-            $"parallel decode {decodeMs:F1} ms, GL upload {stopwatch.Elapsed.TotalMilliseconds - decodeMs:F1} ms");
+            foreach (var (key, data) in modelTask.Result)
+                Models.Insert(key, new Model(_gl, data));
+        });
     }
 
     private static void AddPath(HashSet<string> set, string? path)
@@ -144,8 +140,8 @@ public class ResourceSystem : IDisposable
             Roughness = def.Roughness != null ? Textures.Get(def.Roughness) : null,
             Metallic  = def.Metallic  != null ? Textures.Get(def.Metallic)  : null,
             AO        = def.AO        != null ? Textures.Get(def.AO)         : DefaultTexture,
-            RoughnessValue = def.RoughnessValue,
-            MetallicValue  = def.MetallicValue,
+            RoughnessValue = def.RoughnessScalar,
+            MetallicValue  = def.MetallicScalar,
             Color          = new Vector4(def.Color[0], def.Color[1], def.Color[2], def.Color[3]),
             TwoSided       = def.TwoSided
         };
