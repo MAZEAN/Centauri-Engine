@@ -2,12 +2,12 @@
   "entities": [
     {
       "name":     "Cube",
-      "model":    "Assets/Objects/cube.glb",
+      "model":    "Assets/Objects/Shapes/cube.glb",
       "material": "Assets/Materials/BrickWall.mat"
     },
     {
       "name":     "Rectangle",
-      "model":    "Assets/Objects/cube.glb",
+      "model":    "Assets/Objects/Shapes/cube.glb",
       "material": "Assets/Materials/CobbleStoneFloor.mat",
       "position": [-3, 1, 0],
       "scale":    [1, 0.2, 1],
@@ -16,56 +16,61 @@
     },
     {
       "name":     "Dragon",
-      "model":    "Assets/Objects/medium_dragon.glb",
+      "model":    "Assets/Objects/Models/medium_dragon.glb",
       "position": [0, 1, -8]
     },
     {
       "name":     "Floor",
-      "model":    "Assets/Objects/cube.glb",
+      "model":    "Assets/Objects/Shapes/cube.glb",
       "material": "Assets/Materials/ChessTiles.mat",
       "position": [0, -2, 0],
       "scale":    [100, 1, 100],
       "uvScale":  [10.0, 10.0]
     },
+    { "name": "Tree1", 
+      "model": "Assets/Objects/Trees/CommonTree_1.gltf",
+      "materials": ["Assets/Materials/Bark.mat", "Assets/Materials/Leaves.mat"],
+      "position": [6, -1.5, -3]
+    },
     {
       "name":     "Sphere1",
-      "model":    "Assets/Objects/sphere.glb",
+      "model":    "Assets/Objects/Shapes/sphere.glb",
       "material": "Assets/Materials/RustyMetal.mat",
       "position": [0, 2, -4]
     },
     {
       "name":     "Sphere2",
-      "model":    "Assets/Objects/sphere.glb",
+      "model":    "Assets/Objects/Shapes/sphere.glb",
       "material": "Assets/Materials/BlueMetalPlate.mat",
       "position": [-3, 1, -3]
     },
     {
       "name":     "Sphere3",
-      "model":    "Assets/Objects/sphere.glb",
+      "model":    "Assets/Objects/Shapes/sphere.glb",
       "material": "Assets/Materials/CorrugatedIron.mat",
       "position": [3, 0, 0]
     },
     {
       "name":     "Sphere5",
-      "model":    "Assets/Objects/sphere.glb",
+      "model":    "Assets/Objects/Shapes/sphere.glb",
       "position": [0, 5, 0]
     },
     {
       "name":     "Sphere6",
-      "model":    "Assets/Objects/sphere.glb",
+      "model":    "Assets/Objects/Shapes/sphere.glb",
       "position": [5, 1, -6],
       "scale":    [0.5, 0.5, 0.5]
     },
     {
       "name":     "Torus",
-      "model":    "Assets/Objects/torus.glb",
+      "model":    "Assets/Objects/Shapes/torus.glb",
       "material": "Assets/Materials/WoodFloorDeck.mat",
       "position": [2, 0, -3],
       "rotation": [45, 0, 45]
     },
     {
       "name":     "Cone",
-      "model":    "Assets/Objects/cone.glb",
+      "model":    "Assets/Objects/Shapes/cone.glb",
       "material": "Assets/Materials/Gold.mat",
       "position": [3, 3, -3],
       "rotation": [0, -90, 15]

@@ -56,8 +56,8 @@ public class MaterialDefinition
     [JsonPropertyName("metallic")]  public string? Metallic  { get; set; }
     [JsonPropertyName("ao")]        public string? AO        { get; set; }
 
-    [JsonPropertyName("roughnessValue")] public float RoughnessScalar { get; set; } = 0.5f;
-    [JsonPropertyName("metallicValue")]  public float MetallicScalar  { get; set; } = 0.1f;
+    [JsonPropertyName("roughnessScalar")] public float RoughnessScalar { get; set; } = 0.5f;
+    [JsonPropertyName("metallicScalar")]  public float MetallicScalar  { get; set; } = 0.1f;
     [JsonPropertyName("color")]          public float[] Color        { get; set; } = [1f, 1f, 1f, 1f];
     [JsonPropertyName("twoSided")]       public bool   TwoSided      { get; set; } = false;
 }
