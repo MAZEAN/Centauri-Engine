@@ -4,6 +4,7 @@ using Silk.NET.OpenGL;
 
 using World;
 using Graphics.Resources;
+using Graphics.Resources.Materials;
 using Graphics.Geometry;
 using Utils.Misc;
 using Targets;
@@ -21,6 +22,8 @@ public sealed class GeometryPrepass : IDisposable
     private readonly InstanceBuffer _instances;
     
     private readonly Dictionary<Model, List<InstanceData>> _groups = new();
+    // per-model submesh materials (from a representative entity) — drives the foliage alpha test
+    private readonly Dictionary<Model, IReadOnlyList<Material?>> _materials = new();
 
     public uint NormalTexture   => _target.ColorTextures[0];
     public uint DepthTexture    => _target.DepthTexture;
@@ -56,7 +59,8 @@ public sealed class GeometryPrepass : IDisposable
         _shader.Use();
         _shader.SetUniform("uView",       camera.GetViewMatrix());
         _shader.SetUniform("uProjection", camera.GetProjectionMatrix());
-        
+        _shader.SetUniform("uAlbedo",     0);
+
         foreach (var list in _groups.Values)
             list.Clear();
 
@@ -69,22 +73,47 @@ public sealed class GeometryPrepass : IDisposable
             if (!_groups.TryGetValue(model, out var list))
                 _groups[model] = list = new List<InstanceData>();
 
+            _materials[model] = entity.Materials;   // representative — foliage materials are shared
             list.Add(new InstanceData(entity.Transform.WorldMatrix, entity.UvScale, entity.UvOffset));
         }
-        
+
         foreach (var (model, list) in _groups)
         {
             if (list.Count == 0) continue;
 
             _instances.Upload(list);
-            foreach (var mesh in model.Meshes)
+            var materials = _materials[model];
+
+            for (var i = 0; i < model.Meshes.Count; i++)
             {
+                SetMeshState(i < materials.Count ? materials[i] : null);
+
+                var mesh = model.Meshes[i];
                 mesh.ConfigureInstancing(_instances.Handle);
                 mesh.DrawInstanced(list.Count);
             }
         }
 
+        _gl.Enable(EnableCap.CullFace);   // restore default for the next pass
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+    }
+
+    // Alpha-tested foliage (two-sided material with an albedo) discards by alpha so its
+    // depth/normals match the leaf cutout, and renders both faces. Everything else is opaque.
+    private void SetMeshState(Material? material)
+    {
+        if (material is { TwoSided: true, Albedo: { } albedo })
+        {
+            _shader.SetUniform("uAlphaTest", 1);
+            _gl.ActiveTexture(TextureUnit.Texture0);
+            _gl.BindTexture(TextureTarget.Texture2D, albedo.Handle);
+            _gl.Disable(EnableCap.CullFace);
+        }
+        else
+        {
+            _shader.SetUniform("uAlphaTest", 0);
+            _gl.Enable(EnableCap.CullFace);
+        }
     }
 
     public void Dispose()
