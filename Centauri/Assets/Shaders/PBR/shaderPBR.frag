@@ -256,6 +256,9 @@ void main()
         ? normalize(fTBN * (texture(uNormalMap, fUv).rgb * 2.0 - 1.0))
         : normalize(fNormal);
 
+    if (!gl_FrontFacing) 
+        N = -N;
+
     roughness = SpecularAARoughness(roughness, N);
 
     vec3 V  = normalize(uCameraPos - fFragPos);

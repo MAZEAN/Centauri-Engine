@@ -39,13 +39,17 @@ public class MainRenderer : IDisposable
     private readonly InstanceBuffer _instanceBuffer;
     private readonly List<InstanceData> _instances = new();
 
-    private bool _iblActive;
     private GLShader? _activeShader;
     private Camera    _viewCamera = null!;
     private Matrix4x4 _view;
     private Vector3   _cameraPosition;
+    
     private float     _iblScale;
+    
+    // Flags
+    private bool _iblActive;
     private bool      _ssaoActive;
+    private bool?     _twoSided;
 
     public MainRenderer(GL gl, AppConfig config, IBLBaker ibl, ShadowMapper shadows, InstanceBuffer instances)
     {
@@ -66,6 +70,7 @@ public class MainRenderer : IDisposable
         _textures.Reset();
         
         _activeShader = null;
+        _twoSided     = null;
         
         if (ssaoActive)
         {
@@ -96,6 +101,8 @@ public class MainRenderer : IDisposable
 
         foreach (var batch in batches)
             DrawBatch(batch, cullingCamera, cull, ref stats);
+        
+        RestoreSurfaceState();
     }
 
     private void DrawBatch(Batch batch, Camera cullCamera, bool cull, ref FrameStats stats)
@@ -128,6 +135,7 @@ public class MainRenderer : IDisposable
                 continue;
 
             var shader = EnsureShader(material.Shader);
+            SetSurfaceState(material.TwoSided);
 
             stats.TextureBinds += _textures.BindMaterial(material);
             ShaderUniformBinder.UploadMaterial(shader, material);
@@ -142,6 +150,33 @@ public class MainRenderer : IDisposable
             stats.TotalVertices  += (int)mesh.VertexCount * _instances.Count;
         }
     }
+    
+    private void SetSurfaceState(bool twoSided)
+    {
+        if (_twoSided == twoSided) return;
+        _twoSided = twoSided;
+
+        if (twoSided)
+        {
+            _gl.Disable(EnableCap.CullFace);
+            _gl.Disable(EnableCap.Blend);
+            _gl.Enable(EnableCap.SampleAlphaToCoverage);
+        }
+        else
+        {
+            _gl.Enable(EnableCap.CullFace);
+            _gl.Enable(EnableCap.Blend);
+            _gl.Disable(EnableCap.SampleAlphaToCoverage);
+        }
+    }
+
+    private void RestoreSurfaceState()
+    {
+        _gl.Enable(EnableCap.CullFace);
+        _gl.Enable(EnableCap.Blend);
+        _gl.Disable(EnableCap.SampleAlphaToCoverage);
+    }
+
     
     private GLShader EnsureShader(GLShader shader)
     {
