@@ -102,7 +102,7 @@ public class MainRenderer : IDisposable
         foreach (var batch in batches)
             DrawBatch(batch, cullingCamera, cull, ref stats);
         
-        RestoreSurfaceState();
+        ResetSurfaceRenderState();
     }
 
     private void DrawBatch(Batch batch, Camera cullCamera, bool cull, ref FrameStats stats)
@@ -135,7 +135,7 @@ public class MainRenderer : IDisposable
                 continue;
 
             var shader = EnsureShader(material.Shader);
-            SetSurfaceState(material.TwoSided);
+            SetSurfaceRenderState(material.TwoSided);
 
             stats.TextureBinds += _textures.BindMaterial(material);
             ShaderUniformBinder.UploadMaterial(shader, material);
@@ -151,20 +151,27 @@ public class MainRenderer : IDisposable
         }
     }
     
-    private void SetSurfaceState(bool twoSided)
+    private void SetSurfaceRenderState(bool twoSided)
     {
         if (_twoSided == twoSided) return;
         _twoSided = twoSided;
 
-        if (twoSided) 
+        if (twoSided)
+        {
             _gl.Disable(EnableCap.CullFace);
-        else          
+            _gl.Enable(EnableCap.SampleAlphaToCoverage);
+        }
+        else
+        {
             _gl.Enable(EnableCap.CullFace);
+            _gl.Disable(EnableCap.SampleAlphaToCoverage);
+        }
     }
 
-    private void RestoreSurfaceState()
+    private void ResetSurfaceRenderState()
     {
         _gl.Enable(EnableCap.CullFace);
+        _gl.Disable(EnableCap.SampleAlphaToCoverage);
     }
 
     

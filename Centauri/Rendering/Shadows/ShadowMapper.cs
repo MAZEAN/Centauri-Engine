@@ -11,8 +11,18 @@ using Graphics.Resources.Materials;
 using Graphics.Geometry;
 using Utils.Geometry;
 
+internal readonly struct Caster
+{
+    public readonly InstanceData Data;
+    public readonly BoundingBox  Bounds;
+    public Caster(InstanceData data, BoundingBox bounds) { Data = data; Bounds = bounds; }
+}
+
 public sealed class ShadowMapper : IDisposable
 {
+    private const float SlopeBias    = 2.0f;   // polygon-offset factor
+    private const float ConstantBias = 4.0f;   // polygon-offset units
+    
     private readonly GL _gl;
     private readonly AppConfig _config;
     private readonly InstanceBuffer _instances;
@@ -22,9 +32,10 @@ public sealed class ShadowMapper : IDisposable
     private readonly Frustum _cull = new();
     private readonly CascadeBuilder _cascadeBuilder;
     
-    private readonly Dictionary<Model, List<InstanceData>> _solid    = new();
-    private readonly Dictionary<Model, List<InstanceData>> _twoSided = new();
+    private readonly Dictionary<Model, List<Caster>> _solid    = new();
+    private readonly Dictionary<Model, List<Caster>> _twoSided = new();
     private readonly Dictionary<Model, IReadOnlyList<Material?>> _materials = new();
+    private readonly List<InstanceData> _visible = new(); 
 
     public bool Active { get; private set; }
     public uint DepthTexture => _maps.DepthTexture;
@@ -65,25 +76,24 @@ public sealed class ShadowMapper : IDisposable
         var sceneBounds = ComputeSceneBounds(scene);
 
         Cascades = _cascadeBuilder.Build(camera, dir, sceneBounds, Cascades);
+        
+        CollectCasters(scene);
 
         SetRenderState();
+        _depth.Use();
+        _depth.SetUniform("uAlbedo", 0);
         
         for (var c = 0; c < Cascades.Length; c++)
         {
             _maps.BindLayer(c);
-            _depth.Use();
             _depth.SetUniform("uLightMatrix", Cascades[c].Matrix);
-            _depth.SetUniform("uAlbedo", 0);
             
             _cull.Update(Cascades[c].Matrix);
             
-            BucketCasters(scene, ref stats);
-            
-            _gl.Enable(EnableCap.CullFace);
-            _gl.CullFace(TriangleFace.Front);
+            SetSolidRenderState();
             DrawGroups(_solid, ref stats);
+            ResetSolidRenderState();
             
-            _gl.Disable(EnableCap.CullFace);
             DrawGroups(_twoSided, ref stats);
         }
 
@@ -91,7 +101,7 @@ public sealed class ShadowMapper : IDisposable
         Active = true;
     }
     
-    private void BucketCasters(Scene scene, ref FrameStats stats)
+    private void CollectCasters(Scene scene)
     {
         foreach (var list in _solid.Values)    list.Clear();
         foreach (var list in _twoSided.Values) list.Clear();
@@ -101,29 +111,36 @@ public sealed class ShadowMapper : IDisposable
             if (!entity.Enabled || entity.Model is not { } model)
                 continue;
 
-            if (!_cull.IsVisibleAABB(entity.GetWorldBounds()))
-            {
-                stats.ShadowCulled++;
-                continue;
-            }
-
             var groups = entity.AnyTwoSided ? _twoSided : _solid;
             if (!groups.TryGetValue(model, out var list))
-                groups[model] = list = new List<InstanceData>();
+                groups[model] = list = new List<Caster>();
             
             _materials[model] = entity.Materials;
-            list.Add(new InstanceData(entity.Transform.WorldMatrix, entity.UvScale, entity.UvOffset));
+            list.Add(new Caster(
+                new InstanceData(entity.Transform.WorldMatrix, entity.UvScale, entity.UvOffset),
+                entity.GetWorldBounds()));
         }
     }
     
-    private void DrawGroups(Dictionary<Model, List<InstanceData>> groups, ref FrameStats stats)
+    private void DrawGroups(Dictionary<Model, List<Caster>> groups, ref FrameStats stats)
     {
-        foreach (var (model, list) in groups)
+        foreach (var (model, casters) in groups)
         {
-            if (list.Count == 0) continue;
+            if (casters.Count == 0) continue;
+            
+            _visible.Clear();
+            foreach (var caster in casters)
+            {
+                if (_cull.IsVisibleAABB(caster.Bounds))
+                    _visible.Add(caster.Data);
+                else
+                    stats.ShadowCulled++;
+            }
 
-            _instances.Upload(list);
-            stats.ShadowCasters += list.Count;
+            if (_visible.Count == 0) continue;
+
+            _instances.Upload(_visible);
+            stats.ShadowCasters += _visible.Count;
 
             var materials = _materials[model];
             for (var i = 0; i < model.Meshes.Count; i++)
@@ -132,7 +149,7 @@ public sealed class ShadowMapper : IDisposable
 
                 var mesh = model.Meshes[i];
                 mesh.ConfigureInstancing(_instances.Handle);
-                mesh.DrawInstanced(list.Count);
+                mesh.DrawInstanced(_visible.Count);
             }
         }
     }
@@ -168,9 +185,22 @@ public sealed class ShadowMapper : IDisposable
             : new BoundingBox(Vector3.Zero, Vector3.Zero);   // no casters
     }
 
+    private void SetSolidRenderState()
+    {
+        _gl.Enable(EnableCap.CullFace);
+        _gl.CullFace(TriangleFace.Front);
+        _gl.Enable(EnableCap.PolygonOffsetFill);
+        _gl.PolygonOffset(SlopeBias, ConstantBias);
+    }
+
+    private void ResetSolidRenderState()
+    {
+        _gl.Disable(EnableCap.PolygonOffsetFill);
+        _gl.Disable(EnableCap.CullFace);
+    }
+
     private void SetRenderState()
     {
-        _gl.Enable(EnableCap.PolygonOffsetFill);
         _gl.Enable(EnableCap.CullFace);
     }
 
