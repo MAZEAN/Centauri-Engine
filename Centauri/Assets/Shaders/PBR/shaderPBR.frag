@@ -272,13 +272,8 @@ void main()
         vec3 L        = normalize(-uDir.direction.xyz);
         vec3 radiance = uDir.color.xyz * uDir.params.x;
         float shadow  = uHasShadow == 1 ? ShadowFactor(N, L) : 0.0;
+        
         Lo += CalcPBR(L, radiance, N, V, albedo, roughness, metallic) * (1.0 - shadow);
-
-        if (uFoliage == 1)
-        {
-            float backlit = pow(max(dot(V, -L), 0.0), 2.0);
-            Lo += albedo * radiance * (backlit + 0.25) * (1.0 - shadow * 0.5);
-        }
     }
 
     // point lights
