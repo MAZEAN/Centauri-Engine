@@ -1,10 +1,10 @@
-namespace Centauri.UI.Panels.Inspector;
+namespace Centauri.UI.Panels.Inspector.Sections;
 
 using Config;
 using World;
 using Common;
 
-public sealed class ColorGradingSection : IInspectorSection
+public sealed class ColorGradingSection : ISection
 {
     private readonly ColorGrading _grading;
 

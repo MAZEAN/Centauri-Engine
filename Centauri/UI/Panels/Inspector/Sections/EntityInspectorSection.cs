@@ -1,4 +1,4 @@
-namespace Centauri.UI.Panels.Inspector;
+namespace Centauri.UI.Panels.Inspector.Sections;
 
 using ImGuiNET;
 using System.Numerics;
@@ -10,7 +10,7 @@ using Graphics.Resources.Materials;
 // The selected-entity inspector: name/enabled header plus the Transform / Material / Light
 // sub-panels. Holds the transient rotation-edit state. Shows a placeholder when nothing
 // is selected.
-public sealed class EntityInspectorSection : IInspectorSection
+public sealed class EntityInspectorSection : ISection
 {
     private static readonly string[] LightTypes = ["None", "Directional", "Point", "Spot"];
 

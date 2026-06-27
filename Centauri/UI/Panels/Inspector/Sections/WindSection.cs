@@ -1,4 +1,4 @@
-namespace Centauri.UI.Panels.Inspector;
+namespace Centauri.UI.Panels.Inspector.Sections;
 
 using Config;
 using World;
@@ -7,7 +7,7 @@ using Common;
 // Scene-wide wind controls. Drives the per-material foliage sway (materials opt in via the
 // `wind` flag); when strength or speed is zero the foliage is static and the shadow pass can
 // fall back on its static-cascade cache.
-public sealed class WindSection : IInspectorSection
+public sealed class WindSection : ISection
 {
     private readonly AppConfig _config;
 

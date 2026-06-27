@@ -48,7 +48,7 @@
   },
   "shadows": {
     "enabled": true,
-    "size": 4096,
+    "size": 2048,
     "distance": 150.0,
     "depthBias": 0.0,
     "normalBias": 2.5,

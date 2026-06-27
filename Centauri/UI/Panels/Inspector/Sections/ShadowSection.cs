@@ -1,4 +1,4 @@
-namespace Centauri.UI.Panels.Inspector;
+namespace Centauri.UI.Panels.Inspector.Sections;
 
 using System.Globalization;
 
@@ -6,7 +6,7 @@ using Config;
 using World;
 using Common;
 
-public sealed class ShadowSection : IInspectorSection
+public sealed class ShadowSection : ISection
 {
     private static readonly uint[] Sizes = [512, 1024, 2048, 4096, 8192];
     private static readonly string[] SizeLabels =

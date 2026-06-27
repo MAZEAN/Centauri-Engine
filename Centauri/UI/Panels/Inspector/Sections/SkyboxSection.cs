@@ -1,11 +1,11 @@
-namespace Centauri.UI.Panels.Inspector;
+namespace Centauri.UI.Panels.Inspector.Sections;
 
 using ImGuiNET;
 
 using World;
 using Common;
 
-public sealed class SkyboxSection : IInspectorSection
+public sealed class SkyboxSection : ISection
 {
     public void Draw(Scene scene)
     {

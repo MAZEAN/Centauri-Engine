@@ -1,10 +1,10 @@
-namespace Centauri.UI.Panels.Inspector;
+namespace Centauri.UI.Panels.Inspector.Sections;
 
 using Config;
 using World;
 using Common;
 
-public sealed class SSAOSection : IInspectorSection
+public sealed class SSAOSection : ISection
 {
     private readonly AppConfig _config;
 

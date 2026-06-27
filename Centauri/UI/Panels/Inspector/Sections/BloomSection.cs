@@ -1,10 +1,10 @@
-namespace Centauri.UI.Panels.Inspector;
+namespace Centauri.UI.Panels.Inspector.Sections;
 
 using Config;
 using World;
 using Common;
 
-public sealed class BloomSection : IInspectorSection
+public sealed class BloomSection : ISection
 {
     private readonly AppConfig _config;
 

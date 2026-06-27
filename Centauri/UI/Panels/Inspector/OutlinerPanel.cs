@@ -1,4 +1,4 @@
-namespace Centauri.UI.Panels;
+namespace Centauri.UI.Panels.Inspector;
 
 using ImGuiNET;
 using System.Numerics;
@@ -9,7 +9,7 @@ using Common;
 // Scene hierarchy — lists every entity (including light-only ones that can't be
 // ray-picked in the viewport) and selects on click. Selection drives the
 // PropertiesPanel inspector, which already edits lights/materials/transforms.
-public sealed class OutlinerPanel
+public sealed class HierarchyPanel
 {
     private const float Width   = 300f;
     private const float Padding = 10f;
@@ -19,7 +19,7 @@ public sealed class OutlinerPanel
     private readonly ImFontPtr _font;
     private const ImGuiWindowFlags Flags = Widgets.PanelBase;
 
-    public OutlinerPanel(ImFontPtr font) => _font = font;
+    public HierarchyPanel(ImFontPtr font) => _font = font;
 
     public void Render(Scene scene)
     {

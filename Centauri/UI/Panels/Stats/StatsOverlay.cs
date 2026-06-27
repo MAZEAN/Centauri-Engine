@@ -1,4 +1,4 @@
-namespace Centauri.UI.Panels;
+namespace Centauri.UI.Panels.Stats;
 
 using ImGuiNET;
 using System.Numerics;

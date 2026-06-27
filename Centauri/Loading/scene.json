@@ -32,6 +32,21 @@
       "materials": ["Assets/Materials/Bark.mat", "Assets/Materials/Leaves.mat"],
       "position": [6, -1.5, -3]
     },
+    { "name": "Tree2",
+      "model": "Assets/Objects/Trees/CommonTree_1.gltf",
+      "materials": ["Assets/Materials/Bark.mat", "Assets/Materials/Leaves.mat"],
+      "position": [8, -1.5, -5]
+    },
+    { "name": "Tree3",
+      "model": "Assets/Objects/Trees/CommonTree_1.gltf",
+      "materials": ["Assets/Materials/Bark.mat", "Assets/Materials/Leaves.mat"],
+      "position": [9, -1.5, -1]
+    },
+    { "name": "Pine1",
+      "model": "Assets/Objects/Trees/Pine_1.gltf",
+      "materials": ["Assets/Materials/Bark.mat", "Assets/Materials/Pine_Leaves.mat"],
+      "position": [6, -1.5, 0]
+    },
     {
       "name":     "Sphere1",
       "model":    "Assets/Objects/Shapes/sphere.glb",

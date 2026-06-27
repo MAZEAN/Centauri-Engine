@@ -7,7 +7,9 @@ using Silk.NET.Input;
 using Config;
 using World;
 using Utils.Misc;
-using Panels;
+using Panels.Inspector;
+using Panels.Stats;
+using Panels.Toolbar;
 using Rendering.Profiling;
 
 // Owns the whole ImGui surface — the controller plus every panel.
@@ -18,7 +20,7 @@ public sealed class UISystem : IDisposable
     private readonly ImGuiManager   _imGui;
     private readonly StatsOverlay   _statsOverlay;
     private readonly PropertiesPanel _properties;
-    private readonly OutlinerPanel _outliner;
+    private readonly HierarchyPanel _outliner;
     private readonly ViewportToolbar _toolbar;
 
     public UISystem(GL gl, AppConfig config, IWindow window, IInputContext input, ColorGrading grading)
@@ -27,7 +29,7 @@ public sealed class UISystem : IDisposable
         _imGui        = new ImGuiManager(gl, config.ImGui, window, input);
         _statsOverlay = new StatsOverlay(_imGui.Font, config);
         _properties    = new PropertiesPanel(_imGui.Font, _config, grading);
-        _outliner = new OutlinerPanel(_imGui.Font);
+        _outliner = new HierarchyPanel(_imGui.Font);
         _toolbar = new ViewportToolbar(_imGui.Font, config);
     }
 

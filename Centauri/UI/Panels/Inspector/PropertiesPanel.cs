@@ -1,4 +1,4 @@
-namespace Centauri.UI.Panels;
+namespace Centauri.UI.Panels.Inspector;
 
 using ImGuiNET;
 using System.Numerics;
@@ -6,7 +6,7 @@ using System.Numerics;
 using World;
 using Config;
 using Common;
-using Inspector;
+using Sections;
 
 // Hosts the Properties window chrome and drives an ordered list of inspector sections.
 // Adding a section is one entry in the list below + a class in Panels/Inspector/.
@@ -19,7 +19,7 @@ public class PropertiesPanel
     private const ImGuiWindowFlags Flags = Widgets.PanelBase;
 
     private readonly ImFontPtr _font;
-    private readonly IInspectorSection[] _sections;
+    private readonly ISection[] _sections;
 
     public PropertiesPanel(ImFontPtr font, AppConfig config, ColorGrading grading)
     {
@@ -64,7 +64,7 @@ public class PropertiesPanel
         var viewport = ImGui.GetMainViewport();
 
         // stack beneath the outliner: outliner padding + height + a gap
-        var top = viewport.WorkPos.Y + Padding + OutlinerPanel.Height + Padding;
+        var top = viewport.WorkPos.Y + Padding + HierarchyPanel.Height + Padding;
         var anchor = new Vector2(viewport.WorkPos.X + viewport.WorkSize.X - Padding, top);
 
         ImGui.SetNextWindowPos(anchor, ImGuiCond.Always, new Vector2(1f, 0f));   // pivot top-right
