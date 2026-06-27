@@ -15,7 +15,12 @@ internal readonly struct Caster
 {
     public readonly InstanceData Data;
     public readonly BoundingBox  Bounds;
-    public Caster(InstanceData data, BoundingBox bounds) { Data = data; Bounds = bounds; }
+
+    public Caster(InstanceData data, BoundingBox bounds)
+    {
+        Data = data; 
+        Bounds = bounds;
+    }
 }
 
 public sealed class ShadowMapper : IDisposable
@@ -36,6 +41,9 @@ public sealed class ShadowMapper : IDisposable
     private readonly Dictionary<Model, List<Caster>> _twoSided = new();
     private readonly Dictionary<Model, IReadOnlyList<Material?>> _materials = new();
     private readonly List<InstanceData> _visible = new(); 
+    
+    private int         _boundsRevision = -1;
+    private BoundingBox _cachedSceneBounds;
 
     public bool Active { get; private set; }
     public uint DepthTexture => _maps.DepthTexture;
@@ -73,7 +81,7 @@ public sealed class ShadowMapper : IDisposable
 
         var dir         = Vector3.Normalize(scene.Lighting.DirectionalLights[0].Direction);
         var camera      = scene.Cameras.Active;
-        var sceneBounds = ComputeSceneBounds(scene);
+        var sceneBounds = SceneBounds(scene);
 
         Cascades = _cascadeBuilder.Build(camera, dir, sceneBounds, Cascades);
         
@@ -81,7 +89,9 @@ public sealed class ShadowMapper : IDisposable
 
         SetRenderState();
         _depth.Use();
+        
         _depth.SetUniform("uAlbedo", 0);
+        _depth.SetUniform("uTime", Time.Now);
         
         for (var c = 0; c < Cascades.Length; c++)
         {
@@ -156,6 +166,7 @@ public sealed class ShadowMapper : IDisposable
     
     private void SetCasterAlphaTest(Material? material)
     {
+        _depth.SetUniform("uWind", material is { Wind: true } ? 1 : 0);
         if (material is { TwoSided: true, Albedo: { } albedo })
         {
             _depth.SetUniform("uAlphaTest", 1);
@@ -166,6 +177,16 @@ public sealed class ShadowMapper : IDisposable
         {
             _depth.SetUniform("uAlphaTest", 0);
         }
+    }
+    
+    private BoundingBox SceneBounds(Scene scene)
+    {
+        if (scene.Revision != _boundsRevision)
+        {
+            _cachedSceneBounds = ComputeSceneBounds(scene);
+            _boundsRevision    = scene.Revision;
+        }
+        return _cachedSceneBounds;
     }
     
     private static BoundingBox ComputeSceneBounds(Scene scene)

@@ -60,6 +60,7 @@ public sealed class GeometryPrepass : IDisposable
         _shader.SetUniform("uView",       camera.GetViewMatrix());
         _shader.SetUniform("uProjection", camera.GetProjectionMatrix());
         _shader.SetUniform("uAlbedo",     0);
+        _shader.SetUniform("uTime",       Time.Now); 
 
         foreach (var list in _groups.Values)
             list.Clear();
@@ -102,6 +103,7 @@ public sealed class GeometryPrepass : IDisposable
     // depth/normals match the leaf cutout, and renders both faces. Everything else is opaque.
     private void SetMeshState(Material? material)
     {
+        _shader.SetUniform("uWind", material is { Wind: true } ? 1 : 0);
         if (material is { TwoSided: true, Albedo: { } albedo })
         {
             _shader.SetUniform("uAlphaTest", 1);

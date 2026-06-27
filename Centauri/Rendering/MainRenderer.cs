@@ -30,6 +30,7 @@ public class MainRenderer : IDisposable
     private const float NightAmbient = 0.15f;   // moonlit IBL floor so night isn't pitch black
 
     private readonly LightBuffer _lightBuffer;
+    private readonly ShadowBuffer _shadowBuffer;
     private readonly HashSet<GLShader> _lightBlockBound = new();
 
     private readonly TextureBinder _textures;
@@ -59,6 +60,7 @@ public class MainRenderer : IDisposable
         _shadows = shadows;
 
         _lightBuffer = new LightBuffer(gl);
+        _shadowBuffer = new ShadowBuffer(gl);
         _textures    = new TextureBinder(gl);
         _uniforms    = new ShaderUniformBinder(config, ibl, shadows);
         _instanceBuffer = instances;
@@ -92,6 +94,7 @@ public class MainRenderer : IDisposable
 
         BindIbl(scene);
         BindShadows();
+        UploadShadowData();
 
         var cull = _config.Debug.EnableCulling;
         var batches = _batcher.GetBatches(scene);
@@ -181,7 +184,10 @@ public class MainRenderer : IDisposable
 
         shader.Use();
         if (_lightBlockBound.Add(shader))
-            shader.BindUniformBlock("Lights", LightBuffer.BindingPoint);
+        {
+            shader.BindUniformBlock("Lights",  LightBuffer.BindingPoint);
+            shader.BindUniformBlock("Shadows", ShadowBuffer.BindingPoint);
+        }
 
         shader.SetUniform("uView",      _view);
         shader.SetUniform("uCameraPos", _cameraPosition);
@@ -243,6 +249,19 @@ public class MainRenderer : IDisposable
         if (!_shadows.Active) return;
         _gl.ActiveTexture(TextureUnit.Texture8);
         _gl.BindTexture(TextureTarget.Texture2DArray, _shadows.DepthTexture);
+    }
+    
+    private void UploadShadowData()
+    {
+        if (!_shadows.Active) return;
+
+        var cascades = _shadows.Cascades;
+        float size   = _config.Shadows.Size;
+        for (var i = 0; i < cascades.Length; i++)
+            _shadowBuffer.SetCascade(i, cascades[i].Matrix, cascades[i].SplitDepth,
+                cascades[i].Radius * 2f / size);
+
+        _shadowBuffer.Upload();
     }
 
     private static void ResetFrameStats(ref FrameStats stats)

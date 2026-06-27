@@ -154,7 +154,8 @@ public class ResourceSystem : IDisposable
             MetallicScalar  = def.MetallicScalar,
             Translucency   = def.TranslucencyScalar,
             Color          = new Vector4(def.Color[0], def.Color[1], def.Color[2], def.Color[3]),
-            TwoSided       = def.TwoSided
+            TwoSided       = def.TwoSided,
+            Wind           = def.Wind
         };
     }
 

@@ -17,10 +17,8 @@ public class Material
     public float MetallicScalar  { get; set; } = 0.1f;
     public float Translucency   { get; set; } = 0f; 
     
-    // Shadow casting: solid meshes record BACK-face depth (front-face cull) to avoid
-    // self-shadow acne. Thin / two-sided geometry (foliage, single-quad walls) has no
-    // back face, so it must render double-sided in the shadow pass instead.
     public bool TwoSided { get; set; } = false;
+    public bool Wind { get; set; } = false;
 
     public Material(GLShader shader)
     {
@@ -38,7 +36,8 @@ public class Material
         RoughnessScalar = RoughnessScalar,
         MetallicScalar  = MetallicScalar,
         Translucency   = Translucency,
-        TwoSided       = TwoSided
+        TwoSided       = TwoSided,
+        Wind           = Wind
     };
     
     public ulong SortKey

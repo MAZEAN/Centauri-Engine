@@ -5,6 +5,12 @@ using System.Runtime.CompilerServices;
 
 public static class Time
 {
+    private static readonly long _start = Stopwatch.GetTimestamp();
+    private static float _frame;
+    
+    public static float Now => _frame;
+    public static void BeginFrame() => _frame = (float)Stopwatch.GetElapsedTime(_start).TotalSeconds;
+    
     public readonly struct Scope : IDisposable
     {
         private readonly string _label;

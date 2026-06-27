@@ -6,6 +6,7 @@ using Graphics.Resources;
 using Graphics.Resources.Materials;
 using IBL;
 using Shadows;
+using Utils.Misc;
 
 // Packs the uniforms a lit shader needs: the per-shader globals (texture-unit slots,
 // IBL, CSM) and the per-entity material/transform values. Pure uniform uploads — the
@@ -26,6 +27,7 @@ public sealed class ShaderUniformBinder
     public void UploadGlobals(GLShader shader, Camera camera, bool iblActive, float iblIntensityScale, bool ssaoActive)
     {
         shader.SetUniform("uProjection", camera.GetProjectionMatrix());
+        shader.SetUniform("uTime", Time.Now);
 
         // texture unit bindings
         shader.SetUniform("uAlbedoMap",    0);
@@ -53,16 +55,7 @@ public sealed class ShaderUniformBinder
 
         if (!_shadows.Active) return;
 
-        var cascades = _shadows.Cascades;
-        shader.SetUniform("uCascadeCount", cascades.Length);
-
-        for (var i = 0; i < cascades.Length; i++)
-        {
-            shader.SetUniform($"uLightMatrices[{i}]", cascades[i].Matrix);
-            shader.SetUniform($"uCascadeSplits[{i}]", cascades[i].SplitDepth);
-            shader.SetUniform($"uTexelWorld[{i}]", cascades[i].Radius * 2f / _config.Shadows.Size);
-        }
-
+        shader.SetUniform("uCascadeCount", _shadows.Cascades.Length);
         shader.SetUniform("uShadowBias", _config.Shadows.DepthBias);
         shader.SetUniform("uNormalBias", _config.Shadows.NormalBias);
         shader.SetUniform("uPcfRadius",  _config.Shadows.PcfRadius);
@@ -80,5 +73,6 @@ public sealed class ShaderUniformBinder
         shader.SetUniform("uTranslucency",   mat.Translucency);
         shader.SetUniform("uColor",          mat.Color);
         shader.SetUniform("uFoliage",        mat.TwoSided ? 1 : 0);
+        shader.SetUniform("uWind",           mat.Wind ? 1 : 0);
     }
 }

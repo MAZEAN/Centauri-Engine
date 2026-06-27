@@ -17,11 +17,33 @@ layout (location = 8) in vec4 iUvScaleOffset;
 uniform mat4 uView;         // camera transform — moves world relative to camera
 uniform mat4 uProjection;   // perspective — makes far things smaller
 
+uniform int   uWind;        // 1 = foliage sway (must match the prepass/depth passes)
+uniform float uTime;        // seconds, latched once per frame
+
+// Sway weighted by height above the instance origin: the base stays planted, the canopy
+// moves. Per-vertex phase from world XZ de-phases neighbouring leaves so they shimmer
+// instead of sliding as a rigid block. Keep IDENTICAL in prepass.vert and depth.vert.
+vec3 WindSway(vec3 worldPos, vec3 origin)
+{
+    const float AMP  = 0.06;
+    const float FREQ = 1.6;
+    const vec2  DIR  = vec2(0.8, 0.6);   // wind heading in world XZ
+
+    float height = max(worldPos.y - origin.y, 0.0);
+    float phase  = dot(worldPos.xz, vec2(0.35));
+    float sway   = sin(uTime * FREQ + phase) + 0.5 * sin(uTime * FREQ * 2.3 + phase * 1.7);
+
+    return worldPos + vec3(DIR.x, 0.0, DIR.y) * (sway * AMP * height);
+}
+
 void main()
 {
     mat3 normalMatrix = transpose(inverse(mat3(iModel)));
 
     vec4 worldPos = iModel * vec4(vPos, 1.0);
+    if (uWind == 1)
+        worldPos.xyz = WindSway(worldPos.xyz, iModel[3].xyz);
+    
     vec4 viewPos  = uView * worldPos;
     fViewDepth    = -viewPos.z;
 

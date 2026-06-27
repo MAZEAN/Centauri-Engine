@@ -61,6 +61,7 @@ public class MaterialDefinition
     [JsonPropertyName("translucencyScalar")] public float TranslucencyScalar { get; set; } = 0f;
     [JsonPropertyName("color")]          public float[] Color        { get; set; } = [1f, 1f, 1f, 1f];
     [JsonPropertyName("twoSided")]       public bool   TwoSided      { get; set; } = false;
+    [JsonPropertyName("wind")]           public bool   Wind          { get; set; } = false;
 }
 
 public class CameraDefinition

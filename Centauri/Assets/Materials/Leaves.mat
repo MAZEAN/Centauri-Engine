@@ -4,5 +4,6 @@
   "roughnessScalar": 1.0,
   "metallicScalar": 0.0,
   "translucencyScalar": 0.5,
-  "twoSided": true
+  "twoSided": true,
+  "wind": true
 }
