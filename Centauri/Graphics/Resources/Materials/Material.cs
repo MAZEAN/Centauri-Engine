@@ -13,8 +13,9 @@ public class Material
     
     // Editable properties
     public Vector4 Color        { get; set; } = Vector4.One;
-    public float RoughnessValue { get; set; } = 0.5f;
-    public float MetallicValue  { get; set; } = 0.1f;
+    public float RoughnessScalar { get; set; } = 0.5f;
+    public float MetallicScalar  { get; set; } = 0.1f;
+    public float Translucency   { get; set; } = 0f; 
     
     // Shadow casting: solid meshes record BACK-face depth (front-face cull) to avoid
     // self-shadow acne. Thin / two-sided geometry (foliage, single-quad walls) has no
@@ -34,8 +35,9 @@ public class Material
         Metallic  = Metallic,
         AO        = AO,
         Color          = Color,
-        RoughnessValue = RoughnessValue,
-        MetallicValue  = MetallicValue,
+        RoughnessScalar = RoughnessScalar,
+        MetallicScalar  = MetallicScalar,
+        Translucency   = Translucency,
         TwoSided       = TwoSided
     };
     

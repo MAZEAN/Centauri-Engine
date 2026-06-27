@@ -75,8 +75,9 @@ public sealed class ShaderUniformBinder
         shader.SetUniform("uHasRoughness", mat.Roughness != null ? 1 : 0);
         shader.SetUniform("uHasMetallic",  mat.Metallic  != null ? 1 : 0);
 
-        shader.SetUniform("uRoughnessValue", mat.RoughnessValue);
-        shader.SetUniform("uMetallicValue",  mat.MetallicValue);
+        shader.SetUniform("uRoughnessScalar", mat.RoughnessScalar);
+        shader.SetUniform("uMetallicScalar",  mat.MetallicScalar);
+        shader.SetUniform("uTranslucency",   mat.Translucency);
         shader.SetUniform("uColor",          mat.Color);
         shader.SetUniform("uFoliage",        mat.TwoSided ? 1 : 0);
     }

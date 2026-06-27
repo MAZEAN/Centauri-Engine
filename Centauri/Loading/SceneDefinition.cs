@@ -58,6 +58,7 @@ public class MaterialDefinition
 
     [JsonPropertyName("roughnessScalar")] public float RoughnessScalar { get; set; } = 0.5f;
     [JsonPropertyName("metallicScalar")]  public float MetallicScalar  { get; set; } = 0.1f;
+    [JsonPropertyName("translucencyScalar")] public float TranslucencyScalar { get; set; } = 0f;
     [JsonPropertyName("color")]          public float[] Color        { get; set; } = [1f, 1f, 1f, 1f];
     [JsonPropertyName("twoSided")]       public bool   TwoSided      { get; set; } = false;
 }

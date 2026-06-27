@@ -150,8 +150,9 @@ public class ResourceSystem : IDisposable
             Roughness = def.Roughness != null ? Textures.Get(def.Roughness) : null,
             Metallic  = def.Metallic  != null ? Textures.Get(def.Metallic)  : null,
             AO        = def.AO        != null ? Textures.Get(def.AO)         : DefaultTexture,
-            RoughnessValue = def.RoughnessScalar,
-            MetallicValue  = def.MetallicScalar,
+            RoughnessScalar = def.RoughnessScalar,
+            MetallicScalar  = def.MetallicScalar,
+            Translucency   = def.TranslucencyScalar,
             Color          = new Vector4(def.Color[0], def.Color[1], def.Color[2], def.Color[3]),
             TwoSided       = def.TwoSided
         };

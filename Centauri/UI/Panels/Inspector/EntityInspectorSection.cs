@@ -74,8 +74,9 @@ public sealed class EntityInspectorSection : IInspectorSection
             if (e.Materials.Count > 1) ImGui.TextDisabled($"Submesh {i}");
 
             Widgets.ColorRow4("Base Color", mat.Color, v => EditMaterial(e, scene, index, m => m.Color = v));
-            Widgets.SliderRow("Roughness", mat.RoughnessValue, v => EditMaterial(e, scene, index, m => m.RoughnessValue = v), 0f, 1f, 0.5f);
-            Widgets.SliderRow("Metallic",  mat.MetallicValue,  v => EditMaterial(e, scene, index, m => m.MetallicValue  = v), 0f, 1f, 0.1f);
+            Widgets.SliderRow("Roughness", mat.RoughnessScalar, v => EditMaterial(e, scene, index, m => m.RoughnessScalar = v), 0f, 1f, 0.5f);
+            Widgets.SliderRow("Metallic",  mat.MetallicScalar,  v => EditMaterial(e, scene, index, m => m.MetallicScalar  = v), 0f, 1f, 0.1f);
+            Widgets.SliderRow("Translucency", mat.Translucency, v => EditMaterial(e, scene, index, m => m.Translucency = v), 0f, 1f, 0f);
             ImGui.PopID();
         }
     }

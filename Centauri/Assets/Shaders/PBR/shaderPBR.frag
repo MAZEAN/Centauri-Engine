@@ -51,8 +51,9 @@ uniform int uHasNormal;
 uniform int uHasRoughness;
 uniform int uHasMetallic;
 
-uniform float uRoughnessValue;
-uniform float uMetallicValue;
+uniform float uRoughnessScalar;
+uniform float uMetallicScalar;
+uniform float uTranslucency;
 uniform vec4  uColor;
 
 // IBL
@@ -245,8 +246,8 @@ void showShadowCascadesView(vec3 color, vec4  albedoSample) {
 void main()
 {
     vec4  albedoSample = uHasAlbedo    == 1 ? texture(uAlbedoMap,    fUv) : uColor;
-    float roughness    = uHasRoughness == 1 ? texture(uRoughnessMap, fUv).r : uRoughnessValue;
-    float metallic     = uHasMetallic  == 1 ? texture(uMetallicMap,  fUv).r : uMetallicValue;
+    float roughness    = uHasRoughness == 1 ? texture(uRoughnessMap, fUv).r : uRoughnessScalar;
+    float metallic     = uHasMetallic  == 1 ? texture(uMetallicMap,  fUv).r : uMetallicScalar;
     float ao           = texture(uAOMap, fUv).r;
 
     vec3 albedo = pow(albedoSample.rgb, vec3(2.2));
@@ -274,6 +275,16 @@ void main()
         float shadow  = uHasShadow == 1 ? ShadowFactor(N, L) : 0.0;
         
         Lo += CalcPBR(L, radiance, N, V, albedo, roughness, metallic) * (1.0 - shadow);
+
+        if (uTranslucency > 0.0)
+        {
+            const float DISTORTION = 0.25;
+            const float POWER      = 4.0;
+
+            vec3  transDir = normalize(L + N * DISTORTION);
+            float t        = pow(clamp(dot(V, -transDir), 0.0, 1.0), POWER);
+            Lo += albedo * radiance * t * uTranslucency * (1.0 - shadow * 0.5);
+        }
     }
 
     // point lights
