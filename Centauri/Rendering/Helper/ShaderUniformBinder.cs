@@ -27,7 +27,7 @@ public sealed class ShaderUniformBinder
     public void UploadGlobals(GLShader shader, Camera camera, bool iblActive, float iblIntensityScale, bool ssaoActive)
     {
         shader.SetUniform("uProjection", camera.GetProjectionMatrix());
-        shader.SetUniform("uTime", Time.Now);
+        UploadWind(shader, _config.Wind);
 
         // texture unit bindings
         shader.SetUniform("uAlbedoMap",    0);
@@ -74,5 +74,13 @@ public sealed class ShaderUniformBinder
         shader.SetUniform("uColor",          mat.Color);
         shader.SetUniform("uFoliage",        mat.TwoSided ? 1 : 0);
         shader.SetUniform("uWind",           mat.Wind ? 1 : 0);
+    }
+    
+    public static void UploadWind(GLShader shader, WindConfig wind)
+    {
+        shader.SetUniform("uTime",         Time.Now);
+        shader.SetUniform("uWindStrength", wind.Enabled ? wind.Strength : 0f);
+        shader.SetUniform("uWindSpeed",    wind.Speed);
+        shader.SetUniform("uWindDir",      wind.DirectionVector);
     }
 }

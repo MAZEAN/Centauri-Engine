@@ -9,6 +9,7 @@ using Graphics.Geometry;
 using Utils.Misc;
 using Targets;
 using Config;
+using Helper;
 
 // Renders view-space normals + depth + material (roughness/metallic) into single-sample
 // textures before the lit pass. These are the inputs the screen-space effects need: SSAO
@@ -60,7 +61,7 @@ public sealed class GeometryPrepass : IDisposable
         _shader.SetUniform("uView",       camera.GetViewMatrix());
         _shader.SetUniform("uProjection", camera.GetProjectionMatrix());
         _shader.SetUniform("uAlbedo",     0);
-        _shader.SetUniform("uTime",       Time.Now); 
+        ShaderUniformBinder.UploadWind(_shader, _config.Wind);
 
         foreach (var list in _groups.Values)
             list.Clear();

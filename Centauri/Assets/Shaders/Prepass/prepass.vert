@@ -14,17 +14,17 @@ uniform mat4 uProjection;
 uniform int   uWind;        // 1 = foliage sway (must match the lit/depth passes)
 uniform float uTime;        // seconds, latched once per frame
 
+uniform float uWindStrength;   // sway amplitude   (WindConfig.Strength)
+uniform float uWindSpeed;      // oscillation freq (WindConfig.Speed)
+uniform vec2  uWindDir;
+
 vec3 WindSway(vec3 worldPos, vec3 origin)
 {
-    const float AMP  = 0.06;
-    const float FREQ = 1.6;
-    const vec2  DIR  = vec2(0.8, 0.6);
-
     float height = max(worldPos.y - origin.y, 0.0);
     float phase  = dot(worldPos.xz, vec2(0.35));
-    float sway   = sin(uTime * FREQ + phase) + 0.5 * sin(uTime * FREQ * 2.3 + phase * 1.7);
+    float sway   = sin(uTime * uWindSpeed + phase) + 0.5 * sin(uTime * uWindSpeed * 2.3 + phase * 1.7);
 
-    return worldPos + vec3(DIR.x, 0.0, DIR.y) * (sway * AMP * height);
+    return worldPos + vec3(uWindDir.x, 0.0, uWindDir.y) * (sway * uWindStrength * height);
 }
 
 void main()

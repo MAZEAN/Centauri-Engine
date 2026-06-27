@@ -10,6 +10,7 @@ using Graphics.Resources;
 using Graphics.Resources.Materials;
 using Graphics.Geometry;
 using Utils.Geometry;
+using Helper;
 
 internal readonly struct Caster
 {
@@ -44,6 +45,9 @@ public sealed class ShadowMapper : IDisposable
     
     private int         _boundsRevision = -1;
     private BoundingBox _cachedSceneBounds;
+    private bool        _sceneHasWind;
+    
+    private readonly ShadowCache _cache = new();
 
     public bool Active { get; private set; }
     public uint DepthTexture => _maps.DepthTexture;
@@ -75,23 +79,34 @@ public sealed class ShadowMapper : IDisposable
         {
             _maps.Dispose();
             _maps = new ShadowArray(_gl, _config.Shadows.Size, _config.Shadows.MaxCascades);
+            _cache.Invalidate();   // fresh, empty maps — must redraw
         }
 
         if (scene.Lighting.DirectionalLights.Count == 0) return;
 
         var dir         = Vector3.Normalize(scene.Lighting.DirectionalLights[0].Direction);
         var camera      = scene.Cameras.Active;
-        var sceneBounds = SceneBounds(scene);
+        var sceneBounds = SceneBounds(scene);   // also refreshes _sceneHasWind (revision-gated)
+
+        var s   = _config.Shadows;
+        var key = new ShadowCacheKey(dir, camera.GetViewMatrix() * camera.GetProjectionMatrix(),
+            scene.Revision, s.CascadeCount, s.Distance, s.SplitLambda);
+
+        if (_cache.CanReuse(key, _sceneHasWind && _config.Wind.Animating))
+        {
+            Active = true;   // last frame's depth maps + Cascades are still valid
+            return;
+        }
 
         Cascades = _cascadeBuilder.Build(camera, dir, sceneBounds, Cascades);
-        
+
         CollectCasters(scene);
 
         SetRenderState();
         _depth.Use();
         
         _depth.SetUniform("uAlbedo", 0);
-        _depth.SetUniform("uTime", Time.Now);
+        ShaderUniformBinder.UploadWind(_depth, _config.Wind);
         
         for (var c = 0; c < Cascades.Length; c++)
         {
@@ -109,8 +124,10 @@ public sealed class ShadowMapper : IDisposable
 
         ResetRenderState();
         Active = true;
+
+        _cache.Record(key);   // these maps are valid until one of the key's inputs changes
     }
-    
+
     private void CollectCasters(Scene scene)
     {
         foreach (var list in _solid.Values)    list.Clear();
@@ -184,9 +201,21 @@ public sealed class ShadowMapper : IDisposable
         if (scene.Revision != _boundsRevision)
         {
             _cachedSceneBounds = ComputeSceneBounds(scene);
+            _sceneHasWind      = ComputeHasWind(scene);
             _boundsRevision    = scene.Revision;
         }
         return _cachedSceneBounds;
+    }
+    
+    private static bool ComputeHasWind(Scene scene)
+    {
+        foreach (var e in scene.Entities)
+        {
+            if (!e.Enabled || e.Model is null) continue;
+            foreach (var m in e.Materials)
+                if (m is { Wind: true }) return true;
+        }
+        return false;
     }
     
     private static BoundingBox ComputeSceneBounds(Scene scene)

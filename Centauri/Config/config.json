@@ -79,5 +79,11 @@
   "taa": {
     "enabled": false,
     "feedback": 0.5
+  },
+  "wind": {
+    "enabled": true,
+    "strength": 0.015,
+    "speed": 0.85,
+    "direction": 37.0
   }
 }

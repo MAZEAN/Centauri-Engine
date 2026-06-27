@@ -35,6 +35,7 @@ public class PropertiesPanel
             new ColorGradingSection(grading),
             new IBLSection(config),
             new ViewportSection(config),
+            new WindSection(config)
         ];
     }
 
