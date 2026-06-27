@@ -8,7 +8,7 @@ using World;
 using Graphics.Resources;
 using Graphics.Geometry;
 using Graphics.Resources.Buffers;
-using Graphics.Resources.Materials;
+using Culling;
 using World.Collections;
 using World.Components;
 using Utils.Misc;
@@ -41,6 +41,7 @@ public class MainRenderer : IDisposable
     private readonly List<InstanceData> _instances = new();
 
     private GLShader? _activeShader;
+    private CullingSystem _culling = null!;
     private Camera    _viewCamera = null!;
     private Matrix4x4 _view;
     private Vector3   _cameraPosition;
@@ -66,13 +67,13 @@ public class MainRenderer : IDisposable
         _instanceBuffer = instances;
     }
 
-    public void Render(Scene scene, float deltaTime, ref FrameStats stats, uint ssaoTexture, bool ssaoActive)
-    {
+    public void Render(Scene scene, float deltaTime, ref FrameStats stats, uint ssaoTexture, bool ssaoActive, CullingSystem culling)    {
         ResetFrameStats(ref stats);
         _textures.Reset();
         
         _activeShader = null;
         _twoSided     = null;
+        _culling      = culling;
         
         if (ssaoActive)
         {
@@ -81,9 +82,6 @@ public class MainRenderer : IDisposable
         }
 
         _viewCamera = scene.Cameras.Active;
-        var cullingCamera = scene.Cameras.Primary;
-
-        cullingCamera.UpdateFrustum();
 
         _view           = _viewCamera.GetViewMatrix();
         _cameraPosition = _viewCamera.Position;
@@ -96,19 +94,18 @@ public class MainRenderer : IDisposable
         BindShadows();
         UploadShadowData();
 
-        var cull = _config.Debug.EnableCulling;
         var batches = _batcher.GetBatches(scene);
 
         stats.RenderableEntities = _batcher.RenderableEntities;
         stats.TwoSidedEntities   = _batcher.TwoSidedEntities;
 
         foreach (var batch in batches)
-            DrawBatch(batch, cullingCamera, cull, ref stats);
+            DrawBatch(batch, ref stats);
         
         ResetSurfaceRenderState();
     }
 
-    private void DrawBatch(Batch batch, Camera cullCamera, bool cull, ref FrameStats stats)
+    private void DrawBatch(Batch batch, ref FrameStats stats)
     {
         _instances.Clear();
 
@@ -116,8 +113,7 @@ public class MainRenderer : IDisposable
         {
             if (!entity.Enabled) continue;
             
-            if (cull && !cullCamera.Frustum.IsVisibleAABB(entity.GetWorldBounds()))
-            {
+            if (!_culling.IsVisible(entity))            {
                 stats.CulledEntities++;
                 continue;
             }

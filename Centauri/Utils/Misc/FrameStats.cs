@@ -25,4 +25,10 @@ public struct FrameStats
     public int ShadowTotal => ShadowCasters + ShadowCulled;
     public int ShadowCasters { get; set; }   // depth-pass draws, summed across cascades
     public int ShadowCulled  { get; set; }   // frustum-culled per cascade, summed
+    
+    public int GridColumns  { get; set; }
+    public int GridRows     { get; set; }
+    public int GridOccupied { get; set; }    // cells holding at least one entity
+    public int GridVisited  { get; set; }    // cells touched by the camera query
+    public int GridCells => GridColumns * GridRows;
 }

@@ -79,6 +79,9 @@ public class StatsOverlay
                 ? stats.CulledEntities / (float)stats.TotalEntities * 100f
                 : 0f;
             Row("Ratio", $"{Widgets.Float(ratio)} %");
+            Row("Grid",     $"{stats.GridColumns}x{stats.GridRows} ({stats.GridCells})");
+            Row("Occupied", stats.GridOccupied.ToString());
+            Row("Visited",  stats.GridVisited.ToString());
         });
         
         Section("Shadows", ColorPalette.Blue, () =>

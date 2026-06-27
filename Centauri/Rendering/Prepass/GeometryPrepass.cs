@@ -10,6 +10,7 @@ using Utils.Misc;
 using Targets;
 using Config;
 using Helper;
+using Culling;
 
 // Renders view-space normals + depth + material (roughness/metallic) into single-sample
 // textures before the lit pass. These are the inputs the screen-space effects need: SSAO
@@ -42,13 +43,9 @@ public sealed class GeometryPrepass : IDisposable
 
     public void Resize(uint width, uint height) => _target.Resize(width, height);
 
-    public void Render(Scene scene)
+    public void Render(Scene scene, CullingSystem culling)
     {
         var camera = scene.Cameras.Active;
-        
-        var cullingCamera = scene.Cameras.Primary;
-        cullingCamera.UpdateFrustum();
-        var cull = _config.Debug.EnableCulling;
 
         _target.Bind();
         _target.Clear();
@@ -69,8 +66,7 @@ public sealed class GeometryPrepass : IDisposable
         foreach (var entity in scene.Entities)
         {
             if (!entity.Enabled || entity.Model is not { } model) continue;
-            if (cull && !cullingCamera.Frustum.IsVisibleAABB(entity.GetWorldBounds()))
-                continue;
+            if (!culling.IsVisible(entity)) continue;
 
             if (!_groups.TryGetValue(model, out var list))
                 _groups[model] = list = new List<InstanceData>();

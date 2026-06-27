@@ -30,6 +30,7 @@ public class PropertiesPanel
             new SkyboxSection(),
             new ShadowSection(config),
             new SSAOSection(config),
+            new CullingSection(config),
             new TAASection(config),
             new BloomSection(config),
             new ColorGradingSection(grading),

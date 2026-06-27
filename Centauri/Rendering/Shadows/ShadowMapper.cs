@@ -11,18 +11,7 @@ using Graphics.Resources.Materials;
 using Graphics.Geometry;
 using Utils.Geometry;
 using Helper;
-
-internal readonly struct Caster
-{
-    public readonly InstanceData Data;
-    public readonly BoundingBox  Bounds;
-
-    public Caster(InstanceData data, BoundingBox bounds)
-    {
-        Data = data; 
-        Bounds = bounds;
-    }
-}
+using Culling;
 
 public sealed class ShadowMapper : IDisposable
 {
@@ -38,10 +27,10 @@ public sealed class ShadowMapper : IDisposable
     private readonly Frustum _cull = new();
     private readonly CascadeBuilder _cascadeBuilder;
     
-    private readonly Dictionary<Model, List<Caster>> _solid    = new();
-    private readonly Dictionary<Model, List<Caster>> _twoSided = new();
+    private readonly Dictionary<Model, List<InstanceData>> _solid    = new();
+    private readonly Dictionary<Model, List<InstanceData>> _twoSided = new();
     private readonly Dictionary<Model, IReadOnlyList<Material?>> _materials = new();
-    private readonly List<InstanceData> _visible = new(); 
+    private readonly HashSet<Entity> _cascadeVisible = new();
     
     private int         _boundsRevision = -1;
     private BoundingBox _cachedSceneBounds;
@@ -67,7 +56,7 @@ public sealed class ShadowMapper : IDisposable
             PathResolver.Resolve("Assets/Shaders/Shadow/depth.frag"));
     }
 
-    public void Render(Scene scene, ref FrameStats stats)
+    public void Render(Scene scene, CullingSystem culling, ref FrameStats stats)
     {
         stats.ShadowCasters = 0;
         stats.ShadowCulled  = 0;
@@ -100,7 +89,6 @@ public sealed class ShadowMapper : IDisposable
 
         Cascades = _cascadeBuilder.Build(camera, dir, sceneBounds, Cascades);
 
-        CollectCasters(scene);
 
         SetRenderState();
         _depth.Use();
@@ -108,12 +96,19 @@ public sealed class ShadowMapper : IDisposable
         _depth.SetUniform("uAlbedo", 0);
         ShaderUniformBinder.UploadWind(_depth, _config.Wind);
         
+        var totalCasters = culling.EntityCount;
         for (var c = 0; c < Cascades.Length; c++)
         {
             _maps.BindLayer(c);
             _depth.SetUniform("uLightMatrix", Cascades[c].Matrix);
             
             _cull.Update(Cascades[c].Matrix);
+            
+            _cascadeVisible.Clear();
+            culling.CullInto(_cull, _cascadeVisible);
+            stats.ShadowCulled += totalCasters - _cascadeVisible.Count;
+
+            BucketCasters(_cascadeVisible);
             
             SetSolidRenderState();
             DrawGroups(_solid, ref stats);
@@ -128,46 +123,31 @@ public sealed class ShadowMapper : IDisposable
         _cache.Record(key);   // these maps are valid until one of the key's inputs changes
     }
 
-    private void CollectCasters(Scene scene)
+    private void BucketCasters(HashSet<Entity> visible)
     {
         foreach (var list in _solid.Values)    list.Clear();
         foreach (var list in _twoSided.Values) list.Clear();
 
-        foreach (var entity in scene.Entities)
+        foreach (var entity in visible)
         {
-            if (!entity.Enabled || entity.Model is not { } model)
-                continue;
+            if (entity.Model is not { } model) continue;
 
             var groups = entity.AnyTwoSided ? _twoSided : _solid;
             if (!groups.TryGetValue(model, out var list))
-                groups[model] = list = new List<Caster>();
+                groups[model] = list = new List<InstanceData>();
             
             _materials[model] = entity.Materials;
-            list.Add(new Caster(
-                new InstanceData(entity.Transform.WorldMatrix, entity.UvScale, entity.UvOffset),
-                entity.GetWorldBounds()));
+            list.Add(new InstanceData(entity.Transform.WorldMatrix, entity.UvScale, entity.UvOffset));
         }
     }
     
-    private void DrawGroups(Dictionary<Model, List<Caster>> groups, ref FrameStats stats)
+    private void DrawGroups(Dictionary<Model, List<InstanceData>> groups, ref FrameStats stats)
     {
-        foreach (var (model, casters) in groups)
+        foreach (var (model, list) in groups)
         {
-            if (casters.Count == 0) continue;
-            
-            _visible.Clear();
-            foreach (var caster in casters)
-            {
-                if (_cull.IsVisibleAABB(caster.Bounds))
-                    _visible.Add(caster.Data);
-                else
-                    stats.ShadowCulled++;
-            }
-
-            if (_visible.Count == 0) continue;
-
-            _instances.Upload(_visible);
-            stats.ShadowCasters += _visible.Count;
+            if (list.Count == 0) continue;
+            _instances.Upload(list);
+            stats.ShadowCasters += list.Count;
 
             var materials = _materials[model];
             for (var i = 0; i < model.Meshes.Count; i++)
@@ -176,7 +156,7 @@ public sealed class ShadowMapper : IDisposable
 
                 var mesh = model.Meshes[i];
                 mesh.ConfigureInstancing(_instances.Handle);
-                mesh.DrawInstanced(_visible.Count);
+                mesh.DrawInstanced(list.Count);
             }
         }
     }

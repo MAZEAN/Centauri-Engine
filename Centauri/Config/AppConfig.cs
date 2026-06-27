@@ -17,4 +17,5 @@ public class AppConfig
     [JsonPropertyName("bloom")]   public BloomConfig  Bloom { get; init; } = new();
     [JsonPropertyName("taa")]     public TAAConfig    TAA { get; init; } = new();
     [JsonPropertyName("wind")]    public WindConfig   Wind { get; init; } = new();
+    [JsonPropertyName("culling")] public CullingConfig Culling { get; init; } = new();
 }

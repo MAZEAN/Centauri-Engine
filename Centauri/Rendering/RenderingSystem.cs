@@ -18,6 +18,7 @@ using Shadows;
 using DebugView;
 using Profiling;
 using SSAO;
+using Culling;
 
 public class RenderingSystem : IDisposable
 {
@@ -31,6 +32,7 @@ public class RenderingSystem : IDisposable
     private readonly IBLBaker _ibl;
     private readonly GPUProfiler _profiler;
     private readonly InstanceBuffer _instances;
+    private readonly CullingSystem _culling;
     
     private UISystem _ui = null!;
     private PostProcessor _post = null!;
@@ -57,6 +59,7 @@ public class RenderingSystem : IDisposable
         _config        = config;
         
         _instances = new InstanceBuffer(gl);
+        _culling   = new CullingSystem(_config.Culling.CellSize, _config.Culling.OversizeFactor);
         
         _shadows = new ShadowMapper(gl, _config, _instances);
         _ibl = new IBLBaker(gl, _config.IBLConfig);
@@ -104,6 +107,10 @@ public class RenderingSystem : IDisposable
         scene.Lighting.Collect(scene.Entities);
         scene.Cameras.Active.JitterNdc = _post.NextTaaJitter();
         
+        _culling.Update(scene, scene.Cameras.Primary, _config.Debug.EnableCulling,
+            _config.Culling.CellSize, _config.Culling.OversizeFactor);
+        UpdateGridStats();
+        
         RenderPrePostComponents(scene, deltaTime);
         
         _post.BeginScene();
@@ -127,7 +134,7 @@ public class RenderingSystem : IDisposable
         }
 
         using (_profiler.Measure("Forward"))
-            _mainRenderer.Render(scene, deltaTime, ref _stats, _ssao.AoTexture, _ssaoActive);
+            _mainRenderer.Render(scene, deltaTime, ref _stats, _ssao.AoTexture, _ssaoActive, _culling);
 
         using (_profiler.Measure("Debug"))
         {
@@ -149,7 +156,7 @@ public class RenderingSystem : IDisposable
         _profiler.BeginFrame(_config.Debug.ShowGPUTimings);
 
         using (_profiler.Measure("Shadows"))
-            _shadows.Render(scene, ref _stats);
+            _shadows.Render(scene, _culling, ref _stats);
 
         // SSAO (and the Normals/Depth/AO debug views) all need the prepass buffers
         _ssaoActive = _config.SSAO.Enabled || _config.Debug.Shading == ShadingMode.AmbientOcclusion;
@@ -158,7 +165,7 @@ public class RenderingSystem : IDisposable
         
         if (needPrepass)
             using (_profiler.Measure("Prepass"))
-                _prepass.Render(scene);
+                _prepass.Render(scene, _culling);
 
         if (_ssaoActive)
             using (_profiler.Measure("SSAO"))
@@ -183,6 +190,15 @@ public class RenderingSystem : IDisposable
 
         _skyIsDay = isDay;
         scene.Skyboxes.TrySetActive(isDay ? "Day" : "Night");
+    }
+    
+    private void UpdateGridStats()
+    {
+        var grid = _culling.Grid;
+        _stats.GridColumns  = grid.Columns;
+        _stats.GridRows     = grid.Rows;
+        _stats.GridOccupied = grid.OccupiedCells;
+        _stats.GridVisited  = grid.VisitedCells;
     }
     
     private void UpdateFPSCounter(float deltaTime)

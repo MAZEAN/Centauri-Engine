@@ -85,5 +85,9 @@
     "strength": 0.015,
     "speed": 0.85,
     "direction": 37.0
+  },
+  "culling": {
+    "cellSize": 16.0,
+    "oversizeFactor": 8.0
   }
 }
