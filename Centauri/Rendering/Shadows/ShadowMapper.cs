@@ -7,6 +7,7 @@ using Config;
 using World;
 using Utils.Misc;
 using Graphics.Resources;
+using Graphics.Resources.Materials;
 using Graphics.Geometry;
 using Utils.Geometry;
 
@@ -23,6 +24,7 @@ public sealed class ShadowMapper : IDisposable
     
     private readonly Dictionary<Model, List<InstanceData>> _solid    = new();
     private readonly Dictionary<Model, List<InstanceData>> _twoSided = new();
+    private readonly Dictionary<Model, IReadOnlyList<Material?>> _materials = new();
 
     public bool Active { get; private set; }
     public uint DepthTexture => _maps.DepthTexture;
@@ -71,6 +73,8 @@ public sealed class ShadowMapper : IDisposable
             _maps.BindLayer(c);
             _depth.Use();
             _depth.SetUniform("uLightMatrix", Cascades[c].Matrix);
+            _depth.SetUniform("uAlbedo", 0);
+            
             _cull.Update(Cascades[c].Matrix);
             
             BucketCasters(scene, ref stats);
@@ -106,7 +110,8 @@ public sealed class ShadowMapper : IDisposable
             var groups = entity.AnyTwoSided ? _twoSided : _solid;
             if (!groups.TryGetValue(model, out var list))
                 groups[model] = list = new List<InstanceData>();
-
+            
+            _materials[model] = entity.Materials;
             list.Add(new InstanceData(entity.Transform.WorldMatrix, entity.UvScale, entity.UvOffset));
         }
     }
@@ -120,11 +125,29 @@ public sealed class ShadowMapper : IDisposable
             _instances.Upload(list);
             stats.ShadowCasters += list.Count;
 
-            foreach (var mesh in model.Meshes)
+            var materials = _materials[model];
+            for (var i = 0; i < model.Meshes.Count; i++)
             {
+                SetCasterAlphaTest(i < materials.Count ? materials[i] : null);
+
+                var mesh = model.Meshes[i];
                 mesh.ConfigureInstancing(_instances.Handle);
                 mesh.DrawInstanced(list.Count);
             }
+        }
+    }
+    
+    private void SetCasterAlphaTest(Material? material)
+    {
+        if (material is { TwoSided: true, Albedo: { } albedo })
+        {
+            _depth.SetUniform("uAlphaTest", 1);
+            _gl.ActiveTexture(TextureUnit.Texture0);
+            _gl.BindTexture(TextureTarget.Texture2D, albedo.Handle);
+        }
+        else
+        {
+            _depth.SetUniform("uAlphaTest", 0);
         }
     }
     
