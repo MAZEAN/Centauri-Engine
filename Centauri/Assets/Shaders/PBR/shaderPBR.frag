@@ -14,6 +14,8 @@ const float PI               = 3.14159265359;
 const int   MAX_POINT_LIGHTS = 16;
 const int   MAX_SPOT_LIGHTS  = 16;
 const int   MAX_CASCADES = 4;
+const float CASCADE_BLEND = 0.1;   // fraction of a cascade's depth range used as the cross-fade band
+const float SHADOW_FADE   = 0.1;   // fraction of the shadow distance over which shadows fade out
 
 // ─── light structs (std140 — every member padded to vec4) ───────────────────────
 struct DirLight {
@@ -83,7 +85,8 @@ uniform int   uPcfRadius;
 
 uniform int uShowCascades;
 
-int SelectCascade(float viewDepth) {
+int SelectCascade(float viewDepth) 
+{
     for (int i = 0; i < uCascadeCount; ++i)
         if (viewDepth < uCascadeSplits[i]) 
             return i;
@@ -91,32 +94,53 @@ int SelectCascade(float viewDepth) {
     return uCascadeCount - 1;
 }
 
-float ShadowFactor(vec3 N, vec3 L)
+float SampleCascade(int c, vec3 N, vec3 L) 
 {
-    int c = SelectCascade(fViewDepth);
-
-    // offset along the normal by N texels of THIS cascade — self-tunes near vs far,
-    // so one bias value works across every cascade instead of being a single guess
     float nOffset = uNormalBias * uTexelWorld[c];
     vec4 ls = uLightMatrices[c] * vec4(fFragPos + N * nOffset, 1.0);
     vec3 proj = ls.xyz / ls.w * 0.5 + 0.5;
-    
-    if (proj.z > 1.0) 
-        return 0.0;                       // beyond far plane: lit
+
+    if (proj.z > 1.0)
+        return 0.0;
 
     float bias    = max(uShadowBias * (1.0 - dot(N, L)), uShadowBias * 0.1);
     float current = proj.z - bias;
 
     float lit   = 0.0;
     vec2  texel = 1.0 / vec2(textureSize(uShadowMap, 0).xy);
-    
+
     for (int x = -uPcfRadius; x <= uPcfRadius; ++x)
         for (int y = -uPcfRadius; y <= uPcfRadius; ++y)
-            // vec4(uv.xy, layer, compareDepth) — GPU compares + 2x2 blends in one tap
             lit += texture(uShadowMap, vec4(proj.xy + vec2(x, y) * texel, float(c), current));
-
+    
     float samples = float((2 * uPcfRadius + 1) * (2 * uPcfRadius + 1));
-    return 1.0 - lit / samples;                          // shadow amount (0 = lit, 1 = shadowed)
+    return 1.0 - lit / samples;
+}
+
+float ShadowFactor(vec3 N, vec3 L)
+{
+    int c = SelectCascade(fViewDepth);
+
+    float shadow = SampleCascade(c, N, L);
+    
+    if (c + 1 < uCascadeCount)
+    {
+        float splitFar  = uCascadeSplits[c];
+        float splitNear = c == 0 ? 0.0 : uCascadeSplits[c - 1];
+        float band      = CASCADE_BLEND * (splitFar - splitNear);
+
+        if (band > 0.0)
+        {
+            float t = clamp((splitFar - fViewDepth) / band, 0.0, 1.0);  // 1 inside, 0 at the seam
+            if (t < 1.0)
+                shadow = mix(SampleCascade(c + 1, N, L), shadow, t);
+        }
+    }
+    
+    float maxDist = uCascadeSplits[uCascadeCount - 1];
+    float fade    = clamp((maxDist - fViewDepth) / (maxDist * SHADOW_FADE), 0.0, 1.0);
+
+    return shadow * fade;
 }
 
 // ─── lighting ──────────────────────────────────────────────────────────────────
@@ -220,8 +244,8 @@ vec3 CalcSpotLight(SpotLight light, vec3 N, vec3 V, vec3 albedo, float roughness
     vec3  L           = normalize(lightDir);
 
     float attenuation = 1.0 / (light.params.y
-    + light.params.z * dist
-    + light.params.w * dist * dist);
+        + light.params.z * dist
+        + light.params.w * dist * dist);
 
     float theta     = dot(L, normalize(-light.direction.xyz));
     float epsilon   = light.cutoffs.x - light.cutoffs.y;
@@ -235,9 +259,9 @@ vec3 CalcSpotLight(SpotLight light, vec3 N, vec3 V, vec3 albedo, float roughness
 void showShadowCascadesView(vec3 color, vec4  albedoSample) {
     int ci = SelectCascade(fViewDepth);
     vec3 tint = ci == 0 ? vec3(1.0, 0.3, 0.3)
-            : ci == 1 ? vec3(0.3, 1.0, 0.3)
-            : ci == 2 ? vec3(0.3, 0.3, 1.0)
-            :           vec3(1.0, 1.0, 0.3);
+              : ci == 1 ? vec3(0.3, 1.0, 0.3)
+              : ci == 2 ? vec3(0.3, 0.3, 1.0)
+              :           vec3(1.0, 1.0, 0.3);
     
     FragColor = vec4(color * tint, albedoSample.a);
 }
