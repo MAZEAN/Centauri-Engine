@@ -29,14 +29,14 @@ public class PropertiesPanel
             new EntityInspectorSection(),
             new SkyboxSection(),
             new ShadowSection(config),
+            new WindSection(config),
             new SSAOSection(config),
             new CullingSection(config),
             new TAASection(config),
             new BloomSection(config),
             new ColorGradingSection(grading),
             new IBLSection(config),
-            new ViewportSection(config),
-            new WindSection(config)
+            new ViewportSection(config)
         ];
     }
 

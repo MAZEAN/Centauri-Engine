@@ -35,16 +35,17 @@ public sealed class CascadeBuilder
         var far    = MathF.Min(_config.Shadows.Distance, camFar);
 
         Span<Vector3> frustum = stackalloc Vector3[8];
+        Span<Vector3> slice   = stackalloc Vector3[8];
+
         GetFrustumCorners(camera, frustum);
 
         var prevSplit = near;
         for (var c = 0; c < n; c++)
         {
-            var split = CascadeSplit(c, n, near, far);
+            var split = CascadeSplit(c, n, near, far, _config.Shadows.SplitLambda);
+            var invRange = 1f / (camFar - near);
 
-            Span<Vector3> slice = stackalloc Vector3[8];
-            SliceCorners(frustum, (prevSplit - near) / (camFar - near),
-                (split - near) / (camFar - near), slice);
+            SliceCorners(frustum, (prevSplit - near) * invRange, (split - near) * invRange, slice);
 
             cascades[c] = FitCascade(slice, dir, split, sceneBounds);
             prevSplit = split;
@@ -70,13 +71,13 @@ public sealed class CascadeBuilder
     }
 
     // PSSM: blend logarithmic and uniform split distances
-    private float CascadeSplit(int c, int n, float near, float far)
+    private static float CascadeSplit(int c, int n, float near, float far, float splitLambda)
     {
         var p   = (c + 1) / (float)n;
         var log = near * MathF.Pow(far / near, p);
         var uni = near + (far - near) * p;
 
-        return _config.Shadows.SplitLambda * log + (1f - _config.Shadows.SplitLambda) * uni;
+        return splitLambda * log + (1f - splitLambda) * uni;
     }
 
     // interpolate the slice's 8 corners along the frustum edges (z is linear along edges)
@@ -99,10 +100,7 @@ public sealed class CascadeBuilder
             center += p;
         center /= 8f;
 
-        var radius = 0f;
-        foreach (var p in corners)
-            radius = MathF.Max(radius, (p - center).Length());
-        radius = MathF.Ceiling(radius * RadiusSnap) / RadiusSnap;
+        var radius = ComputeRadius(corners, center);
 
         var up   = MathF.Abs(dir.Y) > UpThreshold ? Vector3.UnitZ : Vector3.UnitY;
         var view = Matrix4x4.CreateLookAt(center - dir * radius, center, up);
@@ -154,4 +152,16 @@ public sealed class CascadeBuilder
 
         return maxZ;
     }
+
+    private static float ComputeRadius(ReadOnlySpan<Vector3> corners, Vector3 center)
+    {
+        var radiusSq = 0f;
+        foreach (var p in corners)
+        {
+            radiusSq = MathF.Max(radiusSq,
+                Vector3.DistanceSquared(p, center));
+        }
+
+        return MathF.Sqrt(radiusSq);
+    } 
 }

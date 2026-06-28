@@ -51,10 +51,10 @@ public sealed class GPUProfiler : IDisposable
         {
             if (!_issued[_frame, z]) continue;
 
-            _gl.GetQueryObject(_queries[_frame, z], QueryObjectParameterName.QueryResultAvailable, out uint ready);
+            _gl.GetQueryObject(_queries[_frame, z], QueryObjectParameterName.ResultAvailable, out uint ready);
             if (ready != 0)
             {
-                _gl.GetQueryObject(_queries[_frame, z], QueryObjectParameterName.QueryResult, out uint ns);
+                _gl.GetQueryObject(_queries[_frame, z], QueryObjectParameterName.Result, out uint ns);
                 _ms[z] = ns / 1_000_000.0;
             }
 

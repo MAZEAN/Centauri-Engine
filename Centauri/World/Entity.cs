@@ -11,12 +11,12 @@ public readonly record struct TransformSnapshot(Vector3 Position, Vector3 Euler,
 
 public class Entity : IDisposable
 {
-    public string    Name    { get; set; }
-    public bool      Enabled { get; set; } = true;
-    public Model?    Model    { get; }
-    public Light?    Light    { get; set; }
-    public Vector2   UvScale  { get; set; } = Vector2.One;
-    public Vector2   UvOffset { get; set; } = Vector2.Zero;
+    public string  Name { get; set; } = null!;
+    public bool    Enabled { get; set; } = true;
+    public Model?  Model    { get; }
+    public Light?  Light    { get; set; }
+    public Vector2 UvScale  { get; set; } = Vector2.One;
+    public Vector2 UvOffset { get; set; } = Vector2.Zero;
     
     // Materials
     private readonly Material?[] _materials;

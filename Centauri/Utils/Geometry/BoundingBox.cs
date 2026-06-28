@@ -66,8 +66,8 @@ public readonly struct BoundingBox
         var tMin = Vector3.Min(t0, t1);
         var tMax = Vector3.Max(t0, t1);
 
-        float near = MathF.Max(MathF.Max(tMin.X, tMin.Y), tMin.Z);
-        float far  = MathF.Min(MathF.Min(tMax.X, tMax.Y), tMax.Z);
+        var near = MathF.Max(MathF.Max(tMin.X, tMin.Y), tMin.Z);
+        var far  = MathF.Min(MathF.Min(tMax.X, tMax.Y), tMax.Z);
 
         t = near;
         return far >= MathF.Max(near, 0f); // hit, and in front of the ray
