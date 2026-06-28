@@ -19,9 +19,10 @@ public sealed class GeometryPrepass : IDisposable
 {
     private readonly GL _gl;
     private readonly AppConfig _config;
+    private readonly InstanceBuffer _instances;
+    
     private readonly GLShader _shader;
     private readonly RenderTarget _target;
-    private readonly InstanceBuffer _instances;
     
     private readonly Dictionary<Model, List<InstanceData>> _groups = new();
     // per-model submesh materials (from a representative entity) — drives the foliage alpha test
@@ -36,6 +37,7 @@ public sealed class GeometryPrepass : IDisposable
         _gl = gl;
         _config = config;
         _instances = instances;
+        
         _shader = new GLShader(gl,
             PathResolver.Resolve("Assets/Shaders/Prepass/prepass.vert"),
             PathResolver.Resolve("Assets/Shaders/Prepass/prepass.frag"));
@@ -96,7 +98,6 @@ public sealed class GeometryPrepass : IDisposable
             }
         }
 
-        _gl.Enable(EnableCap.CullFace);   // restore default for the next pass
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
     }
 
