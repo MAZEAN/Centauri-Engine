@@ -8,30 +8,26 @@ using World;
 using Config;
 using Graphics.Geometry;
 using Utils.Geometry;
+using Culling;
 
 public sealed class DebugRenderer : IDisposable
 {
     private readonly AppConfig _config;
-    private readonly DebugView.Draw _draw;
+    private readonly Draw _draw;
     private readonly Mesh _cameraMesh;
 
     private bool _active;
 
     private const float DirLineLength = 100.0f;
     private const float FaceAlpha     = 0.05f; // translucency of AABB side faces
-
-    private static readonly Vector3 CameraColor     = new(1.0f, 0.5f, 0.0f);
-    private static readonly Vector3 DirColor        = new(1.0f, 1.0f, 1.0f);
-    private static readonly Vector3 FrustumColor    = new(1.0f, 1.0f, 0.0f);
-    private static readonly Vector3 AABBColor       = new(0.0f, 1.0f, 0.0f);
-    private static readonly Vector3 AABBCulledColor = new(1.0f, 0.0f, 0.0f);
-    private static readonly Vector3 SelectedColor   = new(1.0f, 1.0f, 1.0f);
+    private const float GridFaceAlpha = 0.01f;   // translucent fill on cells in view this frame
+    private const float GridFaceSelectedAlpha = 0.05f;   // translucent fill on cells in view this frame
 
     public DebugRenderer(GL gl, AppConfig config)
     {
         _config     = config;
-        _draw       = new DebugView.Draw(gl);
-        _cameraMesh = DebugView.Shapes.BuildCameraMesh(gl);
+        _draw       = new Draw(gl);
+        _cameraMesh = Shapes.BuildCameraMesh(gl);
     }
 
     // ── Begin / End ───────────────────────────────────────────────────────────
@@ -87,13 +83,13 @@ public sealed class DebugRenderer : IDisposable
             var bounds  = entity.GetWorldBounds();
             var culled  = !cullingFrustum.IsVisibleAABB(bounds);
             var corners = bounds.GetBoxCorners();
-            var color   = culled ? AABBCulledColor : AABBColor;
+            var color   = culled ? ColorPalette.AABBCulled : ColorPalette.AABBStd;
 
             _draw.Color(color, FaceAlpha);          // translucent fill
-            _draw.Triangles(DebugView.Shapes.BoxFaces(corners));
+            _draw.Triangles(Shapes.BoxFaces(corners));
 
             _draw.Color(color);
-            _draw.Lines(DebugView.Shapes.BoxEdges(corners));
+            _draw.Lines(Shapes.BoxEdges(corners));
         }
     }
     
@@ -103,30 +99,79 @@ public sealed class DebugRenderer : IDisposable
         if (scene.Selected is not { } e || e.Model is null) return;
 
         _draw.Model(Matrix4x4.Identity);
-        _draw.Color(SelectedColor);
-        _draw.Lines(DebugView.Shapes.BoxEdges(e.GetWorldBounds().GetBoxCorners()));
+        _draw.Color(ColorPalette.Selected);
+        _draw.Lines(Shapes.BoxEdges(e.GetWorldBounds().GetBoxCorners()));
     }
+    
+    public void DrawCullingGrid(Scene scene, SpatialGrid grid)
+    {
+        AssertActive();
+        if (!_config.Debug.ShowCullingGrid) return;
+
+        _draw.Model(Matrix4x4.Identity);
+
+        for (var r = 0; r < grid.Rows; r++)
+        {
+            for (var c = 0; c < grid.Columns; c++)
+            {
+                if (grid.CellCount(c, r) == 0) continue;   // occupied cells only
+
+                var corners = grid.CellBounds(c, r).GetBoxCorners();
+                var visited = grid.CellVisited(c, r);
+                var color   = visited ? ColorPalette.GridVisited : ColorPalette.GridOccupied;
+
+                if (visited)
+                {
+                    _draw.Color(color, GridFaceAlpha);
+                    _draw.Triangles(Shapes.BoxFaces(corners));
+                }
+                
+                _draw.Color(color);
+                _draw.Lines(Shapes.BoxEdges(corners));
+            } 
+        }
+            
+        
+        if (scene.Selected is { Model: not null } selected &&
+            grid.TryGetCells(selected.GetWorldBounds(), out var c0, out var r0, out var c1, out var r1))
+        {
+            for (var r = r0; r <= r1; r++)
+            {
+                for (var c = c0; c <= c1; c++)
+                {
+                    var corners = grid.CellBounds(c, r).GetBoxCorners();
+                    
+                    _draw.Color(ColorPalette.GridSelected, GridFaceSelectedAlpha);
+                    _draw.Triangles(Shapes.BoxFaces(corners));
+                    
+                    _draw.Color(ColorPalette.GridSelected);
+                    _draw.Lines(Shapes.BoxEdges(corners));
+                }
+            }
+        }
+    }
+
 
     // ── Private drawing ───────────────────────────────────────────────────────
     private void DrawCameraShape(Camera cam)
     {
         var model =
-            Matrix4x4.CreateScale(DebugView.Shapes.CameraScale) *
+            Matrix4x4.CreateScale(Shapes.CameraScale) *
             Matrix4x4.CreateWorld(cam.Position, cam.Forward, cam.Up);
 
         _draw.Model(model);
-        _draw.Color(CameraColor);
+        _draw.Color(ColorPalette.Camera);
         _draw.DrawMesh(_cameraMesh);
     }
 
     private void DrawDirectionLine(Camera cam)
     {
         _draw.Model(Matrix4x4.Identity);
-        _draw.Color(DirColor);
+        _draw.Color(ColorPalette.CameraDir);
 
-        var tipOffset = MathF.Abs(DebugView.Shapes.CameraModelBase) * DebugView.Shapes.CameraScale;
-        var start     = cam.Position + cam.Forward * tipOffset;
-        var end       = start + cam.Forward * DirLineLength;
+        var tipOffset = MathF.Abs(Shapes.CameraModelBase) * Shapes.CameraScale;
+        var start   = cam.Position + cam.Forward * tipOffset;
+        var end     = start + cam.Forward * DirLineLength;
 
         _draw.Lines([start.X, start.Y, start.Z, end.X, end.Y, end.Z]);
     }
@@ -134,8 +179,8 @@ public sealed class DebugRenderer : IDisposable
     private void DrawFrustum(Camera cam)
     {
         _draw.Model(Matrix4x4.Identity);
-        _draw.Color(FrustumColor);
-        _draw.Lines(DebugView.Shapes.BoxEdges(cam.GetFrustumCorners()));
+        _draw.Color(ColorPalette.Frustum);
+        _draw.Lines(Shapes.BoxEdges(cam.GetFrustumCorners()));
     }
 
     private void AssertActive([CallerMemberName] string caller = "")

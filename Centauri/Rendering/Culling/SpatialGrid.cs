@@ -165,6 +165,16 @@ public sealed class SpatialGrid
 
     public int  CellCount  (int col, int row) => _cells[row * _columns + col].Count;
     public bool CellVisited(int col, int row) => _visited.Length > 0 && _visited[row * _columns + col];
+    
+    public bool TryGetCells(BoundingBox b, out int c0, out int r0, out int c1, out int r1)
+    {
+        c0 = r0 = c1 = r1 = 0;
+        if (_columns == 0 || _rows == 0 || IsOversized(b)) return false;
+
+        (c0, r0) = CellOf(b.Min);
+        (c1, r1) = CellOf(b.Max);
+        return true;
+    }
 
     // ── internals ───────────────────────────────────────────────────────────────
     private bool IsOversized(BoundingBox b) =>

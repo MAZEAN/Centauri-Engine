@@ -21,7 +21,7 @@ public sealed class CullingSection : ISection
         var dbg  = _config.Debug;
         var conf = _config.Culling;
 
-        Widgets.CheckRow("Enabled", dbg.EnableCulling, v => dbg.EnableCulling = v);
+        Widgets.CheckRow("Enabled",   dbg.EnableCulling,   v => dbg.EnableCulling   = v);
 
         Widgets.DragRow("Cell Size", conf.CellSize, v => conf.CellSize = MathF.Max(1f, v),
             0.5f, 1f, 256f, "%.1f", conf.AuthoredCellSize);

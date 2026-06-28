@@ -22,8 +22,8 @@ public sealed class ViewportSection : ISection
         Widgets.CheckRow("Stats Overlay",   d.ShowStatsOverlay,  v => d.ShowStatsOverlay  = v);
         Widgets.CheckRow("Frustum Culling", d.EnableCulling,     v => d.EnableCulling     = v);
         Widgets.CheckRow("Anisotropic",     d.AnisotropicFilter, v => d.AnisotropicFilter = v);
-
         Widgets.CheckRow("Bounding Boxes",  d.ShowBoundingBoxes, v => d.ShowBoundingBoxes = v);
+        Widgets.CheckRow("Spatial Grid",    d.ShowCullingGrid,   v => d.ShowCullingGrid   = v);
         Widgets.CheckRow("Cameras",         d.ShowCameras,       v => d.ShowCameras       = v);
         Widgets.CheckRow("Frustums",        d.ShowFrustums,      v => d.ShowFrustums      = v);
     }

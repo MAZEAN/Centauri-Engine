@@ -143,8 +143,9 @@ public class RenderingSystem : IDisposable
 
             _debugRenderer.DrawCameras(scene);
             _debugRenderer.DrawAllAABBs(scene, scene.Cameras.Primary.Frustum);
-
+            _debugRenderer.DrawCullingGrid(scene, _culling.Grid);
             _debugRenderer.DrawSelection(scene);
+            
             _debugRenderer.End();
         }
     }

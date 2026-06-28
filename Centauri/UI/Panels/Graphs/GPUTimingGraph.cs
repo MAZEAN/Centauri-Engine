@@ -1,4 +1,4 @@
-namespace Centauri.UI.Panels;
+namespace Centauri.UI.Panels.Graphs;
 
 using ImGuiNET;
 using System.Numerics;
@@ -11,7 +11,7 @@ using Rendering.Profiling;
 // stays steady regardless of frame rate, and the Y axis auto-scales to a tidy ms ceiling.
 // A legend below shows each pass's latest (interval-averaged) cost — calm enough to read,
 // unlike the per-frame text it replaces.
-internal sealed class GpuTimingGraph
+internal sealed class GPUTimingGraph
 {
     private const float GraphHeight = 150f;
     private const float LeftPad = 36f;   // Y tick-label gutter

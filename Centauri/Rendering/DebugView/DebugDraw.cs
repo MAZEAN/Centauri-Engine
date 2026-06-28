@@ -45,9 +45,7 @@ public sealed class Draw : IDisposable
     // ── pass setup / teardown ─────────────────────────────────────────────────
     public void Begin(Matrix4x4 view, Matrix4x4 projection)
     {
-        _gl.Disable(EnableCap.CullFace);
-        _gl.Disable(EnableCap.DepthTest);
-        _gl.DepthMask(false);
+        SetRenderState();
 
         _shader.Use();
         _shader.SetUniform("uView",       view);
@@ -61,6 +59,7 @@ public sealed class Draw : IDisposable
         _gl.Enable(EnableCap.CullFace);
         _gl.Enable(EnableCap.DepthTest);
         _gl.DepthMask(true);
+        _gl.Disable(EnableCap.Blend);
     }
 
     // ── per-draw uniforms ─────────────────────────────────────────────────────
@@ -110,6 +109,15 @@ public sealed class Draw : IDisposable
         }
 
         _gl.DrawArrays(mode, 0, count);
+    }
+
+    private void SetRenderState()
+    {
+        _gl.Disable(EnableCap.CullFace);
+        _gl.Disable(EnableCap.DepthTest);
+        _gl.DepthMask(false);
+        _gl.Enable(EnableCap.Blend);
+        _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
     }
 
     public void Dispose()

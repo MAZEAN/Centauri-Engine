@@ -22,7 +22,7 @@ public class StatsOverlay
     private readonly ImFontPtr _font;
     private readonly AppConfig _config;
     private readonly PerformanceGraph _perfGraph = new();
-    private readonly GpuTimingGraph _gpuGraph = new();
+    private readonly GPUTimingGraph _gpuGraph = new();
 
     public StatsOverlay(ImFontPtr font, AppConfig config)
     {
