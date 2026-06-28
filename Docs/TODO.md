@@ -14,7 +14,8 @@
 * [x] Day/Night cycle
 * [x] Screen Space Ambient Occlusion (SSAO)
 * [x] Temporal Anti-Aliasing (TAA)
-* [ ] Reflection Probes (maybe additionally SSR + Planar Reflections)
+* [x] Screen Space Reflections (SSR) (with ray tracing or PBR Accumulation)
+* [ ] Reflection Probes (maybe additionally Planar Reflections)
 * [ ] GTAO (Ground-Truth AO)
 * [ ] Contact-hardening / PCSS
 * [ ] Raytracing with BVH (only experimental, not real-time)

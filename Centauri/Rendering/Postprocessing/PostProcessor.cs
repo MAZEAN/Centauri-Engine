@@ -6,6 +6,7 @@ using Graphics.Resources;
 using Utils.Misc;
 using Config;
 using World;
+using SSR;
 using TAA;
 
 public sealed class PostProcessor : IDisposable
@@ -13,6 +14,7 @@ public sealed class PostProcessor : IDisposable
     private readonly GL _gl;
     private readonly HDRFramebuffer _hdr;
     private readonly AppConfig _config;
+    private readonly SSRPass _ssr;
     private readonly TAAPass _taa;
     
     private uint _width, _height;
@@ -33,6 +35,7 @@ public sealed class PostProcessor : IDisposable
             PathResolver.Resolve("Assets/Shaders/Post/post.vert"),
             PathResolver.Resolve("Assets/Shaders/Post/post.frag"));
         _bloom = new BloomPass(gl, _config.Bloom, width, height);
+        _ssr = new SSRPass(gl, _config.SSR, width, height);
         _taa = new TAAPass(gl, _config.TAA, width, height);
         _emptyVao = gl.GenVertexArray();
     }
@@ -43,6 +46,7 @@ public sealed class PostProcessor : IDisposable
         _height = height;
         _hdr.Resize(width, height);
         _bloom.Resize(width, height);
+        _ssr.Resize(width, height);
         _taa.Resize(width, height);
     }
 
@@ -51,16 +55,22 @@ public sealed class PostProcessor : IDisposable
     public System.Numerics.Vector2 NextTaaJitter() => _taa.NextJitter(_width, _height);
     public uint VelocityTexture => _taa.VelocityTexture;   // TAA motion vectors, for the debug view
 
-    public void Composite(Camera camera, uint depthTex, bool taaAvailable)
+    public void Composite(Camera camera, uint depthTex, uint normalTex, uint materialTex,
+        bool ssrAvailable, bool taaAvailable)
     {
         _hdr.Resolve();
         
         var sceneColor = _hdr.ResolvedTexture;
         
+        var ssrActive = ssrAvailable && _config.SSR.Enabled;
+        if (ssrActive)
+            _ssr.Render(sceneColor, depthTex, normalTex, materialTex, camera);
+        
         var taaActive = taaAvailable && _config.TAA.Enabled;
+        var ssrInTonemap = ssrActive && !taaActive;
         if (taaActive)
         {
-            _taa.Render(sceneColor, depthTex, camera);
+            _taa.Render(sceneColor, ssrActive ? _ssr.ReflectionTexture : 0, ssrActive, depthTex, camera);
             sceneColor = _taa.OutputTexture;
         }
         
@@ -92,6 +102,12 @@ public sealed class PostProcessor : IDisposable
         _tonemap.SetUniform("uHasBloom",       bloomActive ? 1 : 0);
         _tonemap.SetUniform("uBloomIntensity", _config.Bloom.Intensity);
         
+        _gl.ActiveTexture(TextureUnit.Texture2);
+        _gl.BindTexture(TextureTarget.Texture2D, ssrInTonemap ? _ssr.ReflectionTexture : 0);
+        
+        _tonemap.SetUniform("uSsr",    2);
+        _tonemap.SetUniform("uHasSsr", ssrInTonemap ? 1 : 0);
+        
         _gl.BindVertexArray(_emptyVao);
         _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
         _gl.BindVertexArray(0);
@@ -114,6 +130,7 @@ public sealed class PostProcessor : IDisposable
         _hdr.Dispose();
         _tonemap.Dispose();
         _bloom.Dispose();
+        _ssr.Dispose();
         _taa.Dispose();
         
         _gl.DeleteVertexArray(_emptyVao);

@@ -28,6 +28,7 @@ public sealed class GeometryPrepass : IDisposable
     private readonly Dictionary<Model, IReadOnlyList<Material?>> _materials = new();
 
     public uint NormalTexture   => _target.ColorTextures[0];
+    public uint MaterialTexture => _target.ColorTextures[1];
     public uint DepthTexture    => _target.DepthTexture;
 
     public GeometryPrepass(GL gl, AppConfig config, uint width, uint height, InstanceBuffer instances)
@@ -38,7 +39,8 @@ public sealed class GeometryPrepass : IDisposable
         _shader = new GLShader(gl,
             PathResolver.Resolve("Assets/Shaders/Prepass/prepass.vert"),
             PathResolver.Resolve("Assets/Shaders/Prepass/prepass.frag"));
-        _target = new RenderTarget(gl, width, height, [InternalFormat.Rgba16f], withDepth: true);
+        _target = new RenderTarget(gl, width, height,
+            [InternalFormat.Rgba16f, InternalFormat.Rgba8], withDepth: true);
     }
 
     public void Resize(uint width, uint height) => _target.Resize(width, height);

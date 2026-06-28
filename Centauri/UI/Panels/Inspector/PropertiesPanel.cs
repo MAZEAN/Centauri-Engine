@@ -31,6 +31,7 @@ public class PropertiesPanel
             new ShadowSection(config),
             new WindSection(config),
             new SSAOSection(config),
+            new SSRSection(config),
             new CullingSection(config),
             new TAASection(config),
             new BloomSection(config),
