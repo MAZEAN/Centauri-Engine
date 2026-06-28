@@ -18,8 +18,8 @@ public class SkyboxRenderer : IDisposable
     {
         _gl = gl;
         _shader = new GLShader(gl,
-            PathResolver.Resolve("Assets/Shaders/Skybox/skybox.vert"),
-            PathResolver.Resolve("Assets/Shaders/Skybox/skybox.frag"));
+            PathResolver.Resolve("Shaders/Skybox/skybox.vert"),
+            PathResolver.Resolve("Shaders/Skybox/skybox.frag"));
 
         var (vertices, indices) = BuildCube();
         _cube = new Mesh(gl, vertices, indices);

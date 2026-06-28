@@ -1,5 +1,5 @@
 {
-  "shader":    "Assets/Shaders/PBR/shaderPBR",
+  "shader":    "Shaders/PBR/shaderPBR",
   "albedo":    "Assets/Textures/RustyMetal/rusty_metal_diff_1k.jpg",
   "normal":    "Assets/Textures/RustyMetal/rusty_metal_nor_gl_1k.jpg",
   "roughness": "Assets/Textures/RustyMetal/rusty_metal_rough_1k.jpg",

@@ -34,9 +34,9 @@ public sealed class BloomPass : IDisposable
         _gl = gl;
         _config = config;
 
-        _prefilter = Load(gl, "Assets/Shaders/Post/bloom_prefilter.frag");
-        _down      = Load(gl, "Assets/Shaders/Post/bloom_down.frag");
-        _up        = Load(gl, "Assets/Shaders/Post/bloom_up.frag");
+        _prefilter = Load(gl, "Shaders/Post/bloom_prefilter.frag");
+        _down      = Load(gl, "Shaders/Post/bloom_down.frag");
+        _up        = Load(gl, "Shaders/Post/bloom_up.frag");
 
         for (var i = 0; i < MipCount; i++)
         {
@@ -118,7 +118,7 @@ public sealed class BloomPass : IDisposable
     }
 
     private static GLShader Load(GL gl, string frag) =>
-        new(gl, PathResolver.Resolve("Assets/Shaders/Post/post.vert"), PathResolver.Resolve(frag));
+        new(gl, PathResolver.Resolve("Shaders/Post/post.vert"), PathResolver.Resolve(frag));
 
     private void Bind(TextureUnit unit, uint tex)
     {

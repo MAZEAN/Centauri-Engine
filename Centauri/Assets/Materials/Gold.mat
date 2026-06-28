@@ -1,5 +1,5 @@
 {
-  "shader":    "Assets/Shaders/PBR/shaderPBR",
+  "shader":    "Shaders/PBR/shaderPBR",
   "albedo":    "Assets/Textures/Gold/gold_diff_1k.jpg",
   "normal":    "Assets/Textures/Gold/gold_nor_gl_1k.jpg",
   "roughness": "Assets/Textures/Gold/gold_rough_1k.jpg",

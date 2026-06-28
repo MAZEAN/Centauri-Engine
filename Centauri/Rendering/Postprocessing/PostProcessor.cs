@@ -40,8 +40,8 @@ public sealed class PostProcessor : IDisposable
         _height = height;
         
         _tonemap = new GLShader(gl,
-            PathResolver.Resolve("Assets/Shaders/Post/post.vert"),
-            PathResolver.Resolve("Assets/Shaders/Post/post.frag"));
+            PathResolver.Resolve("Shaders/Post/post.vert"),
+            PathResolver.Resolve("Shaders/Post/post.frag"));
         _bloom = new BloomPass(gl, _config.Bloom, width, height);
         _ssr = new SSRPass(gl, _config.SSR, width, height);
         _taa = new TAAPass(gl, _config.TAA, width, height);

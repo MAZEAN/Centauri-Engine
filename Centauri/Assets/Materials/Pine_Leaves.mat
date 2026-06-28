@@ -1,5 +1,5 @@
 {
-  "shader":    "Assets/Shaders/PBR/shaderPBR",
+  "shader":    "Shaders/PBR/shaderPBR",
   "albedo":    "Assets/Textures/Leaves/Leaf_Pine_C.png",
   "roughnessScalar": 1.0,
   "metallicScalar": 0.0,

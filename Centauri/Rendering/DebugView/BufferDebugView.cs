@@ -19,8 +19,8 @@ public sealed class BufferDebugView : IDisposable
     {
         _gl = gl;
         _shader = new GLShader(gl,
-            PathResolver.Resolve("Assets/Shaders/Debug/buffer.vert"),
-            PathResolver.Resolve("Assets/Shaders/Debug/buffer.frag"));
+            PathResolver.Resolve("Shaders/Debug/buffer.vert"),
+            PathResolver.Resolve("Shaders/Debug/buffer.frag"));
         _vao = gl.GenVertexArray();
     }
 
