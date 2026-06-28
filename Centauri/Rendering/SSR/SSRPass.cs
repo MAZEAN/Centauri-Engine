@@ -33,8 +33,8 @@ public sealed class SSRPass : IDisposable
     private readonly RenderTarget _blurTarget;
     private readonly RenderTarget _resolveTarget;
 
-    public uint ReflectionTexture => _target.ColorTextures[0];
-
+    public uint ReflectionTexture => _resolveTarget.ColorTextures[0];
+    
     public SSRPass(GL gl, SSRConfig config, uint width, uint height)
     {
         _gl = gl;
@@ -64,6 +64,7 @@ public sealed class SSRPass : IDisposable
     {
         _target.Resize(width / ResDivisor, height / ResDivisor);
         _blurTarget.Resize(width / ResDivisor, height / ResDivisor);
+        _resolveTarget.Resize(width / ResDivisor, height / ResDivisor);
     }
 
     public void Render(uint sceneTex, uint depthTex, uint normalTex, uint materialTex, Camera camera,
