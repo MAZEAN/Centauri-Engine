@@ -83,8 +83,8 @@ void main()
     }
 
     // screen reflection, weighted by the same specular BRDF as the fallback
-    vec3 ssrSpec = ssr.rgb * W;
-
+    vec3 ssrSpec = ssr.rgb * W * uIblIntensity;
+    
     // delta the post stack adds onto the scene (which already holds iblSpec from the lit pass)
     vec3 delta = (ssrSpec - iblSpec) * conf;
 

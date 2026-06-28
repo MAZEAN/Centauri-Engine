@@ -19,7 +19,7 @@ using Targets;
 // ssr_resolve.frag (IBL blend).
 public sealed class SSRPass : IDisposable
 {
-    private const uint ResDivisor = 2;
+    private readonly uint _resDivisor;
     
     private readonly GL _gl;
     private readonly SSRConfig _config;
@@ -40,6 +40,8 @@ public sealed class SSRPass : IDisposable
         _gl = gl;
         _config = config;
         
+        _resDivisor = config.HalfResolution ? 2u : 1u;
+        
         _shader = new GLShader(gl,
             PathResolver.Resolve("Assets/Shaders/Post/post.vert"),
             PathResolver.Resolve("Assets/Shaders/SSR/ssr.frag"));
@@ -50,11 +52,11 @@ public sealed class SSRPass : IDisposable
             PathResolver.Resolve("Assets/Shaders/Post/post.vert"),
             PathResolver.Resolve("Assets/Shaders/SSR/ssr_resolve.frag"));
         
-        _target = new RenderTarget(gl, width / ResDivisor, height / ResDivisor,
+        _target = new RenderTarget(gl, width / _resDivisor, height / _resDivisor,
             [InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Linear);
-        _blurTarget = new RenderTarget(gl, width / ResDivisor, height / ResDivisor,
+        _blurTarget = new RenderTarget(gl, width / _resDivisor, height / _resDivisor,
             [InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Linear);
-        _resolveTarget = new RenderTarget(gl, width / ResDivisor, height / ResDivisor,
+        _resolveTarget = new RenderTarget(gl, width / _resDivisor, height / _resDivisor,
             [InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Linear);
         
         _vao = gl.GenVertexArray();
@@ -62,9 +64,9 @@ public sealed class SSRPass : IDisposable
 
     public void Resize(uint width, uint height)
     {
-        _target.Resize(width / ResDivisor, height / ResDivisor);
-        _blurTarget.Resize(width / ResDivisor, height / ResDivisor);
-        _resolveTarget.Resize(width / ResDivisor, height / ResDivisor);
+        _target.Resize(width / _resDivisor, height / _resDivisor);
+        _blurTarget.Resize(width / _resDivisor, height / _resDivisor);
+        _resolveTarget.Resize(width / _resDivisor, height / _resDivisor);
     }
 
     public void Render(uint sceneTex, uint depthTex, uint normalTex, uint materialTex, Camera camera,
@@ -74,8 +76,8 @@ public sealed class SSRPass : IDisposable
         Matrix4x4.Invert(proj, out var invProj);
         Matrix4x4.Invert(camera.GetViewMatrix(), out var invView);
 
-        _gl.Disable(EnableCap.DepthTest);
-
+        SetRenderState();
+        
         _target.Bind();
         _target.Clear(0f, 0f, 0f, 0f);
 
@@ -106,12 +108,15 @@ public sealed class SSRPass : IDisposable
         _blur.SetUniform("uMaterial", 1);
         _blur.SetUniform("uTexel", new Vector2(1f / _blurTarget.Width, 1f / _blurTarget.Height));
         _blur.SetUniform("uRoughnessCutoff", _config.RoughnessCutoff);
+        
         Bind(TextureUnit.Texture0, _target.ColorTextures[0]);
         Bind(TextureUnit.Texture1, materialTex);
+        
         DrawFullscreen();
         
         _resolveTarget.Bind();
         _resolveTarget.Clear(0f, 0f, 0f, 0f);
+        
         _resolve.Use();
         _resolve.SetUniform("uSsr",          0);
         _resolve.SetUniform("uDepth",        1);
@@ -124,17 +129,19 @@ public sealed class SSRPass : IDisposable
         _resolve.SetUniform("uMaxReflectionLod", maxReflectionLod);
         _resolve.SetUniform("uIblIntensity",     iblIntensity);
         _resolve.SetUniform("uHasIBL",           hasIbl ? 1 : 0);
+        
         Bind(TextureUnit.Texture0, _blurTarget.ColorTextures[0]);
         Bind(TextureUnit.Texture1, depthTex);
         Bind(TextureUnit.Texture2, normalTex);
         Bind(TextureUnit.Texture3, materialTex);
         BindCube(TextureUnit.Texture4, prefilterMap);
         Bind(TextureUnit.Texture5, brdfLut);
+        
         DrawFullscreen();
 
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         
-        _gl.Enable(EnableCap.DepthTest);
+        ResetRenderState();
     }
 
     private void Bind(TextureUnit unit, uint tex)
@@ -154,6 +161,16 @@ public sealed class SSRPass : IDisposable
         _gl.BindVertexArray(_vao);
         _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
         _gl.BindVertexArray(0);
+    }
+
+    private void SetRenderState()
+    {
+        _gl.Disable(EnableCap.DepthTest);
+    }
+
+    private void ResetRenderState()
+    {
+        _gl.Enable(EnableCap.DepthTest);
     }
 
     public void Dispose()

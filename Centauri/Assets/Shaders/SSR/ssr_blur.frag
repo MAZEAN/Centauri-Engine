@@ -45,7 +45,8 @@ void main()
 
     // gate on how much of the kernel actually hit — drops sparse dilation wisps
     float coverage = totalW > 0.0 ? wsum / totalW : 0.0;
-    if (coverage < MIN_COVERAGE) { FragColor = vec4(0.0); return; }
+    float gate = smoothstep(MIN_COVERAGE * 0.6, MIN_COVERAGE, coverage);
+    if (gate <= 0.0) { FragColor = vec4(0.0); return; }
 
-    FragColor = vec4(sum / wsum, coverage);
+    FragColor = vec4(sum / wsum, coverage * gate);
 }
