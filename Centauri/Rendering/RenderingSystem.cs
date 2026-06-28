@@ -117,9 +117,17 @@ public class RenderingSystem : IDisposable
         _post.BeginScene();
         RenderCentralComponents(scene, deltaTime);
         
+        var activeSky = scene.Skyboxes.Active;
+        var iblInputs = new Postprocessing.IblResolveInputs(
+            PrefilterMap:     activeSky?.PrefilteredMap ?? 0,
+            BrdfLut:          _ibl.BrdfLut,
+            MaxReflectionLod: _ibl.MaxReflectionLod,
+            Intensity:        _config.IBLConfig.IblIntensity,
+            HasIbl:           activeSky is { IblBaked: true });
+        
         using (_profiler.Measure("Post"))
             _post.Composite(scene.Cameras.Active, _prepass.DepthTexture, _prepass.NormalTexture,
-                _prepass.MaterialTexture, _ssrActive, _taaActive);
+                _prepass.MaterialTexture, _ssrActive, _taaActive, in iblInputs);
         
         RenderAfterPostComponents(scene, deltaTime);
     }

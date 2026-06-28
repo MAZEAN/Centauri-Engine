@@ -11,20 +11,27 @@ using Targets;
 
 // Screen-space reflections: ray-marches the prepass depth buffer and samples the resolved
 // HDR scene to build a reflection term, weighted per-surface by the prepass material buffer
-// (roughness/metallic) and Fresnel. The result is an additive contribution the post stack
-// folds into the scene before tonemapping. See Assets/Shaders/SSR/ssr.frag for the march.
+// (roughness/metallic). The reflection is then RESOLVED against the IBL specular fallback so
+// that, where SSR is confident, it replaces the environment reflection the lit pass already
+// applied (rather than stacking on it); where it is not, the scene keeps that fallback. The
+// result is the delta the post stack folds into the scene before tonemapping.
+// See Assets/Shaders/SSR/ssr.frag (march), ssr_blur.frag (roughness blur) and
+// ssr_resolve.frag (IBL blend).
 public sealed class SSRPass : IDisposable
 {
     private const uint ResDivisor = 2;
     
     private readonly GL _gl;
     private readonly SSRConfig _config;
+    
     private readonly GLShader _shader;
     private readonly GLShader _blur;
+    private readonly GLShader _resolve;
     private readonly uint _vao;
 
     private readonly RenderTarget _target;
-    private RenderTarget _blurTarget;
+    private readonly RenderTarget _blurTarget;
+    private readonly RenderTarget _resolveTarget;
 
     public uint ReflectionTexture => _target.ColorTextures[0];
 
@@ -32,16 +39,24 @@ public sealed class SSRPass : IDisposable
     {
         _gl = gl;
         _config = config;
+        
         _shader = new GLShader(gl,
             PathResolver.Resolve("Assets/Shaders/Post/post.vert"),
             PathResolver.Resolve("Assets/Shaders/SSR/ssr.frag"));
         _blur = new GLShader(gl,
             PathResolver.Resolve("Assets/Shaders/Post/post.vert"),
             PathResolver.Resolve("Assets/Shaders/SSR/ssr_blur.frag"));
+        _resolve = new GLShader(gl,
+            PathResolver.Resolve("Assets/Shaders/Post/post.vert"),
+            PathResolver.Resolve("Assets/Shaders/SSR/ssr_resolve.frag"));
+        
         _target = new RenderTarget(gl, width / ResDivisor, height / ResDivisor,
             [InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Linear);
         _blurTarget = new RenderTarget(gl, width / ResDivisor, height / ResDivisor,
             [InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Linear);
+        _resolveTarget = new RenderTarget(gl, width / ResDivisor, height / ResDivisor,
+            [InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Linear);
+        
         _vao = gl.GenVertexArray();
     }
 
@@ -51,10 +66,12 @@ public sealed class SSRPass : IDisposable
         _blurTarget.Resize(width / ResDivisor, height / ResDivisor);
     }
 
-    public void Render(uint sceneTex, uint depthTex, uint normalTex, uint materialTex, Camera camera)
+    public void Render(uint sceneTex, uint depthTex, uint normalTex, uint materialTex, Camera camera,
+        uint prefilterMap, uint brdfLut, float maxReflectionLod, float iblIntensity, bool hasIbl)
     {
         var proj = camera.GetProjectionMatrix();
         Matrix4x4.Invert(proj, out var invProj);
+        Matrix4x4.Invert(camera.GetViewMatrix(), out var invView);
 
         _gl.Disable(EnableCap.DepthTest);
 
@@ -91,6 +108,28 @@ public sealed class SSRPass : IDisposable
         Bind(TextureUnit.Texture0, _target.ColorTextures[0]);
         Bind(TextureUnit.Texture1, materialTex);
         DrawFullscreen();
+        
+        _resolveTarget.Bind();
+        _resolveTarget.Clear(0f, 0f, 0f, 0f);
+        _resolve.Use();
+        _resolve.SetUniform("uSsr",          0);
+        _resolve.SetUniform("uDepth",        1);
+        _resolve.SetUniform("uNormal",       2);
+        _resolve.SetUniform("uMaterial",     3);
+        _resolve.SetUniform("uPrefilterMap", 4);
+        _resolve.SetUniform("uBrdfLUT",      5);
+        _resolve.SetUniform("uInvProjection",    invProj);
+        _resolve.SetUniform("uInvView",          invView);
+        _resolve.SetUniform("uMaxReflectionLod", maxReflectionLod);
+        _resolve.SetUniform("uIblIntensity",     iblIntensity);
+        _resolve.SetUniform("uHasIBL",           hasIbl ? 1 : 0);
+        Bind(TextureUnit.Texture0, _blurTarget.ColorTextures[0]);
+        Bind(TextureUnit.Texture1, depthTex);
+        Bind(TextureUnit.Texture2, normalTex);
+        Bind(TextureUnit.Texture3, materialTex);
+        BindCube(TextureUnit.Texture4, prefilterMap);
+        Bind(TextureUnit.Texture5, brdfLut);
+        DrawFullscreen();
 
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         
@@ -101,6 +140,12 @@ public sealed class SSRPass : IDisposable
     {
         _gl.ActiveTexture(unit);
         _gl.BindTexture(TextureTarget.Texture2D, tex);
+    }
+    
+    private void BindCube(TextureUnit unit, uint tex)
+    {
+        _gl.ActiveTexture(unit);
+        _gl.BindTexture(TextureTarget.TextureCubeMap, tex);
     }
     
     private void DrawFullscreen()
@@ -114,8 +159,10 @@ public sealed class SSRPass : IDisposable
     {
         _shader.Dispose();
         _blur.Dispose();
+        _resolve.Dispose();
         _target.Dispose();
         _blurTarget.Dispose();
+        _resolveTarget.Dispose();
         _gl.DeleteVertexArray(_vao);
     }
 }

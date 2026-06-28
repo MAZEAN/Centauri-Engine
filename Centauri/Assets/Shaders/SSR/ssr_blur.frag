@@ -47,5 +47,5 @@ void main()
     float coverage = totalW > 0.0 ? wsum / totalW : 0.0;
     if (coverage < MIN_COVERAGE) { FragColor = vec4(0.0); return; }
 
-    FragColor = vec4(sum / wsum, 1.0);
+    FragColor = vec4(sum / wsum, coverage);
 }

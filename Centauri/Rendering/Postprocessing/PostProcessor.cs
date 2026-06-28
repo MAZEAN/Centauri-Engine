@@ -9,6 +9,14 @@ using World;
 using SSR;
 using TAA;
 
+public readonly record struct IblResolveInputs (
+    uint  PrefilterMap,
+    uint  BrdfLut,
+    float MaxReflectionLod,
+    float Intensity,
+    bool  HasIbl
+);
+
 public sealed class PostProcessor : IDisposable
 {
     private readonly GL _gl;
@@ -56,7 +64,7 @@ public sealed class PostProcessor : IDisposable
     public uint VelocityTexture => _taa.VelocityTexture;   // TAA motion vectors, for the debug view
 
     public void Composite(Camera camera, uint depthTex, uint normalTex, uint materialTex,
-        bool ssrAvailable, bool taaAvailable)
+        bool ssrAvailable, bool taaAvailable, in IblResolveInputs ibl)
     {
         _hdr.Resolve();
         
@@ -64,7 +72,8 @@ public sealed class PostProcessor : IDisposable
         
         var ssrActive = ssrAvailable && _config.SSR.Enabled;
         if (ssrActive)
-            _ssr.Render(sceneColor, depthTex, normalTex, materialTex, camera);
+            _ssr.Render(sceneColor, depthTex, normalTex, materialTex, camera,
+                ibl.PrefilterMap, ibl.BrdfLut, ibl.MaxReflectionLod, ibl.Intensity, ibl.HasIbl);
         
         var taaActive = taaAvailable && _config.TAA.Enabled;
         var ssrInTonemap = ssrActive && !taaActive;

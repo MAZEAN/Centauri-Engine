@@ -70,6 +70,7 @@ void main()
     vec4 clipQ = uProjection * vec4(Q, 1.0);
     vec2 uvP   = (clipP.xy / clipP.w) * 0.5 + 0.5;
     vec2 uvQ   = (clipQ.xy / clipQ.w) * 0.5 + 0.5;
+    
     float invWP = 1.0 / clipP.w;
     float invWQ = 1.0 / clipQ.w;
 
@@ -136,13 +137,8 @@ void main()
     // distance: fade the far end of the ray where data is least reliable
     float distFade  = 1.0 - clamp(length(viewPos(hitUv) - P) / uMaxDistance, 0.0, 1.0);
 
-    // ── Fresnel weight (metal reflects strongly, dielectric only at grazing) ──
-    vec3  F0       = mix(vec3(0.04), vec3(1.0), metallic);
-    float cosTheta = max(dot(N, -V), 0.0);
-    vec3  F        = F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
+    vec3  reflColor  = texture(uScene, hitUv).rgb * uIntensity;
+    float confidence = edgeFade * roughFade * distFade;
 
-    vec3 reflColor = texture(uScene, hitUv).rgb;
-    vec3 result    = reflColor * F * uIntensity * edgeFade * roughFade * distFade;
-
-    FragColor = vec4(result, 1.0);
+    FragColor = vec4(reflColor, confidence);   // rgb = reflected radiance, a = confidence
 }
