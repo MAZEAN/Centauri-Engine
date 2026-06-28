@@ -57,7 +57,9 @@ public sealed class GeometryPrepass : IDisposable
         _shader.Use();
         _shader.SetUniform("uView",       camera.GetViewMatrix());
         _shader.SetUniform("uProjection", camera.GetProjectionMatrix());
-        _shader.SetUniform("uAlbedo",     0);
+        _shader.SetUniform("uAlbedo",       0);
+        _shader.SetUniform("uRoughnessMap", 2);   // material buffer (roughness/metallic) for SSR
+        _shader.SetUniform("uMetallicMap",  3);
         ShaderUniformBinder.UploadWind(_shader, _config.Wind);
 
         foreach (var list in _groups.Values)
@@ -101,6 +103,8 @@ public sealed class GeometryPrepass : IDisposable
     private void SetMeshState(Material? material)
     {
         _shader.SetUniform("uWind", material is { Wind: true } ? 1 : 0);
+        BindMaterial(material);
+        
         if (material is { TwoSided: true, Albedo: { } albedo })
         {
             _shader.SetUniform("uAlphaTest", 1);
@@ -113,6 +117,28 @@ public sealed class GeometryPrepass : IDisposable
             _shader.SetUniform("uAlphaTest", 0);
             _gl.Enable(EnableCap.CullFace);
         }
+    }
+    
+    private void BindMaterial(Material? material)
+    {
+        if (material is not { } mat)
+        {
+            _shader.SetUniform("uHasRoughness",   0);
+            _shader.SetUniform("uHasMetallic",    0);
+            _shader.SetUniform("uRoughnessValue", 1.0f);
+            _shader.SetUniform("uMetallicValue",  0.0f);
+            return;
+        }
+
+        _shader.SetUniform("uHasRoughness",   mat.Roughness != null ? 1 : 0);
+        _shader.SetUniform("uHasMetallic",    mat.Metallic  != null ? 1 : 0);
+        _shader.SetUniform("uRoughnessValue", mat.RoughnessScalar);
+        _shader.SetUniform("uMetallicValue",  mat.MetallicScalar);
+
+        _gl.ActiveTexture(TextureUnit.Texture2);
+        _gl.BindTexture(TextureTarget.Texture2D, mat.Roughness?.Handle ?? 0);
+        _gl.ActiveTexture(TextureUnit.Texture3);
+        _gl.BindTexture(TextureTarget.Texture2D, mat.Metallic?.Handle ?? 0);
     }
 
     public void Dispose()
