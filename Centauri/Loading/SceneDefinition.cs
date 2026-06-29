@@ -49,6 +49,7 @@ public class LightDefinition
 
 public class MaterialDefinition
 {
+    [JsonPropertyName("name")]     public string Name { get; set; } = "Default";
     [JsonPropertyName("shader")]    public string Shader { get; set; } = "";
     [JsonPropertyName("albedo")]    public string? Albedo    { get; set; }
     [JsonPropertyName("normal")]    public string? Normal    { get; set; }

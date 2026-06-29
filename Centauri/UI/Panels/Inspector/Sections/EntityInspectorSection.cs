@@ -71,7 +71,8 @@ public sealed class EntityInspectorSection : ISection
             var index = i;   // capture for the edit closures
 
             ImGui.PushID(i);
-            if (e.Materials.Count > 1) ImGui.TextDisabled($"Submesh {i}");
+            if (e.Materials.Count > 1) 
+                ImGui.TextDisabled($"{mat.Name}");
 
             Widgets.ColorRow4("Base Color", mat.Color, v => EditMaterial(e, scene, index, m => m.Color = v));
             Widgets.SliderRow("Roughness", mat.RoughnessScalar, v => EditMaterial(e, scene, index, m => m.RoughnessScalar = v), 0f, 1f, 0.5f);

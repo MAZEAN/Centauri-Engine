@@ -4,6 +4,7 @@ using System.Numerics;
 
 public class Material
 {
+    public string Name          { get; set; }
     public GLShader   Shader    { get; set; }
     public GLTexture? Albedo    { get; set; } // base color
     public GLTexture? Normal    { get; set; } // normal map
@@ -27,6 +28,7 @@ public class Material
     
     public Material Clone() => new(Shader)
     {
+        Name = Name,
         Albedo    = Albedo,
         Normal    = Normal,
         Roughness = Roughness,

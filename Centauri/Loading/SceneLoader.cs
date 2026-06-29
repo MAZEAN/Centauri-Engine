@@ -85,7 +85,8 @@ public class SceneLoader
     
     private Material?[] ResolveMaterials(EntityDefinition e, Model? model)
     {
-        if (model is null) return Array.Empty<Material?>();
+        if (model is null) 
+            return Array.Empty<Material?>();
 
         var count = model.Meshes.Count;
         var result = new Material?[count];

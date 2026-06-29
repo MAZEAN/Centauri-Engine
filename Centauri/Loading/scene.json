@@ -29,23 +29,29 @@
     },
     { "name": "Tree1", 
       "model": "Assets/Objects/Trees/CommonTree_1.gltf",
-      "materials": ["Assets/Materials/Bark.mat", "Assets/Materials/Leaves.mat"],
+      "materials": ["Assets/Materials/Bark.mat", "Assets/Materials/LeavesCommon.mat"],
       "position": [6, -1.5, -3]
     },
     { "name": "Tree2",
       "model": "Assets/Objects/Trees/CommonTree_1.gltf",
-      "materials": ["Assets/Materials/Bark.mat", "Assets/Materials/Leaves.mat"],
+      "materials": ["Assets/Materials/Bark.mat", "Assets/Materials/LeavesCommon.mat"],
       "position": [8, -1.5, -5]
     },
     { "name": "Tree3",
       "model": "Assets/Objects/Trees/CommonTree_1.gltf",
-      "materials": ["Assets/Materials/Bark.mat", "Assets/Materials/Leaves.mat"],
+      "materials": ["Assets/Materials/Bark.mat", "Assets/Materials/LeavesCommon.mat"],
       "position": [9, -1.5, -1]
     },
     { "name": "Pine1",
       "model": "Assets/Objects/Trees/Pine_1.gltf",
-      "materials": ["Assets/Materials/Bark.mat", "Assets/Materials/Pine_Leaves.mat"],
+      "materials": ["Assets/Materials/Bark.mat", "Assets/Materials/LeavesPine.mat"],
       "position": [6, -1.5, 0]
+    },
+    { "name": "Twisted1",
+      "model": "Assets/Objects/Trees/TwistedTree_1.gltf",
+      "materials": ["Assets/Materials/BarkTwisted.mat", "Assets/Materials/LeavesTwisted.mat"],
+      "position": [11, -1.5, -5],
+      "scale": [0.8, 0.8, 0.8]
     },
     {
       "name":     "Sphere1",

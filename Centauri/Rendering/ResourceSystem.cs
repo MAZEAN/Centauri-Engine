@@ -145,6 +145,7 @@ public class ResourceSystem : IDisposable
 
         return new Material(shader)
         {
+            Name      = def.Name,
             Albedo    = def.Albedo    != null ? Textures.Get(def.Albedo)    : null,
             Normal    = def.Normal    != null ? Textures.Get(def.Normal)    : null,
             Roughness = def.Roughness != null ? Textures.Get(def.Roughness) : null,
