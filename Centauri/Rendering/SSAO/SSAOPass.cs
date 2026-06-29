@@ -21,14 +21,16 @@ public sealed class SsaoPass : IDisposable
 
     private readonly GL _gl;
     private readonly SSAOConfig _config;
+    
     private readonly GLShader _ssao;
     private readonly GLShader _blur;
     private readonly uint _vao;     // empty VAO for attribute-less fullscreen draws
     private readonly uint _noise;
+    
     private readonly Vector3[] _kernel = new Vector3[MaxKernel];
 
-    private RenderTarget _aoTarget;
-    private RenderTarget _blurTarget;
+    private readonly RenderTarget _aoTarget;
+    private readonly RenderTarget _blurTarget;
 
     public uint AoTexture => _blurTarget.ColorTextures[0];
 
@@ -43,9 +45,6 @@ public sealed class SsaoPass : IDisposable
         _blur = new GLShader(gl,
             PathResolver.Resolve("Shaders/Post/post.vert"),
             PathResolver.Resolve("Shaders/SSAO/ssao_blur.frag"));
-
-        // occlusion buffer stays Nearest (consumed only by the blur); the blur output is
-        // Linear so the full-res lit pass gets a smooth bilinear upsample.
         _aoTarget   = new RenderTarget(gl, width / ResDivisor, height / ResDivisor,
             [InternalFormat.Rgba16f], withDepth: false);
         _blurTarget = new RenderTarget(gl, width / ResDivisor, height / ResDivisor,
@@ -53,6 +52,7 @@ public sealed class SsaoPass : IDisposable
 
         _vao   = gl.GenVertexArray();
         _noise = CreateNoise();
+        
         BuildKernel();
     }
 
@@ -86,6 +86,7 @@ public sealed class SsaoPass : IDisposable
         _ssao.SetUniform("uDepth",  0);
         _ssao.SetUniform("uNormal", 1);
         _ssao.SetUniform("uNoise",  2);
+        
         Bind(TextureUnit.Texture0, depthTex);
         Bind(TextureUnit.Texture1, normalTex);
         Bind(TextureUnit.Texture2, _noise);
@@ -93,8 +94,10 @@ public sealed class SsaoPass : IDisposable
 
         // ── blur ──
         _blurTarget.Bind();
+        
         _blur.Use();
         _blur.SetUniform("uSsao", 0);
+        
         Bind(TextureUnit.Texture0, _aoTarget.ColorTextures[0]);
         DrawFullscreen();
 
@@ -149,6 +152,7 @@ public sealed class SsaoPass : IDisposable
         fixed (float* p = data)
             _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgb16f,
                 NoiseDim, NoiseDim, 0, PixelFormat.Rgb, PixelType.Float, p);
+        
         GLSampler.Set(_gl, TextureTarget.Texture2D, GLEnum.Repeat, GLEnum.Nearest, GLEnum.Nearest);
         return tex;
     }

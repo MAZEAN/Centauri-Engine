@@ -14,12 +14,12 @@ public sealed class Batch
 
     public Model       Model     { get; }
     public Material?[] Materials { get; }
-    public List<Entity> Entities { get; } = new();
+    public List<Entity> Entities { get; } = [];
 }
 
 public sealed class ShaderBatcher
 {
-    private readonly List<Batch> _batches = new();
+    private readonly List<Batch> _batches = [];
     private int _revision = -1;
     
     public int RenderableEntities { get; private set; }
@@ -77,6 +77,7 @@ public sealed class ShaderBatcher
     private static bool MaterialsMatch(Material?[] a, IReadOnlyList<Material?> b)
     {
         if (a.Length != b.Count) return false;
+        
         for (var i = 0; i < a.Length; i++)
             if (!ReferenceEquals(a[i], b[i])) return false;
         return true;

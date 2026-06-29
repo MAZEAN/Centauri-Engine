@@ -8,23 +8,27 @@ using Utils.Geometry;
 // entity. The grid is exposed for a debug overlay; the visible set drives the passes.
 public sealed class CullingSystem
 {
-    private SpatialGrid     _grid;
+    private const float Tolerance = 0.001f;
+    
+    private float _cellSize;
+    private float _oversizeFactor;
+    
+    public SpatialGrid Grid { get; private set; }
     private readonly HashSet<Entity> _visible = new();
     
     private int   _builtRevision = -1;
     private bool  _enabled = true;
-    private float _cellSize;
-    private float _oversizeFactor;
-
-    public SpatialGrid Grid => _grid;                       // for the debug overlay
+    
     public IReadOnlyCollection<Entity> Visible => _visible;
     public bool Enabled => _enabled;
+    public int EntityCount => Grid.EntityCount;
 
     public CullingSystem(float cellSize = 16f, float oversizeFactor = 8f)
     {
         _cellSize       = cellSize;
         _oversizeFactor = oversizeFactor;
-        _grid           = new SpatialGrid(cellSize, oversizeFactor);
+        
+        Grid           = new SpatialGrid(cellSize, oversizeFactor);
     }
 
     // Rebuild the grid when the scene changes (revision-gated, like the shadow bounds cache —
@@ -33,17 +37,17 @@ public sealed class CullingSystem
     {
         _enabled = enabled;
         
-        if (cellSize != _cellSize || oversizeFactor != _oversizeFactor)
+        if (Math.Abs(cellSize - _cellSize) > Tolerance || Math.Abs(oversizeFactor - _oversizeFactor) > Tolerance)
         {
             _cellSize       = cellSize;
             _oversizeFactor = oversizeFactor;
-            _grid           = new SpatialGrid(cellSize, oversizeFactor);
-            _builtRevision  = -1;   // force a rebuild with the new cell layout
+            Grid           = new SpatialGrid(cellSize, oversizeFactor);
+            _builtRevision  = -1;
         }
 
         if (scene.Revision != _builtRevision)
         {
-            _grid.Rebuild(scene.Entities);
+            Grid.Rebuild(scene.Entities);
             _builtRevision = scene.Revision;
         }
 
@@ -51,13 +55,12 @@ public sealed class CullingSystem
 
         _visible.Clear();
         if (enabled)
-            _grid.Cull(camera.Frustum, _visible);
+            Grid.Cull(camera.Frustum, _visible);
     }
 
     // When culling is disabled every entity counts as visible.
     public bool IsVisible(Entity entity) => !_enabled || _visible.Contains(entity);
+    
     public void CullInto(Frustum frustum, HashSet<Entity> results) =>
-        _grid.Cull(frustum, results, markVisited: false);
-
-    public int EntityCount => _grid.EntityCount;
+        Grid.Cull(frustum, results, markVisited: false);
 }

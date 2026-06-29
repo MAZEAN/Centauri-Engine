@@ -22,14 +22,14 @@ public sealed class PostProcessor : IDisposable
     private readonly GL _gl;
     private readonly HDRFramebuffer _hdr;
     private readonly AppConfig _config;
+    private uint _width, _height;
+    
     private readonly SSRPass _ssr;
     private readonly TAAPass _taa;
     
-    private uint _width, _height;
-    
     private readonly GLShader _tonemap;
-    private readonly uint _emptyVao;   // core profile needs a bound VAO for attribute-less draws
     private readonly BloomPass _bloom;
+    private readonly uint _emptyVao;   // core profile needs a bound VAO for attribute-less draws
 
     public PostProcessor(GL gl, HDRFramebuffer hdr, AppConfig config, uint width, uint height)
     {

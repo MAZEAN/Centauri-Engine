@@ -12,21 +12,23 @@ using Culling;
 
 public sealed class DebugRenderer : IDisposable
 {
-    private readonly AppConfig _config;
-    private readonly Draw _draw;
-    private readonly Mesh _cameraMesh;
-
-    private bool _active;
-
     private const float DirLineLength = 100.0f;
     private const float FaceAlpha     = 0.05f; // translucency of AABB side faces
     private const float GridFaceAlpha = 0.01f;   // translucent fill on cells in view this frame
     private const float GridFaceSelectedAlpha = 0.05f;   // translucent fill on cells in view this frame
+    
+    private readonly AppConfig _config;
+    private readonly Draw _draw;
+    
+    private readonly Mesh _cameraMesh;
+
+    private bool _active;
 
     public DebugRenderer(GL gl, AppConfig config)
     {
         _config     = config;
         _draw       = new Draw(gl);
+        
         _cameraMesh = Shapes.BuildCameraMesh(gl);
     }
 
@@ -49,7 +51,6 @@ public sealed class DebugRenderer : IDisposable
         _draw.End();
     }
 
-    // ── Draw calls — must be between Begin/End ────────────────────────────────
     public void DrawCameras(Scene scene)
     {
         AssertActive();
@@ -150,9 +151,7 @@ public sealed class DebugRenderer : IDisposable
             }
         }
     }
-
-
-    // ── Private drawing ───────────────────────────────────────────────────────
+    
     private void DrawCameraShape(Camera cam)
     {
         var model =

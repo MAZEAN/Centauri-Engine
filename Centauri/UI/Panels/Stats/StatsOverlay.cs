@@ -21,6 +21,7 @@ public class StatsOverlay
 
     private readonly ImFontPtr _font;
     private readonly AppConfig _config;
+    
     private readonly PerformanceGraph _perfGraph = new();
     private readonly GPUTimingGraph _gpuGraph = new();
 
@@ -78,7 +79,7 @@ public class StatsOverlay
             var ratio = stats.TotalEntities > 0
                 ? stats.CulledEntities / (float)stats.TotalEntities * 100f
                 : 0f;
-            Row("Ratio", $"{Widgets.Float(ratio)} %");
+            Row("Ratio",    $"{Widgets.Float(ratio)} %");
             Row("Grid",     $"{stats.GridColumns}x{stats.GridRows} ({stats.GridCells})");
             Row("Occupied", stats.GridOccupied.ToString());
             Row("Visited",  stats.GridVisited.ToString());
@@ -118,7 +119,7 @@ public class StatsOverlay
         var cam = scene.Cameras.Active;
         Section("Camera", ColorPalette.Red, () =>
         {
-            RowColored("Active", cam.Name, ColorPalette.Amber);
+            RowColored("Active",   cam.Name, ColorPalette.Amber);
             RowColored("Position", Widgets.Vec3(cam.Position), ColorPalette.Blue);
             RowColored("Forward",  Widgets.Vec3(cam.Forward),  ColorPalette.Green);
             Row("Yaw",   Widgets.SignedFloat(cam.Yaw));
@@ -163,7 +164,6 @@ public class StatsOverlay
     private static void ConfigRow(string label, bool value) =>
         StatRow(label, value.ToString(), Widgets.BooleanColor(value));
 
-    // Left-aligned label in a fixed column, value follows on the same line.
     private static void StatRow(string label, string value, Vector4 color)
     {
         var startX = ImGui.GetCursorPosX();
@@ -186,6 +186,7 @@ public class StatsOverlay
         var flags = Flags;
         if (activeMode == ViewMode.Fly)
             flags |= ImGuiWindowFlags.NoInputs;
+        
         return flags;
     }
 }

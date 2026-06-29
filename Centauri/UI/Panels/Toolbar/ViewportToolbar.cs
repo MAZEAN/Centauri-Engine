@@ -13,9 +13,7 @@ public sealed class ViewportToolbar
 {
     private const float Padding = 10f;
     private const float BgAlpha = 0.85f;
-
-    private static readonly ShadingMode[] Modes = Enum.GetValues<ShadingMode>();
-
+    
     private const ImGuiWindowFlags Flags =
         ImGuiWindowFlags.NoMove            | ImGuiWindowFlags.NoResize |
         ImGuiWindowFlags.NoTitleBar        | ImGuiWindowFlags.NoCollapse |
@@ -25,6 +23,8 @@ public sealed class ViewportToolbar
 
     private readonly ImFontPtr _font;
     private readonly AppConfig _config;
+    
+    private static readonly ShadingMode[] Modes = Enum.GetValues<ShadingMode>();
 
     public ViewportToolbar(ImFontPtr font, AppConfig config)
     {
@@ -59,15 +59,18 @@ public sealed class ViewportToolbar
 
         for (var i = 0; i < Modes.Length; i++)
         {
-            if (i > 0) ImGui.SameLine();
+            if (i > 0) 
+                ImGui.SameLine();
 
             var selected = _config.Debug.Shading == Modes[i];
-            if (selected) ImGui.PushStyleColor(ImGuiCol.Button, ColorPalette.Accent);
+            if (selected) 
+                ImGui.PushStyleColor(ImGuiCol.Button, ColorPalette.Accent);
 
             if (ImGui.Button(Modes[i].ToString()))
                 _config.Debug.Shading = Modes[i];
 
-            if (selected) ImGui.PopStyleColor();
+            if (selected) 
+                ImGui.PopStyleColor();
         }
 
         ImGui.PopStyleVar();

@@ -2,8 +2,9 @@ namespace Centauri.Utils.Caching;
 
 public sealed class AssetCache<T> : IDisposable where T : class, IDisposable
 {
-    private readonly Dictionary<string, T> _assets = new();
     private readonly Func<string, T> _factory;
+
+    private readonly Dictionary<string, T> _assets = new();
 
     public AssetCache(Func<string, T> factory)
     {

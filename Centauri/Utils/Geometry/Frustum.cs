@@ -40,6 +40,7 @@ public sealed class Frustum
     {
         var normal = new Vector3(a, b, c);
         var length = normal.Length();
+        
         return new Plane(normal / length, d / length);
     }
 }

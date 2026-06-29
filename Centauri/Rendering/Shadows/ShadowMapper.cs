@@ -125,8 +125,10 @@ public sealed class ShadowMapper : IDisposable
 
     private void BucketCasters(HashSet<Entity> visible)
     {
-        foreach (var list in _solid.Values)    list.Clear();
-        foreach (var list in _twoSided.Values) list.Clear();
+        foreach (var list in _solid.Values)    
+            list.Clear();
+        foreach (var list in _twoSided.Values) 
+            list.Clear();
 
         foreach (var entity in visible)
         {

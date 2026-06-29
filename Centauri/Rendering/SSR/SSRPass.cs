@@ -19,10 +19,10 @@ using Targets;
 // ssr_resolve.frag (IBL blend).
 public sealed class SSRPass : IDisposable
 {
-    private readonly uint _resDivisor;
-    
     private readonly GL _gl;
     private readonly SSRConfig _config;
+    
+    private readonly uint _resDivisor;
     
     private readonly GLShader _shader;
     private readonly GLShader _blur;

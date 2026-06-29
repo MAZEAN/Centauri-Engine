@@ -3,9 +3,9 @@ namespace Centauri.Rendering.Renderers;
 using Silk.NET.OpenGL;
 
 using World;
+using Graphics.Geometry;
 using Graphics.Resources;
 using Utils.Misc;
-using Graphics.Geometry;
 
 public class GridRenderer : IDisposable
 {
@@ -19,13 +19,10 @@ public class GridRenderer : IDisposable
         _shader = new GLShader(gl,
             PathResolver.Resolve("Shaders/Grid/grid.vert"),
             PathResolver.Resolve("Shaders/Grid/grid.frag"));
-
-        // fullscreen quad in NDC space (-1 to 1)
-        // stride is 11 floats to match updated Mesh layout
-        // normal and tangent are placeholders — grid shader doesn't use them
+        
         float[] vertices =
         [
-            // position       normal        uv        tangent
+            // position       normal        uv      tangent
             -1f,  1f,  0f,  0f, 0f, 1f,  0f, 1f,  1f, 0f, 0f,
             -1f, -1f,  0f,  0f, 0f, 1f,  0f, 0f,  1f, 0f, 0f,
              1f,  1f,  0f,  0f, 0f, 1f,  1f, 1f,  1f, 0f, 0f,

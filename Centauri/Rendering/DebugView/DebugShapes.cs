@@ -50,14 +50,14 @@ internal static class Shapes
         const float b = CameraModelBase;
         float[] vertices =
         [
-             0f,      0f,  0f, 0,1,0, 0,0, 1,0,0,
-            -0.2f, -0.2f,  b,  0,1,0, 0,0, 1,0,0,
-             0.2f, -0.2f,  b,  0,1,0, 0,0, 1,0,0,
-             0.2f,  0.2f,  b,  0,1,0, 0,0, 1,0,0,
-            -0.2f,  0.2f,  b,  0,1,0, 0,0, 1,0,0,
+             0f,      0f, 0f,  0f, 1f, 0f,  0f, 0f, 1f,  0f, 0f,
+            -0.2f, -0.2f, b,   0f, 1f, 0f,  0f, 0f, 1f,  0f, 0f,
+             0.2f, -0.2f, b,   0f, 1f, 0f,  0f, 0f, 1f,  0f, 0f,
+             0.2f,  0.2f, b,   0f, 1f, 0f,  0f, 0f, 1f,  0f, 0f,
+            -0.2f,  0.2f, b,   0f, 1f, 0f,  0f, 0f, 1f,  0f, 0f,
         ];
         
-        uint[] indices = [0,1,2, 0,2,3, 0,3,4, 0,4,1, 1,2,3, 3,4,1];
+        uint[] indices = [0, 1, 2,  0, 2, 3,  0, 3, 4,  0, 4, 1,  1, 2, 3,  3, 4, 1];
         
         return new Mesh(gl, vertices, indices);
     }

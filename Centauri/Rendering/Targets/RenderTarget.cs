@@ -16,26 +16,28 @@ public sealed class RenderTarget : IDisposable
     private readonly GLEnum _filter;
 
     private uint _fbo;
-    private uint _width, _height;
 
     public uint[] ColorTextures { get; private set; } = [];
     public uint   DepthTexture  { get; private set; }
 
-    public uint Width  => _width;
-    public uint Height => _height;
+    public uint Width { get; private set; }
+    public uint Height { get; private set; }
 
-    public RenderTarget(GL gl, uint width, uint height, InternalFormat[] colorFormats, bool withDepth, GLEnum filter = GLEnum.Nearest)
+    public RenderTarget(GL gl, uint width, uint height,
+        InternalFormat[] colorFormats, bool withDepth, GLEnum filter = GLEnum.Nearest)
     {
         _gl = gl;
         _colorFormats = colorFormats;
         _withDepth = withDepth;
         _filter = filter;
+        
         Allocate(width, height);
     }
 
     public void Resize(uint width, uint height)
     {
-        if (width == _width && height == _height) return;
+        if (width == Width && height == Height) return;
+        
         Destroy();
         Allocate(width, height);
     }
@@ -43,7 +45,7 @@ public sealed class RenderTarget : IDisposable
     public void Bind()
     {
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, _fbo);
-        _gl.Viewport(0, 0, _width, _height);
+        _gl.Viewport(0, 0, Width, Height);
     }
 
     public void Clear(float r = 0f, float g = 0f, float b = 0f, float a = 1f)
@@ -59,8 +61,8 @@ public sealed class RenderTarget : IDisposable
 
     private unsafe void Allocate(uint width, uint height)
     {
-        _width  = Math.Max(1u, width);
-        _height = Math.Max(1u, height);
+        Width  = Math.Max(1u, width);
+        Height = Math.Max(1u, height);
 
         _fbo = _gl.GenFramebuffer();
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, _fbo);
@@ -72,7 +74,7 @@ public sealed class RenderTarget : IDisposable
         {
             var tex = _gl.GenTexture();
             _gl.BindTexture(TextureTarget.Texture2D, tex);
-            _gl.TexImage2D(TextureTarget.Texture2D, 0, _colorFormats[i], _width, _height, 0,
+            _gl.TexImage2D(TextureTarget.Texture2D, 0, _colorFormats[i], Width, Height, 0,
                 PixelFormat.Rgba, PixelType.Float, null);
             GLSampler.Set(_gl, TextureTarget.Texture2D, GLEnum.ClampToEdge, _filter, _filter);
 
@@ -90,7 +92,7 @@ public sealed class RenderTarget : IDisposable
         {
             DepthTexture = _gl.GenTexture();
             _gl.BindTexture(TextureTarget.Texture2D, DepthTexture);
-            _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.DepthComponent32f, _width, _height, 0,
+            _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.DepthComponent32f, Width, Height, 0,
                 PixelFormat.DepthComponent, PixelType.Float, null);
             GLSampler.Set(_gl, TextureTarget.Texture2D, GLEnum.ClampToEdge, GLEnum.Nearest, GLEnum.Nearest);
             _gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment,
@@ -109,6 +111,7 @@ public sealed class RenderTarget : IDisposable
         _gl.DeleteFramebuffer(_fbo);
         foreach (var tex in ColorTextures)
             _gl.DeleteTexture(tex);
+        
         if (_withDepth)
             _gl.DeleteTexture(DepthTexture);
     }

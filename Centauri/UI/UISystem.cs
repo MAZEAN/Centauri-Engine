@@ -22,19 +22,21 @@ public sealed class UISystem : IDisposable
     private readonly PropertiesPanel _properties;
     private readonly HierarchyPanel _outliner;
     private readonly ViewportToolbar _toolbar;
+    
+    public bool WantsMouse    => _imGui.WantsMouseCapture;
+    public bool WantsKeyboard => _imGui.WantsKeyboardCapture;
 
-    public UISystem(GL gl, AppConfig config, IWindow window, IInputContext input, ColorGrading grading)
+    public UISystem(GL gl, AppConfig config, IWindow window, IInputContext input)
     {
         _config       = config;
+        
         _imGui        = new ImGuiManager(gl, config.ImGui, window, input);
+        
         _statsOverlay = new StatsOverlay(_imGui.Font, config);
-        _properties    = new PropertiesPanel(_imGui.Font, _config, grading);
+        _properties    = new PropertiesPanel(_imGui.Font, _config);
         _outliner = new HierarchyPanel(_imGui.Font);
         _toolbar = new ViewportToolbar(_imGui.Font, config);
     }
-
-    public bool WantsMouse    => _imGui.WantsMouseCapture;
-    public bool WantsKeyboard => _imGui.WantsKeyboardCapture;
 
     public void Update(float deltaTime) => _imGui.Update(deltaTime);
 

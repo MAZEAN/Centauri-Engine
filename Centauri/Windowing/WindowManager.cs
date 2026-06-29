@@ -25,7 +25,6 @@ public class WindowManager
         var options = WindowOptions.Default;
 
         var monitor = FindMonitor();
-        
         options.WindowState = config.Window.State;
         options.WindowBorder = config.Window.Border;
         options.Position = monitor.Bounds.Origin;

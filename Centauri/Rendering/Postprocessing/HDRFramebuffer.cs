@@ -26,6 +26,7 @@ public sealed class HDRFramebuffer : IDisposable
     public void Resize(uint width, uint height)
     {
         if (width == _width && height == _height) return;
+        
         Destroy();
         Allocate(width, height);
     }
@@ -81,10 +82,14 @@ public sealed class HDRFramebuffer : IDisposable
         _gl.BindTexture(TextureTarget.Texture2D, ResolvedTexture);
         _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba16f, _width, _height, 0,
             PixelFormat.Rgba, PixelType.Float, null);
-        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Linear);
-        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
-        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)GLEnum.ClampToEdge);
-        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)GLEnum.ClampToEdge);
+        _gl.TexParameter(TextureTarget.Texture2D,
+            TextureParameterName.TextureMinFilter, (int)GLEnum.Linear);
+        _gl.TexParameter(TextureTarget.Texture2D,
+            TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
+        _gl.TexParameter(TextureTarget.Texture2D,
+            TextureParameterName.TextureWrapS, (int)GLEnum.ClampToEdge);
+        _gl.TexParameter(TextureTarget.Texture2D,
+            TextureParameterName.TextureWrapT, (int)GLEnum.ClampToEdge);
         _gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
             TextureTarget.Texture2D, ResolvedTexture, 0);
         CheckComplete("resolve");

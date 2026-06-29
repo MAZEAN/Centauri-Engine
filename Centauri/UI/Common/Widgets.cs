@@ -19,7 +19,7 @@ internal static class Widgets
     
     public static Vector4 BooleanColor(bool value) => value ? ColorPalette.Green : ColorPalette.Red;
 
-    public static bool BeginPanel(string label, bool defaultOpen = true)
+    private static bool BeginPanel(string label, bool defaultOpen = true)
         => BeginPanel(label, Vector4.Zero, defaultOpen);
 
     public static bool BeginPanel(string label, Vector4 accent, bool defaultOpen = true)

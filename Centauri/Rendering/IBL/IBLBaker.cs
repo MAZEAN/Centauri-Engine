@@ -19,7 +19,7 @@ public sealed class IBLBaker : IDisposable
     private readonly Matrix4x4 _proj;
     private readonly Matrix4x4[] _views;
     
-    private readonly List<uint> _baked = new();
+    private readonly List<uint> _baked = [];
 
     public uint BrdfLut { get; }
     public int MaxReflectionLod => _config.PrefilterMips - 1;
@@ -49,7 +49,7 @@ public sealed class IBLBaker : IDisposable
         BrdfLut = BakeBrdf();
     }
     
-    public unsafe (uint irradiance, uint prefiltered) Bake(GLTexture equirect, float exposure)
+    public (uint irradiance, uint prefiltered) Bake(GLTexture equirect, float exposure)
     {
         _gl.Disable(EnableCap.CullFace);
         
@@ -112,7 +112,7 @@ public sealed class IBLBaker : IDisposable
         }
     }
 
-    private unsafe void RenderToCube(uint cubemap, uint size, int mip, GLShader shader)
+    private void RenderToCube(uint cubemap, uint size, int mip, GLShader shader)
     {
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, _fbo);
         _gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, _rbo);

@@ -38,7 +38,8 @@ internal sealed class PerformanceGraph
 
         _samples[_head] = _accN > 0 ? _accFps / _accN : fps;
         _head = (_head + 1) % Capacity;
-        if (_count < Capacity) _count++;
+        if (_count < Capacity) 
+            _count++;
 
         _accMs = 0f;
         _accFps = 0f;
@@ -117,7 +118,8 @@ internal sealed class PerformanceGraph
     // Round up to a tidy axis maximum (… 1, 2, 2.5, 5 × 10ⁿ …), min 60.
     private static float NiceCeil(float v)
     {
-        if (v <= 60f) return 60f;
+        if (v <= 60f) 
+            return 60f;
         
         var mag  = MathF.Pow(10f, MathF.Floor(MathF.Log10(v)));
         var n    = v / mag;

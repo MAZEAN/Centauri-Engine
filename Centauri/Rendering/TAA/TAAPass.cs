@@ -20,6 +20,7 @@ public sealed class TAAPass : IDisposable
 
     private readonly GL _gl;
     private readonly TAAConfig _config;
+    
     private readonly GLShader _velocity;
     private readonly GLShader _resolve;
     private readonly uint _vao;
@@ -71,6 +72,7 @@ public sealed class TAAPass : IDisposable
         _frame = (_frame + 1) % JitterPeriod;
         var jx = Halton(_frame + 1, 2) - 0.5f;   // [-0.5, 0.5] pixels
         var jy = Halton(_frame + 1, 3) - 0.5f;
+        
         return new Vector2(jx * 2f / width, jy * 2f / height);
     }
 
@@ -134,6 +136,7 @@ public sealed class TAAPass : IDisposable
             f /= b;
             r += f * (i % b);
         }
+        
         return r;
     }
 

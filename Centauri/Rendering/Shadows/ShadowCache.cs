@@ -8,6 +8,8 @@ using System.Numerics;
 // config — the sampling-side params (bias, pcf) don't change the stored depth, so they're out.
 internal readonly struct ShadowCacheKey : IEquatable<ShadowCacheKey>
 {
+    private const float Tolerance = 0.001f;
+    
     private readonly Vector3   _sunDir;
     private readonly Matrix4x4 _viewProj;
     private readonly int       _revision;
@@ -31,8 +33,8 @@ internal readonly struct ShadowCacheKey : IEquatable<ShadowCacheKey>
         _viewProj     == o._viewProj     &&
         _revision     == o._revision     &&
         _cascadeCount == o._cascadeCount &&
-        _distance     == o._distance     &&
-        _splitLambda  == o._splitLambda;
+        Math.Abs(_distance - o._distance) < Tolerance &&
+        Math.Abs(_splitLambda - o._splitLambda) < Tolerance;
 
     public override bool Equals(object? o) => o is ShadowCacheKey k && Equals(k);
     public override int GetHashCode() =>

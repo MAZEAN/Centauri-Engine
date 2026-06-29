@@ -49,7 +49,8 @@ internal sealed class GPUTimingGraph
         for (var i = 0; i < timings.Count; i++)
         {
             var slot = Slot(timings[i].Name);
-            if (slot >= 0) _acc[slot] += (float)timings[i].Milliseconds;
+            if (slot >= 0) 
+                _acc[slot] += (float)timings[i].Milliseconds;
         }
 
         _accN++;
@@ -63,7 +64,8 @@ internal sealed class GPUTimingGraph
         }
 
         _head = (_head + 1) % Capacity;
-        if (_count < Capacity) _count++;
+        if (_count < Capacity) 
+            _count++;
         _accMs = 0f;
         _accN  = 0;
     }
@@ -71,9 +73,12 @@ internal sealed class GPUTimingGraph
     private int Slot(string name)
     {
         for (var z = 0; z < _zoneCount; z++)
-            if (_names[z] == name) return z;
+            if (_names[z] == name) 
+                return z;
 
-        if (_zoneCount >= MaxZones) return -1;
+        if (_zoneCount >= MaxZones) 
+            return -1;
+        
         _names[_zoneCount] = name;
         return _zoneCount++;
     }
@@ -105,7 +110,8 @@ internal sealed class GPUTimingGraph
         for (var i = 0; i < _count; i++)
         {
             var sum = 0f;
-            for (var z = 0; z < _zoneCount; z++) sum += _samples[i, z];
+            for (var z = 0; z < _zoneCount; z++) 
+                sum += _samples[i, z];
             peak = MathF.Max(peak, sum);
         }
         var yMax = NiceCeil(peak);
@@ -167,8 +173,7 @@ internal sealed class GPUTimingGraph
         var last  = (_head - 1 + Capacity) % Capacity;
         var total = GetTotal();
 
-        if (!BeginLegendTable())
-            return;
+        if (!BeginLegendTable()) return;
 
         for (var z = 0; z < _zoneCount; z++)
             DrawLegendRow(z, last, total);
@@ -208,11 +213,17 @@ internal sealed class GPUTimingGraph
         var width = ImGui.CalcTextSize(text).X;
         var avail = ImGui.GetContentRegionAvail().X;
 
-        if (align == HeaderAlign.Right && avail > width)
-            ImGui.SetCursorPosX(ImGui.GetCursorPosX() + avail - width);
-
-        if (align == HeaderAlign.Left)
-            ImGui.SetCursorPosX(ImGui.GetCursorPosX());
+        switch (align)
+        {
+            case HeaderAlign.Right when avail > width:
+                ImGui.SetCursorPosX(ImGui.GetCursorPosX() + avail - width);
+                break;
+            case HeaderAlign.Left:
+                ImGui.SetCursorPosX(ImGui.GetCursorPosX());
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(align), align, null);
+        }
 
         ImGui.TextUnformatted(text);
     }

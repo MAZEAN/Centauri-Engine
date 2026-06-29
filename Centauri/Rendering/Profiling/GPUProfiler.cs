@@ -86,7 +86,8 @@ public sealed class GPUProfiler : IDisposable
 
     private int Slot(string name)
     {
-        if (_slots.TryGetValue(name, out var slot)) return slot;
+        if (_slots.TryGetValue(name, out var slot)) 
+            return slot;
 
         slot = _zoneCount++;
         _slots[name] = slot;
@@ -101,7 +102,6 @@ public sealed class GPUProfiler : IDisposable
                 _gl.DeleteQuery(_queries[s, z]);
     }
 
-    // using-scope around a pass: BeginQuery on enter, EndQuery on exit.
     public readonly ref struct Scope
     {
         private readonly GPUProfiler _p;

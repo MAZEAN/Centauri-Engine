@@ -21,7 +21,7 @@ public class PropertiesPanel
     private readonly ImFontPtr _font;
     private readonly ISection[] _sections;
 
-    public PropertiesPanel(ImFontPtr font, AppConfig config, ColorGrading grading)
+    public PropertiesPanel(ImFontPtr font, AppConfig config)
     {
         _font = font;
         _sections =
@@ -35,7 +35,7 @@ public class PropertiesPanel
             new CullingSection(config),
             new TAASection(config),
             new BloomSection(config),
-            new ColorGradingSection(grading),
+            new ColorGradingSection(config.ColorGrading),
             new IBLSection(config),
             new ViewportSection(config)
         ];

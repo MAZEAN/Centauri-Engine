@@ -6,12 +6,7 @@ using System.Collections.Generic;
 
 public class GLShader : GLResource
 {
-    // name -> uniform location (hashed once per name, then reused)
     private readonly Dictionary<string, int> _locationCache = new();
-
-    // last uploaded value per location, split by type so comparisons are
-    // strongly typed (IEquatable<T>) and never box. Keyed by int location
-    // rather than string, so the per-frame value check does no string hashing.
     private readonly Dictionary<int, int>       _intCache   = new();
     private readonly Dictionary<int, float>     _floatCache = new();
     private readonly Dictionary<int, Vector2>   _vec2Cache  = new();

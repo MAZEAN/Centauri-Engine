@@ -42,7 +42,6 @@ public sealed class Draw : IDisposable
         _gl.BindVertexArray(0);
     }
 
-    // ── pass setup / teardown ─────────────────────────────────────────────────
     public void Begin(Matrix4x4 view, Matrix4x4 projection)
     {
         SetRenderState();
@@ -62,7 +61,6 @@ public sealed class Draw : IDisposable
         _gl.Disable(EnableCap.Blend);
     }
 
-    // ── per-draw uniforms ─────────────────────────────────────────────────────
     public void Color(Vector3 color, float alpha = 1.0f)
     {
         _shader.SetUniform("uColor", color);
@@ -71,7 +69,6 @@ public sealed class Draw : IDisposable
 
     public void Model(Matrix4x4 model) => _shader.SetUniform("uModel", model);
 
-    // ── primitives ────────────────────────────────────────────────────────────
     public void Lines(float[] vertices)     => Upload(vertices, PrimitiveType.Lines);
     public void Triangles(float[] vertices) => Upload(vertices, PrimitiveType.Triangles);
 

@@ -11,7 +11,7 @@ public struct FrameStats
     public int   TextureBinds   { get; set; }
     public int   TotalIndices   { get; set; }
     public int   TotalVertices  { get; set; }
-    public int TotalEntities => DrawnEntities + CulledEntities;
+    public int   TotalEntities => DrawnEntities + CulledEntities;
     
     // Instancing
     public int   Batches        { get; set; }

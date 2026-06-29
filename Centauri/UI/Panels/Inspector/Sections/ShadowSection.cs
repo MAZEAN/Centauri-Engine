@@ -8,11 +8,11 @@ using Common;
 
 public sealed class ShadowSection : ISection
 {
+    private readonly AppConfig _config;
+    
     private static readonly uint[] Sizes = [512, 1024, 2048, 4096, 8192];
     private static readonly string[] SizeLabels =
         Array.ConvertAll(Sizes, x => x.ToString(CultureInfo.InvariantCulture));
-
-    private readonly AppConfig _config;
 
     public ShadowSection(AppConfig config) => _config = config;
 

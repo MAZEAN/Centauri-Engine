@@ -12,7 +12,7 @@ public sealed class SpatialGrid
 
     private List<Entity>[] _cells = [];
     private bool[]         _visited = [];      // parallel to _cells: touched by the last marking Cull
-    private readonly List<Entity> _oversized = new();
+    private readonly List<Entity> _oversized = [];
 
     private Vector3 _origin;                    // min corner (minX, minY, minZ)
     private float   _maxY;
@@ -47,6 +47,7 @@ public sealed class SpatialGrid
         foreach (var e in entities)
         {
             if (!e.Enabled || e.Model is null) continue;
+            
             var b = e.GetWorldBounds();
             EntityCount++;
 
@@ -139,6 +140,7 @@ public sealed class SpatialGrid
     {
         var minX = _origin.X + col * _cellSize;
         var minZ = _origin.Z + row * _cellSize;
+        
         return new BoundingBox(
             new Vector3(minX, _origin.Y, minZ),
             new Vector3(minX + _cellSize, _maxY, minZ + _cellSize));

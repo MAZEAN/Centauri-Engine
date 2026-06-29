@@ -23,7 +23,7 @@ public class Skybox(GLTexture texture, float exposure, float blackLevel)
 
 public class SkyboxSet
 {
-    private readonly List<Skybox> _items = new();
+    private readonly List<Skybox> _items = [];
     private readonly Dictionary<string, Skybox> _byName = new();
     public Skybox? Active { get; private set; }
     

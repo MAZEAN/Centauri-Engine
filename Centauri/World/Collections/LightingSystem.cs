@@ -17,9 +17,9 @@ public class LightingSystem
         public readonly Vector3   Position = position;
     }
 
-    private readonly List<DirectionalLight> _directional = new();
-    private readonly List<ActivePoint>      _point       = new();
-    private readonly List<ActiveSpot>       _spot        = new();
+    private readonly List<DirectionalLight> _directional = [];
+    private readonly List<ActivePoint>      _point       = [];
+    private readonly List<ActiveSpot>       _spot        = [];
 
     public IReadOnlyList<DirectionalLight> DirectionalLights => _directional;
     public IReadOnlyList<ActivePoint>      PointLights       => _point;

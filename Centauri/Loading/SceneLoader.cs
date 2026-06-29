@@ -18,9 +18,9 @@ public class SceneLoader
     
     private readonly string _path;
 
-    public SceneLoader(ResourceSystem resourceManager, Scene scene, AppConfig config)
+    public SceneLoader(ResourceSystem resourceSystem, Scene scene, AppConfig config)
     {
-        _resourceSystem = resourceManager;
+        _resourceSystem = resourceSystem;
         _scene = scene;
         _path = config.Render.ScenePath;
         _config = config;

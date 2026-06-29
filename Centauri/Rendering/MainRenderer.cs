@@ -27,19 +27,18 @@ public class MainRenderer : IDisposable
     private const float SpotConstant  = 1.0f;
     private const float SpotLinear    = 0.09f;
     private const float SpotQuadratic = 0.032f;
-
-    private const float NightAmbient = 0.15f;   // moonlit IBL floor so night isn't pitch black
+    private const float NightAmbient = 0.15f;
 
     private readonly LightBuffer _lightBuffer;
     private readonly ShadowBuffer _shadowBuffer;
-    private readonly HashSet<GLShader> _lightBlockBound = new();
+    private readonly HashSet<GLShader> _lightBlockBound = [];
 
     private readonly TextureBinder _textures;
     private readonly ShaderBatcher _batcher = new();
     private readonly ShaderUniformBinder _uniforms;
     
     private readonly InstanceBuffer _instanceBuffer;
-    private readonly List<InstanceData> _instances = new();
+    private readonly List<InstanceData> _instances = [];
     
     private readonly record struct RenderContext(
         Camera Camera,

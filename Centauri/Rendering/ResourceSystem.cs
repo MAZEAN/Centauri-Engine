@@ -51,7 +51,7 @@ public class ResourceSystem : IDisposable
     }
     
     public Material DefaultMaterial
-        => field ??= new(Shaders.Get(_config.Render.DefaultShader)) { AO = DefaultTexture };
+        => field ??= new Material(Shaders.Get(_config.Render.DefaultShader)) { AO = DefaultTexture };
     
     public Material GetMaterial(string path)
     {
@@ -91,10 +91,8 @@ public class ResourceSystem : IDisposable
         DecodeAssetsInParallelAndUpload(modelPaths, texturePaths);
     }
 
-    private void DecodeAssetsInParallelAndUpload
-        (List<string> modelPaths, HashSet<string> texturePaths)
+    private void DecodeAssetsInParallelAndUpload(List<string> modelPaths, HashSet<string> texturePaths)
     {
-
         // CPU decode off the GL thread
         var textureTask = Task.WhenAll(texturePaths.Select(key =>
             Task.Run(() => (key, data: GLTexture.Decode(PathResolver.Resolve(key))))));
