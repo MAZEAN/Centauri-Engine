@@ -24,9 +24,13 @@ public sealed class GeometryPrepass : IDisposable
     private readonly GLShader _shader;
     private readonly RenderTarget _target;
     
-    private readonly Dictionary<Model, List<InstanceData>> _groups = new();
-    // per-model submesh materials (from a representative entity) — drives the foliage alpha test
-    private readonly Dictionary<Model, IReadOnlyList<Material?>> _materials = new();
+    private sealed class RenderBatch
+    {
+        public List<InstanceData> Instances { get; } = [];
+        public IReadOnlyList<Material?> Materials { get; init; } = [];
+    }
+    
+    private readonly Dictionary<Model, RenderBatch> _batches = new();
 
     public uint NormalTexture   => _target.ColorTextures[0];
     public uint MaterialTexture => _target.ColorTextures[1];
@@ -49,8 +53,16 @@ public sealed class GeometryPrepass : IDisposable
 
     public void Render(Scene scene, CullingSystem culling)
     {
-        var camera = scene.Cameras.Active;
-
+        BeginPass(scene.Cameras.Active);
+        
+        BuildBatches(scene, culling);
+        RenderBatches();
+        
+        EndPass();
+    }
+    
+    private void BeginPass(Camera camera)
+    {
         _target.Bind();
         _target.Clear();
 
@@ -59,45 +71,72 @@ public sealed class GeometryPrepass : IDisposable
         _gl.CullFace(TriangleFace.Back);
 
         _shader.Use();
-        _shader.SetUniform("uView",       camera.GetViewMatrix());
+
+        _shader.SetUniform("uView", camera.GetViewMatrix());
         _shader.SetUniform("uProjection", camera.GetProjectionMatrix());
-        _shader.SetUniform("uAlbedo",       0);
-        _shader.SetUniform("uRoughnessMap", 2);   // material buffer (roughness/metallic) for SSR
-        _shader.SetUniform("uMetallicMap",  3);
+
         ShaderUniformBinder.UploadWind(_shader, _config.Wind);
+    }
 
-        foreach (var list in _groups.Values)
-            list.Clear();
-
+    private void BuildBatches(Scene scene, CullingSystem culling)
+    {
+        foreach (var batch in _batches.Values)
+        {
+            batch.Instances.Clear();
+        }
+        
         foreach (var entity in scene.Entities)
         {
             if (!entity.Enabled || entity.Model is not { } model) continue;
             if (!culling.IsVisible(entity)) continue;
 
-            if (!_groups.TryGetValue(model, out var list))
-                _groups[model] = list = new List<InstanceData>();
+            if (!_batches.TryGetValue(model, out var batch))
+            {
+                batch = new RenderBatch
+                {
+                    Materials = entity.Materials
+                };
 
-            _materials[model] = entity.Materials;   // representative — foliage materials are shared
-            list.Add(new InstanceData(entity.Transform.WorldMatrix, entity.UvScale, entity.UvOffset));
+                _batches[model] = batch;
+            }
+
+            batch.Instances.Add(
+                new InstanceData(
+                    entity.Transform.WorldMatrix,
+                    entity.UvScale,
+                    entity.UvOffset
+                )
+            );
         }
+    }
 
-        foreach (var (model, list) in _groups)
+    private void RenderBatches()
+    {
+        foreach (var (model, batch) in _batches)
         {
-            if (list.Count == 0) continue;
+            if (batch.Instances.Count == 0)
+                continue;
 
-            _instances.Upload(list);
-            var materials = _materials[model];
+            _instances.Upload(batch.Instances);
 
             for (var i = 0; i < model.Meshes.Count; i++)
             {
-                SetMeshState(i < materials.Count ? materials[i] : null);
+                var material =
+                    i < batch.Materials.Count
+                        ? batch.Materials[i]
+                        : null;
+
+                SetMeshState(material);
 
                 var mesh = model.Meshes[i];
                 mesh.ConfigureInstancing(_instances.Handle);
-                mesh.DrawInstanced(list.Count);
+                mesh.DrawInstanced(batch.Instances.Count);
             }
         }
-
+    }
+    
+    private void EndPass()
+    {
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
     }
 

@@ -118,7 +118,7 @@ public class RenderingSystem : IDisposable
         RenderCentralComponents(scene, deltaTime);
         
         var activeSky = scene.Skyboxes.Active;
-        var iblInputs = new Postprocessing.IblResolveInputs(
+        var iblInputs = new IblResolveInputs(
             PrefilterMap:     activeSky?.PrefilteredMap ?? 0,
             BrdfLut:          _ibl.BrdfLut,
             MaxReflectionLod: _ibl.MaxReflectionLod,

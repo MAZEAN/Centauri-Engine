@@ -5,9 +5,10 @@ using System.Numerics;
 
 using Config;
 using World;
-using Graphics.Resources;
 using Graphics.Geometry;
+using Graphics.Resources;
 using Graphics.Resources.Buffers;
+using Graphics.Resources.Materials;
 using Culling;
 using World.Collections;
 using World.Components;
@@ -39,19 +40,21 @@ public class MainRenderer : IDisposable
     
     private readonly InstanceBuffer _instanceBuffer;
     private readonly List<InstanceData> _instances = new();
+    
+    private readonly record struct RenderContext(
+        Camera Camera,
+        Matrix4x4 View,
+        Vector3 CameraPosition,
+        float IblScale,
+        bool SsaoActive,
+        CullingSystem Culling
+    );
 
     private GLShader? _activeShader;
-    private CullingSystem _culling = null!;
-    private Camera    _viewCamera = null!;
-    private Matrix4x4 _view;
-    private Vector3   _cameraPosition;
-    
-    private float     _iblScale;
     
     // Flags
-    private bool _iblActive;
-    private bool      _ssaoActive;
-    private bool?     _twoSided;
+    private bool  _iblActive;
+    private bool? _twoSided;
 
     public MainRenderer(GL gl, AppConfig config, IBLBaker ibl, ShadowMapper shadows, InstanceBuffer instances)
     {
@@ -67,32 +70,17 @@ public class MainRenderer : IDisposable
         _instanceBuffer = instances;
     }
 
-    public void Render(Scene scene, float deltaTime, ref FrameStats stats, uint ssaoTexture, bool ssaoActive, CullingSystem culling)    {
-        ResetFrameStats(ref stats);
-        _textures.Reset();
-        
-        _activeShader = null;
-        _twoSided     = null;
-        _culling      = culling;
-        
-        if (ssaoActive)
-        {
-            _gl.ActiveTexture(TextureUnit.Texture9);
-            _gl.BindTexture(TextureTarget.Texture2D, ssaoTexture);
-        }
-
-        _viewCamera = scene.Cameras.Active;
-
-        _view           = _viewCamera.GetViewMatrix();
-        _cameraPosition = _viewCamera.Position;
-        _iblScale       = DaylightIblScale(scene);
-        _ssaoActive     = ssaoActive;
-
-        UploadLights(scene.Lighting);
-
-        BindIbl(scene);
-        BindShadows();
-        UploadShadowData();
+    public void Render(Scene scene, float deltaTime, ref FrameStats stats, uint ssaoTexture, bool ssaoActive, CullingSystem culling)    
+    {
+        var context = new RenderContext(
+            scene.Cameras.Active,
+            scene.Cameras.Active.GetViewMatrix(),
+            scene.Cameras.Active.Position,
+            DaylightIblScale(scene),
+            ssaoActive,
+            culling
+        );
+        BeginFrame(scene, deltaTime, ref stats, ssaoTexture, ssaoActive);
 
         var batches = _batcher.GetBatches(scene);
 
@@ -100,27 +88,31 @@ public class MainRenderer : IDisposable
         stats.TwoSidedEntities   = _batcher.TwoSidedEntities;
 
         foreach (var batch in batches)
-            DrawBatch(batch, ref stats);
+            DrawBatch(batch, context, ref stats);
         
         ResetSurfaceRenderState();
     }
 
-    private void DrawBatch(Batch batch, ref FrameStats stats)
+    private void BeginFrame(Scene scene, float deltaTime, ref FrameStats stats, uint ssaoTexture, bool ssaoActive)
     {
-        _instances.Clear();
+        _textures.Reset();
+        ResetFrameStats(ref stats);
 
-        foreach (var entity in batch.Entities)
-        {
-            if (!entity.Enabled) continue;
-            
-            if (!_culling.IsVisible(entity))            {
-                stats.CulledEntities++;
-                continue;
-            }
-            _instances.Add(new InstanceData(entity.Transform.WorldMatrix, entity.UvScale, entity.UvOffset));
-        }
+        _activeShader = null;
+        _twoSided = null;
         
-        if (_instances.Count == 0) return;
+        BindSsao(ssaoTexture, ssaoActive);
+        UploadLights(scene.Lighting);
+        BindIbl(scene);
+        BindShadows();
+        UploadShadowData();
+    }
+
+    private void DrawBatch(Batch batch, RenderContext context, ref FrameStats stats)
+    {
+        var count = CollectVisibleInstances(batch, context, ref stats);
+        if (count == 0)
+            return;
         
         _instanceBuffer.Upload(_instances);
 
@@ -133,24 +125,65 @@ public class MainRenderer : IDisposable
             if (i >= batch.Materials.Length || batch.Materials[i] is not { } material)
                 continue;
 
-            var shader = EnsureShader(material.Shader);
-            SetSurfaceRenderState(material.TwoSided);
-
-            stats.TextureBinds += _textures.BindMaterial(material);
-            ShaderUniformBinder.UploadMaterial(shader, material);
-
-            var mesh = meshes[i];
-            mesh.ConfigureInstancing(_instanceBuffer.Handle);
-            mesh.DrawInstanced(_instances.Count);
-
-            stats.DrawCalls      += 1;
-            stats.NaiveDrawCalls += _instances.Count;
-            stats.TotalIndices   += (int)mesh.IndexCount  * _instances.Count;
-            stats.TotalVertices  += (int)mesh.VertexCount * _instances.Count;
+            DrawMesh(meshes[i], material, context, count, ref stats);
         }
     }
     
-    private void SetSurfaceRenderState(bool twoSided)
+    private int CollectVisibleInstances(Batch batch, RenderContext context, ref FrameStats stats)
+    {
+        _instances.Clear();
+
+        foreach (var entity in batch.Entities)
+        {
+            if (!entity.Enabled)
+                continue;
+
+            if (!context.Culling.IsVisible(entity))
+            {
+                stats.CulledEntities++;
+                continue;
+            }
+
+            _instances.Add(
+                new InstanceData(
+                    entity.Transform.WorldMatrix,
+                    entity.UvScale,
+                    entity.UvOffset
+                )
+           );
+        }
+
+        return _instances.Count;
+    }
+
+    private void DrawMesh(Mesh mesh, Material? material, RenderContext context, int instanceCount, ref FrameStats stats)
+    {
+        if (material is null)
+            return;
+
+        var shader = BindShader(material.Shader, context);
+
+        ApplySurfaceState(material.TwoSided);
+
+        RegisterDraw(ref stats, mesh, material, instanceCount);
+
+        ShaderUniformBinder.UploadMaterial(shader, material);
+
+        mesh.ConfigureInstancing(_instanceBuffer.Handle);
+        mesh.DrawInstanced(instanceCount);
+        
+    }
+    
+    private void RegisterDraw(ref FrameStats stats, Mesh mesh, Material? material, int instanceCount)
+    {
+        stats.TextureBinds += _textures.BindMaterial(material);
+        stats.DrawCalls++;
+        stats.NaiveDrawCalls += instanceCount;
+        stats.TotalIndices += (int)mesh.IndexCount * instanceCount;
+        stats.TotalVertices += (int)mesh.VertexCount * instanceCount;
+    }
+    
+    private void ApplySurfaceState(bool twoSided)
     {
         if (_twoSided == twoSided) return;
         _twoSided = twoSided;
@@ -172,9 +205,8 @@ public class MainRenderer : IDisposable
         _gl.Enable(EnableCap.CullFace);
         _gl.Disable(EnableCap.SampleAlphaToCoverage);
     }
-
     
-    private GLShader EnsureShader(GLShader shader)
+    private GLShader BindShader(GLShader shader, RenderContext context)
     {
         if (ReferenceEquals(shader, _activeShader)) return shader;
 
@@ -185,17 +217,14 @@ public class MainRenderer : IDisposable
             shader.BindUniformBlock("Shadows", ShadowBuffer.BindingPoint);
         }
 
-        shader.SetUniform("uView",      _view);
-        shader.SetUniform("uCameraPos", _cameraPosition);
-        _uniforms.UploadGlobals(shader, _viewCamera, _iblActive, _iblScale, _ssaoActive);
+        shader.SetUniform("uView",      context.View);
+        shader.SetUniform("uCameraPos", context.CameraPosition);
+        _uniforms.UploadGlobals(shader, context.Camera, _iblActive, context.IblScale, context.SsaoActive);
 
         _activeShader = shader;
         return shader;
     }
-
-    // -----------------------------
-    // Lighting
-    // -----------------------------
+    
     private void UploadLights(LightingSystem lights)
     {
         _lightBuffer.Begin();
@@ -219,8 +248,7 @@ public class MainRenderer : IDisposable
 
         _lightBuffer.Upload();
     }
-
-    // dim ambient/IBL toward a moonlit floor when a day/night cycle drives the scene
+    
     private static float DaylightIblScale(Scene scene) =>
         scene.FindComponent<DayNightCycle>() is { } cycle
             ? NightAmbient + (1f - NightAmbient) * cycle.Daylight
@@ -238,6 +266,15 @@ public class MainRenderer : IDisposable
         _gl.BindTexture(TextureTarget.TextureCubeMap, sky.PrefilteredMap);
         _gl.ActiveTexture(TextureUnit.Texture7);
         _gl.BindTexture(TextureTarget.Texture2D, _ibl.BrdfLut);
+    }
+    
+    private void BindSsao(uint texture, bool active)
+    {
+        if (active)
+        {
+            _gl.ActiveTexture(TextureUnit.Texture9);
+            _gl.BindTexture(TextureTarget.Texture2D, texture);
+        }
     }
 
     private void BindShadows()
@@ -275,5 +312,6 @@ public class MainRenderer : IDisposable
     public void Dispose()
     {
         _lightBuffer.Dispose();
+        _shadowBuffer.Dispose();
     }
 }
