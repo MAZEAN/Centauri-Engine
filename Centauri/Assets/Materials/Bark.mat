@@ -1,7 +1,0 @@
-{
-  "shader":    "Shaders/PBR/shaderPBR",
-  "albedo":    "Assets/Textures/Bark/Bark_NormalTree.png",
-  "normal":    "Assets/Textures/Bark/Bark_NormalTree_Normal.png",
-  "roughnessScalar": 0.9,
-  "twoSided": false
-}
