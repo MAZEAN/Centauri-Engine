@@ -24,13 +24,9 @@ public sealed class GeometryPrepass : IDisposable
     private readonly GLShader _shader;
     private readonly RenderTarget _target;
     
-    private sealed class RenderBatch
-    {
-        public List<InstanceData> Instances { get; } = [];
-        public IReadOnlyList<Material?> Materials { get; init; } = [];
-    }
-    
-    private readonly Dictionary<Model, RenderBatch> _batches = new();
+    private readonly Dictionary<Model, List<InstanceData>> _groups = new();
+    // per-model submesh materials (from a representative entity) — drives the foliage alpha test
+    private readonly Dictionary<Model, IReadOnlyList<Material?>> _materials = new();
 
     public uint NormalTexture   => _target.ColorTextures[0];
     public uint MaterialTexture => _target.ColorTextures[1];
@@ -53,16 +49,18 @@ public sealed class GeometryPrepass : IDisposable
 
     public void Render(Scene scene, CullingSystem culling)
     {
-        BeginPass(scene.Cameras.Active);
-        
+        BeginPass(scene);
+
         BuildBatches(scene, culling);
         RenderBatches();
         
         EndPass();
     }
-    
-    private void BeginPass(Camera camera)
+
+    private void BeginPass(Scene scene)
     {
+        var camera = scene.Cameras.Active;
+
         _target.Bind();
         _target.Clear();
 
@@ -71,77 +69,57 @@ public sealed class GeometryPrepass : IDisposable
         _gl.CullFace(TriangleFace.Back);
 
         _shader.Use();
-
-        _shader.SetUniform("uView", camera.GetViewMatrix());
+        _shader.SetUniform("uView",       camera.GetViewMatrix());
         _shader.SetUniform("uProjection", camera.GetProjectionMatrix());
-
+        _shader.SetUniform("uAlbedo",       0);
+        _shader.SetUniform("uRoughnessMap", 2);   // material buffer (roughness/metallic) for SSR
+        _shader.SetUniform("uMetallicMap",  3);
         ShaderUniformBinder.UploadWind(_shader, _config.Wind);
     }
 
     private void BuildBatches(Scene scene, CullingSystem culling)
     {
-        foreach (var batch in _batches.Values)
-        {
-            batch.Instances.Clear();
-        }
-        
+        foreach (var list in _groups.Values)
+            list.Clear();
+
         foreach (var entity in scene.Entities)
         {
             if (!entity.Enabled || entity.Model is not { } model) continue;
             if (!culling.IsVisible(entity)) continue;
 
-            if (!_batches.TryGetValue(model, out var batch))
-            {
-                batch = new RenderBatch
-                {
-                    Materials = entity.Materials
-                };
+            if (!_groups.TryGetValue(model, out var list))
+                _groups[model] = list = new List<InstanceData>();
 
-                _batches[model] = batch;
-            }
-
-            batch.Instances.Add(
-                new InstanceData(
-                    entity.Transform.WorldMatrix,
-                    entity.UvScale,
-                    entity.UvOffset
-                )
-            );
+            _materials[model] = entity.Materials;   // representative — foliage materials are shared
+            list.Add(new InstanceData(entity.Transform.WorldMatrix, entity.UvScale, entity.UvOffset));
         }
     }
 
     private void RenderBatches()
     {
-        foreach (var (model, batch) in _batches)
+        foreach (var (model, list) in _groups)
         {
-            if (batch.Instances.Count == 0)
-                continue;
+            if (list.Count == 0) continue;
 
-            _instances.Upload(batch.Instances);
+            _instances.Upload(list);
+            var materials = _materials[model];
 
             for (var i = 0; i < model.Meshes.Count; i++)
             {
-                var material =
-                    i < batch.Materials.Count
-                        ? batch.Materials[i]
-                        : null;
-
-                SetMeshState(material);
+                SetMeshState(i < materials.Count ? materials[i] : null);
 
                 var mesh = model.Meshes[i];
                 mesh.ConfigureInstancing(_instances.Handle);
-                mesh.DrawInstanced(batch.Instances.Count);
+                mesh.DrawInstanced(list.Count);
             }
         }
     }
-    
+
     private void EndPass()
     {
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
     }
-
-    // Alpha-tested foliage (two-sided material with an albedo) discards by alpha so its
-    // depth/normals match the leaf cutout, and renders both faces. Everything else is opaque.
+    
     private void SetMeshState(Material? material)
     {
         _shader.SetUniform("uWind", material is { Wind: true } ? 1 : 0);
@@ -163,7 +141,7 @@ public sealed class GeometryPrepass : IDisposable
     
     private void BindMaterial(Material? material)
     {
-        if (material is not { } mat)
+        if (material is null)
         {
             _shader.SetUniform("uHasRoughness",   0);
             _shader.SetUniform("uHasMetallic",    0);
@@ -172,15 +150,15 @@ public sealed class GeometryPrepass : IDisposable
             return;
         }
 
-        _shader.SetUniform("uHasRoughness",   mat.Roughness != null ? 1 : 0);
-        _shader.SetUniform("uHasMetallic",    mat.Metallic  != null ? 1 : 0);
-        _shader.SetUniform("uRoughnessValue", mat.RoughnessScalar);
-        _shader.SetUniform("uMetallicValue",  mat.MetallicScalar);
+        _shader.SetUniform("uHasRoughness",   material.Roughness != null ? 1 : 0);
+        _shader.SetUniform("uHasMetallic",    material.Metallic  != null ? 1 : 0);
+        _shader.SetUniform("uRoughnessValue", material.RoughnessScalar);
+        _shader.SetUniform("uMetallicValue",  material.MetallicScalar);
 
         _gl.ActiveTexture(TextureUnit.Texture2);
-        _gl.BindTexture(TextureTarget.Texture2D, mat.Roughness?.Handle ?? 0);
+        _gl.BindTexture(TextureTarget.Texture2D, material.Roughness?.Handle ?? 0);
         _gl.ActiveTexture(TextureUnit.Texture3);
-        _gl.BindTexture(TextureTarget.Texture2D, mat.Metallic?.Handle ?? 0);
+        _gl.BindTexture(TextureTarget.Texture2D, material.Metallic?.Handle ?? 0);
     }
 
     public void Dispose()
