@@ -20,6 +20,18 @@ using Profiling;
 using SSAO;
 using Culling;
 
+internal sealed class RenderContext
+{
+    public FrameStats Stats;
+    
+    public bool SsaoActive;
+    public bool SsrActive;
+    public bool TaaActive;
+
+    public CullingSystem Culling;
+    public GPUProfiler Profiler;
+}
+
 public class RenderingSystem : IDisposable
 {
     private readonly GL            _gl;
@@ -30,22 +42,16 @@ public class RenderingSystem : IDisposable
     private readonly SkyboxRenderer _skyboxRenderer;
     private readonly ShadowMapper _shadows;
     private readonly IBLBaker _ibl;
-    private readonly GPUProfiler _profiler;
     private readonly InstanceBuffer _instances;
-    private readonly CullingSystem _culling;
     
     private UISystem _ui = null!;
     private PostProcessor _post = null!;
     private GeometryPrepass _prepass = null!;
     private SsaoPass _ssao = null!;
     private BufferDebugView _bufferDebug = null!;
-
-    private FrameStats _stats;
     
-    // Flags
-    private bool _ssaoActive;   // SSAO ran this frame → bind/apply its result
-    private bool _ssrActive;
-    private bool _taaActive;    // TAA enabled → prepass ran, scene reprojected
+    private readonly RenderContext _context = new();
+    
     private bool? _skyIsDay;
     
     private float _fpsTimer;
@@ -60,11 +66,11 @@ public class RenderingSystem : IDisposable
         _config        = config;
         
         _instances = new InstanceBuffer(gl);
-        _culling   = new CullingSystem(_config.Culling.CellSize, _config.Culling.OversizeFactor);
+        _context.Culling   = new CullingSystem(_config.Culling.CellSize, _config.Culling.OversizeFactor);
         
         _shadows = new ShadowMapper(gl, _config, _instances);
         _ibl = new IBLBaker(gl, _config.IBLConfig);
-        _profiler = new GPUProfiler(gl);
+        _context.Profiler = new GPUProfiler(gl);
         
         _mainRenderer   = new MainRenderer(gl, config, _ibl, _shadows, _instances);
         _gridRenderer   = new GridRenderer(gl);
@@ -103,14 +109,7 @@ public class RenderingSystem : IDisposable
 
     public void Render(Scene scene, float deltaTime)
     {
-        Time.BeginFrame();
-        Graphics.Resources.GLTexture.SetAnisotropy(_gl, _config.Debug.AnisotropicFilter);
-        scene.Lighting.Collect(scene.Entities);
-        scene.Cameras.Active.JitterNdc = _post.NextTaaJitter();
-        
-        _culling.Update(scene, scene.Cameras.Primary, _config.Debug.EnableCulling,
-            _config.Culling.CellSize, _config.Culling.OversizeFactor);
-        UpdateGridStats();
+        BeginFrame(scene);
         
         RenderPrePostComponents(scene, deltaTime);
         
@@ -125,16 +124,28 @@ public class RenderingSystem : IDisposable
             Intensity:        _config.IBLConfig.IblIntensity,
             HasIbl:           activeSky is { IblBaked: true });
         
-        using (_profiler.Measure("Post"))
+        using (_context.Profiler.Measure("Post"))
             _post.Composite(scene.Cameras.Active, _prepass.DepthTexture, _prepass.NormalTexture,
-                _prepass.MaterialTexture, _ssrActive, _taaActive, in iblInputs);
+                _prepass.MaterialTexture, _context.SsrActive, _context.TaaActive, in iblInputs);
         
         RenderAfterPostComponents(scene, deltaTime);
     }
 
+    private void BeginFrame(Scene scene)
+    {
+        Time.BeginFrame();
+        Graphics.Resources.GLTexture.SetAnisotropy(_gl, _config.Debug.AnisotropicFilter);
+        scene.Lighting.Collect(scene.Entities);
+        scene.Cameras.Active.JitterNdc = _post.NextTaaJitter();
+        
+        _context.Culling.Update(scene, scene.Cameras.Primary, _config.Debug.EnableCulling,
+            _config.Culling.CellSize, _config.Culling.OversizeFactor);
+        UpdateGridStats();
+    }
+
     private void RenderCentralComponents(Scene scene, float deltaTime)
     {
-        using (_profiler.Measure("Sky+Grid"))
+        using (_context.Profiler.Measure("Sky+Grid"))
         {
             if (_config.Debug.ShowSkybox)
                 _skyboxRenderer.Render(scene);
@@ -143,17 +154,17 @@ public class RenderingSystem : IDisposable
                 _gridRenderer.Render(scene);
         }
 
-        using (_profiler.Measure("Forward"))
-            _mainRenderer.Render(scene, deltaTime, ref _stats, _ssao.AoTexture, _ssaoActive, _culling);
+        using (_context.Profiler.Measure("Forward"))
+            _mainRenderer.Render(scene, deltaTime, ref _context.Stats, _ssao.AoTexture, _context.SsaoActive, _context.Culling);
 
-        using (_profiler.Measure("Debug"))
+        using (_context.Profiler.Measure("Debug"))
         {
             var active = scene.Cameras.Active;
             _debugRenderer.Begin(active);
 
             _debugRenderer.DrawCameras(scene);
             _debugRenderer.DrawAllAABBs(scene, scene.Cameras.Primary.Frustum);
-            _debugRenderer.DrawCullingGrid(scene, _culling.Grid);
+            _debugRenderer.DrawCullingGrid(scene, _context.Culling.Grid);
             _debugRenderer.DrawSelection(scene);
             
             _debugRenderer.End();
@@ -164,23 +175,23 @@ public class RenderingSystem : IDisposable
     {
         UpdateDayNightSkybox(scene);
 
-        _profiler.BeginFrame(_config.Debug.ShowGPUTimings);
+        _context.Profiler.BeginFrame(_config.Debug.ShowGPUTimings);
 
-        using (_profiler.Measure("Shadows"))
-            _shadows.Render(scene, _culling, ref _stats);
+        using (_context.Profiler.Measure("Shadows"))
+            _shadows.Render(scene, _context.Culling, ref _context.Stats);
 
         // SSAO (and the Normals/Depth/AO debug views) all need the prepass buffers
-        _ssaoActive = _config.SSAO.Enabled || _config.Debug.Shading == ShadingMode.AmbientOcclusion;
-        _ssrActive  = _config.SSR.Enabled;
-        _taaActive  = _config.TAA.Enabled;
-        var needPrepass = _ssaoActive || _ssrActive || _taaActive || _config.Debug.Shading != ShadingMode.Shaded;
+        _context.SsaoActive = _config.SSAO.Enabled || _config.Debug.Shading == ShadingMode.AmbientOcclusion;
+        _context.SsrActive  = _config.SSR.Enabled;
+        _context.TaaActive  = _config.TAA.Enabled;
+        var needPrepass = _context.SsaoActive || _context.SsrActive || _context.TaaActive || _config.Debug.Shading != ShadingMode.Shaded;
         
         if (needPrepass)
-            using (_profiler.Measure("Prepass"))
-                _prepass.Render(scene, _culling);
+            using (_context.Profiler.Measure("Prepass"))
+                _prepass.Render(scene, _context.Culling);
 
-        if (_ssaoActive)
-            using (_profiler.Measure("SSAO"))
+        if (_context.SsaoActive)
+            using (_context.Profiler.Measure("SSAO"))
                 _ssao.Render(_prepass.DepthTexture, _prepass.NormalTexture, scene.Cameras.Active);
     }
 
@@ -190,7 +201,7 @@ public class RenderingSystem : IDisposable
         _bufferDebug.Render(_config.Debug.Shading, _prepass.NormalTexture, _prepass.DepthTexture,
             _ssao.AoTexture, _post.VelocityTexture, _config.Camera.Near, _config.Camera.Far);
         
-        _ui.Render(scene, in _stats, _profiler.Results);
+        _ui.Render(scene, in _context.Stats, _context.Profiler.Results);
     }
     
     private void UpdateDayNightSkybox(Scene scene)
@@ -206,11 +217,11 @@ public class RenderingSystem : IDisposable
     
     private void UpdateGridStats()
     {
-        var grid = _culling.Grid;
-        _stats.GridColumns  = grid.Columns;
-        _stats.GridRows     = grid.Rows;
-        _stats.GridOccupied = grid.OccupiedCells;
-        _stats.GridVisited  = grid.VisitedCells;
+        var grid = _context.Culling.Grid;
+        _context.Stats.GridColumns  = grid.Columns;
+        _context.Stats.GridRows     = grid.Rows;
+        _context.Stats.GridOccupied = grid.OccupiedCells;
+        _context.Stats.GridVisited  = grid.VisitedCells;
     }
     
     private void UpdateFPSCounter(float deltaTime)
@@ -221,8 +232,8 @@ public class RenderingSystem : IDisposable
 
         if (_fpsTimer >= 1.0f)
         {
-            _stats.FPS       = _frameCount / _fpsTimer;
-            _stats.FrameTime = 1000f / _stats.FPS;
+            _context.Stats.FPS       = _frameCount / _fpsTimer;
+            _context.Stats.FrameTime = 1000f / _context.Stats.FPS;
             _frameCount      = 0;
             _fpsTimer        = 0f;
         }
@@ -249,7 +260,7 @@ public class RenderingSystem : IDisposable
         _bufferDebug.Dispose();
         _ibl.Dispose();
         _shadows.Dispose();
-        _profiler.Dispose();
+        _context.Profiler.Dispose();
         _instances.Dispose();
     }
 }
