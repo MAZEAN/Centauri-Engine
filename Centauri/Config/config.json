@@ -92,7 +92,7 @@
   },
   "wind": {
     "enabled": true,
-    "strength": 0.015,
+    "strength": 0.1,
     "speed": 0.85,
     "direction": 37.0
   },

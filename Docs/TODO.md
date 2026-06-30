@@ -15,13 +15,13 @@
 * [x] Screen Space Ambient Occlusion (SSAO)
 * [x] Temporal Anti-Aliasing (TAA)
 * [x] Screen Space Reflections (SSR) (with ray tracing or PBR Accumulation)
-* [ ] Reflection Probes (maybe additionally Planar Reflections)
+* [ ] Reflection Probes (maybe "Planar Reflections" for mirrors)
 * [ ] GTAO (Ground-Truth AO)
 * [ ] Contact-hardening / PCSS
 * [ ] Raytracing with BVH (only experimental, not real-time)
 * [ ] Physics engine integration (BEPUphysics2)
-* [ ] Game-Simulation
-* [ ] Terrain rendering
+* [ ] Foundations for game dev
+* [ ] Terrain
 * [ ] Water simulation (Sea of Thieves algorithm)
 * [ ] Foliage rendering
 
@@ -33,9 +33,12 @@
 * [x] Instancing
 * [x] Async asset loading
 * [x] Sub-mesh materials
-* [ ] LOD system (Impostor)
+* [ ] (auto) LOD system (Impostor)
 * [ ] auto-exposure 
 * [ ] volumetric fog
+* [ ] Better wind (hierarchy)
+* [ ] Remove sun from skybox
+* [ ] Skybox transitions & variantions
 * [ ] Keybindings
 * [ ] UI improvements (DPI-scaling etc.)
 
@@ -43,15 +46,7 @@
 
 ## Bug Fixes
 
----
-
-## Testing
+* [ ] SSR (overly reflective surfaces (increases with distance from camera) & noise)
 
 ---
-
-## Documentation
-
----
-
-## Ideas / Backlog
 

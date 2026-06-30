@@ -25,7 +25,6 @@ public sealed class GeometryPrepass : IDisposable
     private readonly RenderTarget _target;
     
     private readonly Dictionary<Model, List<InstanceData>> _groups = new();
-    // per-model submesh materials (from a representative entity) — drives the foliage alpha test
     private readonly Dictionary<Model, IReadOnlyList<Material?>> _materials = new();
 
     public uint NormalTexture   => _target.ColorTextures[0];
@@ -72,7 +71,7 @@ public sealed class GeometryPrepass : IDisposable
         _shader.SetUniform("uView",       camera.GetViewMatrix());
         _shader.SetUniform("uProjection", camera.GetProjectionMatrix());
         _shader.SetUniform("uAlbedo",       0);
-        _shader.SetUniform("uRoughnessMap", 2);   // material buffer (roughness/metallic) for SSR
+        _shader.SetUniform("uRoughnessMap", 2);
         _shader.SetUniform("uMetallicMap",  3);
         ShaderUniformBinder.UploadWind(_shader, _config.Wind);
     }
@@ -90,7 +89,7 @@ public sealed class GeometryPrepass : IDisposable
             if (!_groups.TryGetValue(model, out var list))
                 _groups[model] = list = new List<InstanceData>();
 
-            _materials[model] = entity.Materials;   // representative — foliage materials are shared
+            _materials[model] = entity.Materials;
             list.Add(new InstanceData(entity.Transform.WorldMatrix, entity.UvScale, entity.UvOffset));
         }
     }

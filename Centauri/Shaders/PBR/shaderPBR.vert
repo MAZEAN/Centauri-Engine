@@ -20,17 +20,33 @@ uniform mat4 uProjection;   // perspective — makes far things smaller
 uniform int   uWind;        // 1 = foliage sway (must match the prepass/depth passes)
 uniform float uTime;        // seconds, latched once per frame
 
-uniform float uWindStrength;   // sway amplitude   (WindConfig.Strength)
-uniform float uWindSpeed;      // oscillation freq (WindConfig.Speed)
+uniform float uWindStrength;   // sway amplitude
+uniform float uWindSpeed;      // oscillation freq
 uniform vec2  uWindDir;
 
 vec3 WindSway(vec3 worldPos, vec3 origin)
 {
-    float height = max(worldPos.y - origin.y, 0.0);
-    float phase  = dot(worldPos.xz, vec2(0.35));
-    float sway   = sin(uTime * uWindSpeed + phase) + 0.5 * sin(uTime * uWindSpeed * 2.3 + phase * 1.7);
+    vec2 windDir = normalize(uWindDir);
 
-    return worldPos + vec3(uWindDir.x, 0.0, uWindDir.y) * (sway * uWindStrength * height);
+    float h = clamp(worldPos.y - origin.y, 0.0, 1.0);
+    float bendWeight = h * h;
+
+    float seed = fract(sin(dot(origin.xz, vec2(12.9898, 78.233))) * 43758.5453);
+
+    float phase = dot(worldPos.xz, windDir) * 0.4 + seed * 6.28318;
+
+    float gust = 0.7 + 0.3 * sin(uTime * 0.15) + 0.15 * sin(uTime * 0.07 + seed * 3.0);
+
+    float sway = sin(uTime * uWindSpeed + phase)
+                + 0.4 * sin(uTime * uWindSpeed * 2.1 + phase * 2.7)
+                + 0.2 * sin(uTime * uWindSpeed * 4.7 + phase * 5.1);
+
+    float amount = sway * gust * uWindStrength * bendWeight;
+
+    worldPos.xz += windDir * amount;
+    worldPos.y -= abs(amount) * 0.1;
+
+    return worldPos;
 }
 
 void main()
