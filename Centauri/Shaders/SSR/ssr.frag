@@ -145,6 +145,8 @@ void main()
     if (!hit) { FragColor = vec4(0.0); return; }
 
     vec3 hitPos = viewPos(hitUv);
+    vec3  hitNormal = normalize(texture(uNormal, hitUv).xyz * 2.0 - 1.0);
+    float backFade  = 1.0 - smoothstep(0.0, 0.25, dot(hitNormal, R));
     
     vec2  ef        = smoothstep(0.0, 0.15, hitUv) * (1.0 - smoothstep(0.85, 1.0, hitUv));
     float edgeFade  = ef.x * ef.y;
@@ -155,7 +157,7 @@ void main()
     float silFade   = silhouetteConfidence(hitUv, hitPos.z);
 
     vec3  reflColor  = texture(uScene, hitUv).rgb * uIntensity;
-    float confidence = edgeFade * roughFade * distFade * silFade;
+    float confidence = edgeFade * roughFade * distFade * silFade * backFade;
 
     FragColor = vec4(reflColor, confidence);   // rgb = reflected radiance, a = confidence
 }

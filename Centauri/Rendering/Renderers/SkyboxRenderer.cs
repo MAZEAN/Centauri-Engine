@@ -26,19 +26,19 @@ public class SkyboxRenderer : IDisposable
     }
 
     public void Render(Scene scene)
+        => Render(scene, scene.Cameras.Active.GetViewMatrix(), scene.Cameras.Active.GetProjectionMatrix());
+    
+    public void Render(Scene scene, Matrix4x4 view, Matrix4x4 projection)
     {
         if (scene.Skyboxes.Active is not { } sky) return;   // no skybox — nothing to draw
-
-        var camera = scene.Cameras.Active;
-
-        var view = camera.GetViewMatrix();
+        
         view.Translation = Vector3.Zero;        // rotation only — sky doesn't translate
 
         SetSkyboxRenderState();
 
         _shader.Use();
         _shader.SetUniform("uView",       view);
-        _shader.SetUniform("uProjection", camera.GetProjectionMatrix());
+        _shader.SetUniform("uProjection", projection);
         _shader.SetUniform("uPanorama",   0);
         
         _shader.SetUniform("uHdr",        sky.Texture.IsHdr ? 1 : 0);

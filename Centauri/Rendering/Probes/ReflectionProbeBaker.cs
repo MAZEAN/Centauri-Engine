@@ -9,6 +9,7 @@ using World;
 using IBL;
 using Culling;
 using Utils.Misc;
+using Renderers;
 
 // Captures a single, static, global reflection probe: renders the real scene from a fixed
 // world position into a cubemap (6 faces, no per-face culling since this is a one-time bake,
@@ -33,6 +34,7 @@ public sealed class ReflectionProbeBaker : IDisposable
     private readonly ReflectionProbeConfig _config;
     private readonly IBLBaker _ibl;
     private readonly MainRenderer _mainRenderer;
+    private readonly SkyboxRenderer _skyboxRenderer;
 
     private readonly uint _fbo, _rbo;
     private readonly CullingSystem _noCulling = new();   // never enabled -> IsVisible() always true
@@ -43,12 +45,14 @@ public sealed class ReflectionProbeBaker : IDisposable
     public int  MaxReflectionLod => _ibl.MaxReflectionLod;
     public bool Baked => PrefilteredMap != 0;
 
-    public ReflectionProbeBaker(GL gl, ReflectionProbeConfig config, IBLBaker ibl, MainRenderer mainRenderer)
+    public ReflectionProbeBaker(GL gl, ReflectionProbeConfig config, IBLBaker ibl, MainRenderer mainRenderer,
+        SkyboxRenderer skyboxRenderer)
     {
         _gl = gl;
         _config = config;
         _ibl = ibl;
         _mainRenderer = mainRenderer;
+        _skyboxRenderer = skyboxRenderer;
         
         _fbo = gl.GenFramebuffer();
         _rbo = gl.GenRenderbuffer();
@@ -84,12 +88,15 @@ public sealed class ReflectionProbeBaker : IDisposable
         _gl.Enable(EnableCap.DepthTest);
 
         var views = FaceViews(Position);
+        var proj  = _probeCamera.GetProjectionMatrix();
 
         for (var i = 0; i < 6; i++)
         {
             _gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
                 (TextureTarget)((int)TextureTarget.TextureCubeMapPositiveX + i), env, 0);
             _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+            
+            _skyboxRenderer.Render(scene, views[i], proj);
 
             var stats = new FrameStats();
             _mainRenderer.Render(scene, 0f, ref stats, ssaoTexture: 0, ssaoActive: false, _noCulling,

@@ -164,7 +164,7 @@ public sealed class ReflectionProbeConfig : IJsonOnDeserialized
     [JsonPropertyName("enabled")]    public bool    Enabled    { get; set; } = true;
     [JsonPropertyName("position")]   public float[] Position   { get; set; } = [0f, 2f, -3f];
     [JsonPropertyName("resolution")] public uint    Resolution { get; set; } = 128;   // cubemap face size
-    [JsonPropertyName("intensity")]  public float   Intensity  { get; set; } = 1.0f;
+    [JsonPropertyName("intensity")]  public float   Intensity  { get; set; } = 0.3f;
     
     [JsonIgnore] public bool RebakeRequested { get; set; }
     [JsonIgnore] public bool Baked           { get; set; }

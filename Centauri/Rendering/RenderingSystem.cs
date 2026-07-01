@@ -77,10 +77,10 @@ public class RenderingSystem : IDisposable
         _context.Profiler = new GPUProfiler(gl);
         
         _mainRenderer   = new MainRenderer(gl, config, _ibl, _shadows, _instances);
-        _reflectionProbe = new ReflectionProbeBaker(gl, _config.ReflectionProbe, _ibl, _mainRenderer);
         _gridRenderer   = new GridRenderer(gl);
         _debugRenderer  = new DebugRenderer(gl, config);
         _skyboxRenderer = new SkyboxRenderer(gl);
+        _reflectionProbe = new ReflectionProbeBaker(gl, _config.ReflectionProbe, _ibl, _mainRenderer, _skyboxRenderer);
     }
     
     public void InitializeComponents(IWindow window, IInputContext input)
@@ -129,17 +129,18 @@ public class RenderingSystem : IDisposable
         _post.BeginScene();
         RenderCentralComponents(scene, deltaTime);
         
-        var activeSky = scene.Skyboxes.Active;
+        var activeSky   = scene.Skyboxes.Active;
+        var probeActive = _config.ReflectionProbe.Enabled && _reflectionProbe.Baked;
         var iblInputs = new IblResolveInputs(
             PrefilterMap:     activeSky?.PrefilteredMap ?? 0,
             BrdfLut:          _ibl.BrdfLut,
             MaxReflectionLod: _ibl.MaxReflectionLod,
             Intensity:        _config.IBLConfig.IblIntensity,
             HasIbl:           activeSky is { IblBaked: true },
-            ProbePrefilterMap:     _reflectionProbe.Baked ? _reflectionProbe.PrefilteredMap : 0,
+            ProbePrefilterMap:     probeActive ? _reflectionProbe.PrefilteredMap : 0,
             ProbeMaxReflectionLod: _reflectionProbe.MaxReflectionLod,
             ProbeIntensity:        _config.ReflectionProbe.Intensity,
-            HasProbe:              _reflectionProbe.Baked
+            HasProbe:              probeActive
             );
         
         using (_context.Profiler.Measure("Post"))
