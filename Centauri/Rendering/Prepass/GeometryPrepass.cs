@@ -24,8 +24,8 @@ public sealed class GeometryPrepass : IDisposable
     private readonly GLShader _shader;
     private readonly RenderTarget _target;
     
-    private readonly Dictionary<Model, List<InstanceData>> _groups = new();
-    private readonly Dictionary<Model, IReadOnlyList<Material?>> _materials = new();
+    private readonly ShaderBatcher _batcher = new();
+    private readonly List<InstanceData> _instanceData = new();
 
     public uint NormalTexture   => _target.ColorTextures[0];
     public uint MaterialTexture => _target.ColorTextures[1];
@@ -50,8 +50,8 @@ public sealed class GeometryPrepass : IDisposable
     {
         BeginPass(scene);
 
-        BuildBatches(scene, culling);
-        RenderBatches();
+        foreach (var batch in _batcher.GetBatches(scene))
+            RenderBatch(batch, culling);
         
         EndPass();
     }
@@ -76,41 +76,27 @@ public sealed class GeometryPrepass : IDisposable
         ShaderUniformBinder.UploadWind(_shader, _config.Wind);
     }
 
-    private void BuildBatches(Scene scene, CullingSystem culling)
+    private void RenderBatch(Batch batch, CullingSystem culling)
     {
-        foreach (var list in _groups.Values)
-            list.Clear();
-
-        foreach (var entity in scene.Entities)
+        _instanceData.Clear();
+        foreach (var entity in batch.Entities)
         {
-            if (!entity.Enabled || entity.Model is not { } model) continue;
-            if (!culling.IsVisible(entity)) continue;
+            if (!entity.Enabled || !culling.IsVisible(entity)) continue;
 
-            if (!_groups.TryGetValue(model, out var list))
-                _groups[model] = list = new List<InstanceData>();
-
-            _materials[model] = entity.Materials;
-            list.Add(new InstanceData(entity.Transform.WorldMatrix, entity.UvScale, entity.UvOffset));
+            _instanceData.Add(new InstanceData(entity.Transform.WorldMatrix, entity.UvScale, entity.UvOffset));
         }
-    }
+        
+        if (_instanceData.Count == 0) return;
+        _instances.Upload(_instanceData);
 
-    private void RenderBatches()
-    {
-        foreach (var (model, list) in _groups)
+        var meshes = batch.Model.Meshes;
+        for (var i = 0; i < meshes.Count; i++)
         {
-            if (list.Count == 0) continue;
+            SetMeshState(i < batch.Materials.Length ? batch.Materials[i] : null);
 
-            _instances.Upload(list);
-            var materials = _materials[model];
-
-            for (var i = 0; i < model.Meshes.Count; i++)
-            {
-                SetMeshState(i < materials.Count ? materials[i] : null);
-
-                var mesh = model.Meshes[i];
-                mesh.ConfigureInstancing(_instances.Handle);
-                mesh.DrawInstanced(list.Count);
-            }
+            var mesh = meshes[i];
+            mesh.ConfigureInstancing(_instances.Handle);
+            mesh.DrawInstanced(_instanceData.Count);
         }
     }
 

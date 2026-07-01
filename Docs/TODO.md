@@ -46,7 +46,5 @@
 
 ## Bug Fixes
 
-* [ ] SSR (overly reflective surfaces (increases with distance from camera) & noise)
-
 ---
 
