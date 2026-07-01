@@ -68,17 +68,18 @@ public sealed class PostProcessor : IDisposable
     public uint VelocityTexture => _taa.VelocityTexture;   // TAA motion vectors, for the debug view
 
     public void Composite(Camera camera, uint depthTex, uint normalTex, uint materialTex,
-        bool ssrAvailable, bool taaAvailable, in IblResolveInputs ibl)
+        bool ssrAvailable, bool taaAvailable, in IblResolveInputs ibl, uint ssaoTex, bool ssaoActive)
     {
         _hdr.Resolve();
-        
+
         var sceneColor = _hdr.ResolvedTexture;
-        
+
         var ssrActive = ssrAvailable && _config.SSR.Enabled;
         if (ssrActive)
             _ssr.Render(sceneColor, depthTex, normalTex, materialTex, camera,
                 ibl.PrefilterMap, ibl.BrdfLut, ibl.MaxReflectionLod, ibl.Intensity, ibl.HasIbl,
-                ibl.ProbePrefilterMap, ibl.ProbeMaxReflectionLod, ibl.ProbeIntensity, ibl.HasProbe);
+                ibl.ProbePrefilterMap, ibl.ProbeMaxReflectionLod, ibl.ProbeIntensity, ibl.HasProbe,
+                ssaoTex, ssaoActive);
         
         var taaActive = taaAvailable && _config.TAA.Enabled;
         var ssrInTonemap = ssrActive && !taaActive;

@@ -145,7 +145,8 @@ public class RenderingSystem : IDisposable
         
         using (_context.Profiler.Measure("Post"))
             _post.Composite(scene.Cameras.Active, _prepass.DepthTexture, _prepass.NormalTexture,
-                _prepass.MaterialTexture, _context.SsrActive, _context.TaaActive, in iblInputs);
+                _prepass.MaterialTexture, _context.SsrActive, _context.TaaActive, in iblInputs,
+                _ssao.AoTexture, _context.SsaoActive);
         
         RenderAfterPostComponents(scene, deltaTime);
     }

@@ -71,7 +71,8 @@ public sealed class SSRPass : IDisposable
 
     public void Render(uint sceneTex, uint depthTex, uint normalTex, uint materialTex, Camera camera,
         uint prefilterMap, uint brdfLut, float maxReflectionLod, float iblIntensity, bool hasIbl,
-        uint probeMap, float probeMaxReflectionLod, float probeIntensity, bool hasProbe)
+        uint probeMap, float probeMaxReflectionLod, float probeIntensity, bool hasProbe,
+        uint ssaoTex, bool ssaoActive)
     {
         var proj = camera.GetProjectionMatrix();
         Matrix4x4.Invert(proj, out var invProj);
@@ -138,7 +139,10 @@ public sealed class SSRPass : IDisposable
         _resolve.SetUniform("uProbeMaxReflectionLod", probeMaxReflectionLod);
         _resolve.SetUniform("uProbeIntensity",        probeIntensity);
         _resolve.SetUniform("uHasProbe",              hasProbe ? 1 : 0);
-        
+
+        _resolve.SetUniform("uSsaoMap",  7);
+        _resolve.SetUniform("uHasSSAO",  ssaoActive ? 1 : 0);
+
         Bind(TextureUnit.Texture0, _blurTarget.ColorTextures[0]);
         Bind(TextureUnit.Texture1, depthTex);
         Bind(TextureUnit.Texture2, normalTex);
@@ -146,8 +150,8 @@ public sealed class SSRPass : IDisposable
         BindCube(TextureUnit.Texture4, prefilterMap);
         Bind(TextureUnit.Texture5, brdfLut);
         BindCube(TextureUnit.Texture6, probeMap);
+        Bind(TextureUnit.Texture7, ssaoTex);
 
-        
         DrawFullscreen();
 
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);

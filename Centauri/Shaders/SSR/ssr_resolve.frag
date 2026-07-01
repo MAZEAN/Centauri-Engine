@@ -22,6 +22,11 @@ uniform float uProbeMaxReflectionLod;
 uniform float uProbeIntensity;
 uniform int   uHasProbe;
 
+// same screen-space AO the lit pass multiplies its ambient (incl. IBL specular) by. The
+// resolve must apply the SAME attenuation or it over-subtracts skyboxSpec in AO'd areas.
+uniform sampler2D uSsaoMap;
+uniform int       uHasSSAO;
+
 vec3 viewPos(vec2 uv)
 {
     float d   = texture(uDepth, uv).r;
@@ -80,7 +85,15 @@ void main()
     vec3 ssrSpec = ssr.rgb * W * fallbackIntensity;
 
     vec3 targetSpec = mix(fallbackSpec, ssrSpec, conf);
-    vec3 delta      = targetSpec - skyboxSpec;
+
+    // Match the lit pass's AO attenuation. The scene already holds skyboxSpec * ssao (the lit
+    // pass multiplies its whole ambient term by ssao); scaling the delta by the same ssao makes
+    //   final = skyboxSpec*ssao + (targetSpec - skyboxSpec)*ssao = targetSpec*ssao,
+    // i.e. an AO-attenuated reflection. Without this the delta subtracts the FULL skyboxSpec
+    // while the scene only holds the darkened one, over-subtracting to black in contact-AO
+    // areas (the voids around the cube's base and its reflection).
+    float ssao  = uHasSSAO == 1 ? texture(uSsaoMap, vUv).r : 1.0;
+    vec3  delta = (targetSpec - skyboxSpec) * ssao;
 
     FragColor = vec4(delta, 1.0);
 }
