@@ -90,6 +90,8 @@ public sealed class SSRPass : IDisposable
         _shader.SetUniform("uThickness",      _config.Thickness);
         _shader.SetUniform("uIntensity",      _config.Intensity);
         _shader.SetUniform("uRoughnessCutoff", _config.RoughnessCutoff);
+        _shader.SetUniform("uSilhouetteThreshold", _config.SilhouetteThreshold);
+        _shader.SetUniform("uTexel", new Vector2(1f / _target.Width, 1f / _target.Height));
 
         _shader.SetUniform("uScene",    0);
         _shader.SetUniform("uDepth",    1);

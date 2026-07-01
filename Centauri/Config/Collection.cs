@@ -217,6 +217,7 @@ public sealed class SSRConfig : IJsonOnDeserialized
     [JsonPropertyName("refineSteps")]     public int   RefineSteps     { get; set; } = 6;      // binary-search refinement
     [JsonPropertyName("roughnessCutoff")] public float RoughnessCutoff { get; set; } = 0.6f;   // fade SSR out above this
     [JsonPropertyName("halfResolution")]  public bool  HalfResolution  { get; set; } = false;  // trade reflection sharpness for speed (applied at startup/resize)
+    [JsonPropertyName("silhouetteThreshold")] public float SilhouetteThreshold { get; set; } = 0.1f;
 
     [JsonIgnore] public float AuthoredIntensity       { get; private set; }
     [JsonIgnore] public float AuthoredMaxDistance     { get; private set; }
@@ -224,6 +225,7 @@ public sealed class SSRConfig : IJsonOnDeserialized
     [JsonIgnore] public int   AuthoredMaxSteps        { get; private set; }
     [JsonIgnore] public int   AuthoredRefineSteps     { get; private set; }
     [JsonIgnore] public float AuthoredRoughnessCutoff { get; private set; }
+    [JsonIgnore] public float AuthoredSilhouetteThreshold { get; private set; }
 
     public SSRConfig() => OnDeserialized();
 
@@ -235,6 +237,7 @@ public sealed class SSRConfig : IJsonOnDeserialized
         AuthoredMaxSteps        = MaxSteps;
         AuthoredRefineSteps     = RefineSteps;
         AuthoredRoughnessCutoff = RoughnessCutoff;
+        AuthoredSilhouetteThreshold = SilhouetteThreshold;
     }
 }
 

@@ -24,6 +24,8 @@ uniform int   uRefineSteps;
 uniform float uThickness;
 uniform float uIntensity;
 uniform float uRoughnessCutoff;
+uniform float uSilhouetteThreshold;   // relative depth-jump ratio that flags a silhouette edge
+uniform vec2  uTexel;                 // 1 / this target's resolution
 
 // reconstruct view-space position from stored depth (matches ssao.frag / CascadeBuilder)
 vec3 viewPos(vec2 uv)
@@ -40,6 +42,20 @@ float rayViewZ(float invWStart, float invWEnd, float s)
 {
     return -1.0 / mix(invWStart, invWEnd, s);   // w = -viewZ for the engine projection
 }
+
+float silhouetteConfidence(vec2 uv, float hitViewZ)
+{
+    float refDepth = max(abs(hitViewZ), 1e-3);
+
+    float maxRelDiff = 0.0;
+    maxRelDiff = max(maxRelDiff, abs(viewPos(uv + vec2( uTexel.x, 0.0)).z - hitViewZ) / refDepth);
+    maxRelDiff = max(maxRelDiff, abs(viewPos(uv + vec2(-uTexel.x, 0.0)).z - hitViewZ) / refDepth);
+    maxRelDiff = max(maxRelDiff, abs(viewPos(uv + vec2(0.0,  uTexel.y)).z - hitViewZ) / refDepth);
+    maxRelDiff = max(maxRelDiff, abs(viewPos(uv + vec2(0.0, -uTexel.y)).z - hitViewZ) / refDepth);
+
+    return 1.0 - smoothstep(uSilhouetteThreshold * 0.5, uSilhouetteThreshold, maxRelDiff);
+}
+
 
 void main()
 {
@@ -60,7 +76,7 @@ void main()
     // clamp the ray so it never crosses in front of the camera (view z must stay negative)
     float rayLen = uMaxDistance;
     if (R.z > 0.0)
-    rayLen = min(rayLen, (-0.05 - P.z) / R.z);
+        rayLen = min(rayLen, (-0.05 - P.z) / R.z);
     if (rayLen <= 0.0) { FragColor = vec4(0.0); return; }
 
     vec3 Q = P + R * rayLen;                                // ray end, view space
@@ -128,17 +144,18 @@ void main()
 
     if (!hit) { FragColor = vec4(0.0); return; }
 
-    // ── confidence fades ──
-    // screen edges: reflected detail leaving the frame has no data, so feather it out
+    vec3 hitPos = viewPos(hitUv);
+    
     vec2  ef        = smoothstep(0.0, 0.15, hitUv) * (1.0 - smoothstep(0.85, 1.0, hitUv));
     float edgeFade  = ef.x * ef.y;
-    // roughness: ramp off toward the cutoff
+
     float roughFade = 1.0 - smoothstep(uRoughnessCutoff * 0.5, uRoughnessCutoff, roughness);
-    // distance: fade the far end of the ray where data is least reliable
-    float distFade  = 1.0 - clamp(length(viewPos(hitUv) - P) / uMaxDistance, 0.0, 1.0);
+
+    float distFade  = 1.0 - clamp(length(hitPos - P) / uMaxDistance, 0.0, 1.0);
+    float silFade   = silhouetteConfidence(hitUv, hitPos.z);
 
     vec3  reflColor  = texture(uScene, hitUv).rgb * uIntensity;
-    float confidence = edgeFade * roughFade * distFade;
+    float confidence = edgeFade * roughFade * distFade * silFade;
 
     FragColor = vec4(reflColor, confidence);   // rgb = reflected radiance, a = confidence
 }

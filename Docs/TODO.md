@@ -36,7 +36,7 @@
 * [ ] (auto) LOD system (Impostor)
 * [ ] auto-exposure 
 * [ ] volumetric fog
-* [ ] Better wind (hierarchy)
+* [ ] Better wind (hierarchy) & leaves (orientation)
 * [ ] Remove sun from skybox
 * [ ] Skybox transitions & variantions
 * [ ] Keybindings

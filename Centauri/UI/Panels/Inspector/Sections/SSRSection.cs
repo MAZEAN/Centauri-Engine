@@ -33,5 +33,7 @@ public sealed class SSRSection : ISection
             1f, 0f, 16f, "%.0f", conf.AuthoredRefineSteps);
         Widgets.DragRow("Roughness Cutoff", conf.RoughnessCutoff, v => conf.RoughnessCutoff = v,
             0.01f, 0f, 1f, "%.2f", conf.AuthoredRoughnessCutoff);
+        Widgets.DragRow("Silhouette Threshold", conf.SilhouetteThreshold, v => conf.SilhouetteThreshold = v,
+            0.01f, 0.01f, 1f, "%.2f", conf.AuthoredSilhouetteThreshold);
     }
 }
