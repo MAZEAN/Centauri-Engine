@@ -37,6 +37,7 @@ public class PropertiesPanel
             new BloomSection(config),
             new ColorGradingSection(config.ColorGrading),
             new IBLSection(config),
+            new ReflectionProbeSection(config),
             new ViewportSection(config)
         ];
     }

@@ -4,11 +4,11 @@ using Silk.NET.OpenGL;
 using Silk.NET.Maths;
 using System.Numerics;
 
-using Centauri.Config;
-using Centauri.World;
-using Centauri.Rendering.IBL;
-using Centauri.Rendering.Culling;
-using Centauri.Utils.Misc;
+using Config;
+using World;
+using IBL;
+using Culling;
+using Utils.Misc;
 
 // Captures a single, static, global reflection probe: renders the real scene from a fixed
 // world position into a cubemap (6 faces, no per-face culling since this is a one-time bake,
@@ -21,10 +21,12 @@ using Centauri.Utils.Misc;
 // when looking straight up/down), so this renders via MainRenderer's explicit view-matrix
 // overload instead of driving a Camera through the scene's normal orbit/look controls.
 //
-// Known limitations of this v1 scope: baked once (not re-bakeable at runtime), single global
-// probe (no placement/volumes/blending), and captured using whatever shadow-cascade data the
-// main camera produced this frame — cascades are fit to the main view, not the probe, so
-// shadows in directions the main camera isn't currently facing may be stale or absent.
+// Known limitations of this v1 scope: baked automatically once at load, plus on-demand via
+// the inspector's Rebake button — no periodic/automatic re-bake, so moving objects only show
+// up in the reflection after a manual rebake. Single global probe (no placement/volumes/
+// blending). And captured using whatever shadow-cascade data the main camera produced this
+// frame — cascades are fit to the main view, not the probe, so shadows in directions the main
+// camera isn't currently facing may be stale or absent.
 public sealed class ReflectionProbeBaker : IDisposable
 {
     private readonly GL _gl;
@@ -36,7 +38,7 @@ public sealed class ReflectionProbeBaker : IDisposable
     private readonly CullingSystem _noCulling = new();   // never enabled -> IsVisible() always true
     private readonly Camera _probeCamera;
 
-    public Vector3 Position { get; }
+    public Vector3 Position => new(_config.Position[0], _config.Position[1], _config.Position[2]);
     public uint PrefilteredMap { get; private set; }
     public int  MaxReflectionLod => _ibl.MaxReflectionLod;
     public bool Baked => PrefilteredMap != 0;
@@ -47,9 +49,7 @@ public sealed class ReflectionProbeBaker : IDisposable
         _config = config;
         _ibl = ibl;
         _mainRenderer = mainRenderer;
-
-        Position = new Vector3(config.Position[0], config.Position[1], config.Position[2]);
-
+        
         _fbo = gl.GenFramebuffer();
         _rbo = gl.GenRenderbuffer();
 
@@ -99,6 +99,9 @@ public sealed class ReflectionProbeBaker : IDisposable
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         _gl.BindTexture(TextureTarget.TextureCubeMap, env);
         _gl.GenerateMipmap(TextureTarget.TextureCubeMap);
+        
+        if (PrefilteredMap != 0)
+            _gl.DeleteTexture(PrefilteredMap);
 
         PrefilteredMap = _ibl.PrefilterEnvironment(env, _config.Resolution);
 

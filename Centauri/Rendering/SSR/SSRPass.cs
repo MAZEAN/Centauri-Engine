@@ -70,7 +70,8 @@ public sealed class SSRPass : IDisposable
     }
 
     public void Render(uint sceneTex, uint depthTex, uint normalTex, uint materialTex, Camera camera,
-        uint prefilterMap, uint brdfLut, float maxReflectionLod, float iblIntensity, bool hasIbl)
+        uint prefilterMap, uint brdfLut, float maxReflectionLod, float iblIntensity, bool hasIbl,
+        uint probeMap, float probeMaxReflectionLod, float probeIntensity, bool hasProbe)
     {
         var proj = camera.GetProjectionMatrix();
         Matrix4x4.Invert(proj, out var invProj);
@@ -126,11 +127,17 @@ public sealed class SSRPass : IDisposable
         _resolve.SetUniform("uMaterial",     3);
         _resolve.SetUniform("uPrefilterMap", 4);
         _resolve.SetUniform("uBrdfLUT",      5);
+        _resolve.SetUniform("uProbeMap",     6);
+        
         _resolve.SetUniform("uInvProjection",    invProj);
         _resolve.SetUniform("uInvView",          invView);
         _resolve.SetUniform("uMaxReflectionLod", maxReflectionLod);
         _resolve.SetUniform("uIblIntensity",     iblIntensity);
         _resolve.SetUniform("uHasIBL",           hasIbl ? 1 : 0);
+        
+        _resolve.SetUniform("uProbeMaxReflectionLod", probeMaxReflectionLod);
+        _resolve.SetUniform("uProbeIntensity",        probeIntensity);
+        _resolve.SetUniform("uHasProbe",              hasProbe ? 1 : 0);
         
         Bind(TextureUnit.Texture0, _blurTarget.ColorTextures[0]);
         Bind(TextureUnit.Texture1, depthTex);
@@ -138,6 +145,8 @@ public sealed class SSRPass : IDisposable
         Bind(TextureUnit.Texture3, materialTex);
         BindCube(TextureUnit.Texture4, prefilterMap);
         Bind(TextureUnit.Texture5, brdfLut);
+        BindCube(TextureUnit.Texture6, probeMap);
+
         
         DrawFullscreen();
 

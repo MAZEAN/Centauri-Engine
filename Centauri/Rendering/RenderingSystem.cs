@@ -118,23 +118,29 @@ public class RenderingSystem : IDisposable
         
         RenderPrePostComponents(scene, deltaTime);
         
-        if (!_probeBaked)
+        if (!_probeBaked || _config.ReflectionProbe.RebakeRequested)
         {
             _reflectionProbe.Bake(scene);
             _probeBaked = true;
+            _config.ReflectionProbe.RebakeRequested = false;
+            _config.ReflectionProbe.Baked = _reflectionProbe.Baked;
         }
         
         _post.BeginScene();
         RenderCentralComponents(scene, deltaTime);
         
         var activeSky = scene.Skyboxes.Active;
-        var useProbe  = _reflectionProbe.Baked;
         var iblInputs = new IblResolveInputs(
-            PrefilterMap:     useProbe ? _reflectionProbe.PrefilteredMap : (activeSky?.PrefilteredMap ?? 0),
+            PrefilterMap:     activeSky?.PrefilteredMap ?? 0,
             BrdfLut:          _ibl.BrdfLut,
-            MaxReflectionLod: useProbe ? _reflectionProbe.MaxReflectionLod : _ibl.MaxReflectionLod,
-            Intensity:        useProbe ? _config.ReflectionProbe.Intensity : _config.IBLConfig.IblIntensity,
-            HasIbl:           useProbe || activeSky is { IblBaked: true });
+            MaxReflectionLod: _ibl.MaxReflectionLod,
+            Intensity:        _config.IBLConfig.IblIntensity,
+            HasIbl:           activeSky is { IblBaked: true },
+            ProbePrefilterMap:     _reflectionProbe.Baked ? _reflectionProbe.PrefilteredMap : 0,
+            ProbeMaxReflectionLod: _reflectionProbe.MaxReflectionLod,
+            ProbeIntensity:        _config.ReflectionProbe.Intensity,
+            HasProbe:              _reflectionProbe.Baked
+            );
         
         using (_context.Profiler.Measure("Post"))
             _post.Composite(scene.Cameras.Active, _prepass.DepthTexture, _prepass.NormalTexture,

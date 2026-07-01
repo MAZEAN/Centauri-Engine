@@ -14,7 +14,11 @@ public readonly record struct IblResolveInputs (
     uint  BrdfLut,
     float MaxReflectionLod,
     float Intensity,
-    bool  HasIbl
+    bool  HasIbl,
+    uint  ProbePrefilterMap,   // reflection probe — optional, better fallback TARGET only
+    float ProbeMaxReflectionLod,
+    float ProbeIntensity,
+    bool  HasProbe
 );
 
 public sealed class PostProcessor : IDisposable
@@ -73,7 +77,8 @@ public sealed class PostProcessor : IDisposable
         var ssrActive = ssrAvailable && _config.SSR.Enabled;
         if (ssrActive)
             _ssr.Render(sceneColor, depthTex, normalTex, materialTex, camera,
-                ibl.PrefilterMap, ibl.BrdfLut, ibl.MaxReflectionLod, ibl.Intensity, ibl.HasIbl);
+                ibl.PrefilterMap, ibl.BrdfLut, ibl.MaxReflectionLod, ibl.Intensity, ibl.HasIbl,
+                ibl.ProbePrefilterMap, ibl.ProbeMaxReflectionLod, ibl.ProbeIntensity, ibl.HasProbe);
         
         var taaActive = taaAvailable && _config.TAA.Enabled;
         var ssrInTonemap = ssrActive && !taaActive;
