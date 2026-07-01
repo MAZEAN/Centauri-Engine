@@ -69,12 +69,16 @@ public class MainRenderer : IDisposable
         _instanceBuffer = instances;
     }
 
-    public void Render(Scene scene, float deltaTime, ref FrameStats stats, uint ssaoTexture, bool ssaoActive, CullingSystem culling)    
+    public void Render(Scene scene, float deltaTime, ref FrameStats stats, uint ssaoTexture, bool ssaoActive, CullingSystem culling)
+        => Render(scene, deltaTime, ref stats, ssaoTexture, ssaoActive, culling, scene.Cameras.Active, scene.Cameras.Active.GetViewMatrix(), scene.Cameras.Active.Position);
+    
+    public void Render(Scene scene, float deltaTime, ref FrameStats stats, uint ssaoTexture, bool ssaoActive,
+        CullingSystem culling, Camera camera, Matrix4x4 view, Vector3 position) 
     {
         var context = new RenderContext(
-            scene.Cameras.Active,
-            scene.Cameras.Active.GetViewMatrix(),
-            scene.Cameras.Active.Position,
+            camera,
+            view,
+            position,
             DaylightIblScale(scene),
             ssaoActive,
             culling

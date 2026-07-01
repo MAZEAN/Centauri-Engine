@@ -11,6 +11,7 @@ public class AppConfig
     [JsonPropertyName("input")]   public InputConfig  Input { get; init; } = new();
     [JsonPropertyName("debug")]   public DebugConfig  Debug { get; init; } = new();
     [JsonPropertyName("ibl")]     public IBLConfig    IBLConfig { get; init; } = new();
+    [JsonPropertyName("reflectionProbe")] public ReflectionProbeConfig ReflectionProbe { get; init; } = new();
     [JsonPropertyName("shadows")] public ShadowConfig Shadows { get; init; } = new();
     [JsonPropertyName("grading")] public ColorGrading ColorGrading { get; init; } = new();
     [JsonPropertyName("ssao")]    public SSAOConfig   SSAO { get; init; } = new();

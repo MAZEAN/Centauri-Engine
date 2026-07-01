@@ -159,6 +159,23 @@ public class IBLConfig : IJsonOnDeserialized
     }
 }
 
+public sealed class ReflectionProbeConfig : IJsonOnDeserialized
+{
+    [JsonPropertyName("enabled")]    public bool    Enabled    { get; set; } = true;
+    [JsonPropertyName("position")]   public float[] Position   { get; set; } = [0f, 2f, -3f];
+    [JsonPropertyName("resolution")] public uint    Resolution { get; set; } = 128;   // cubemap face size
+    [JsonPropertyName("intensity")]  public float   Intensity  { get; set; } = 1.0f;
+
+    [JsonIgnore] public float AuthoredIntensity { get; private set; }
+
+    public ReflectionProbeConfig() => OnDeserialized();
+
+    public void OnDeserialized()
+    {
+        AuthoredIntensity = Intensity;
+    }
+}
+
 public class SSAOConfig : IJsonOnDeserialized
 {
     [JsonPropertyName("enabled")]     public bool  Enabled     { get; set; } = true;

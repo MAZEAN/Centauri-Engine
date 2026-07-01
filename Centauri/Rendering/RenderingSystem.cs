@@ -19,6 +19,7 @@ using DebugView;
 using Profiling;
 using SSAO;
 using Culling;
+using Probes;
 
 internal sealed class RenderContext
 {
@@ -36,12 +37,14 @@ public class RenderingSystem : IDisposable
 {
     private readonly GL            _gl;
     private readonly AppConfig     _config;
+    
     private readonly MainRenderer  _mainRenderer;
     private readonly GridRenderer  _gridRenderer;
     private readonly DebugRenderer _debugRenderer;
     private readonly SkyboxRenderer _skyboxRenderer;
     private readonly ShadowMapper _shadows;
     private readonly IBLBaker _ibl;
+    private readonly ReflectionProbeBaker _reflectionProbe;
     private readonly InstanceBuffer _instances;
     
     private UISystem _ui = null!;
@@ -52,6 +55,7 @@ public class RenderingSystem : IDisposable
     
     private readonly RenderContext _context = new();
     
+    private bool _probeBaked;
     private bool? _skyIsDay;
     
     private float _fpsTimer;
@@ -73,6 +77,7 @@ public class RenderingSystem : IDisposable
         _context.Profiler = new GPUProfiler(gl);
         
         _mainRenderer   = new MainRenderer(gl, config, _ibl, _shadows, _instances);
+        _reflectionProbe = new ReflectionProbeBaker(gl, _config.ReflectionProbe, _ibl, _mainRenderer);
         _gridRenderer   = new GridRenderer(gl);
         _debugRenderer  = new DebugRenderer(gl, config);
         _skyboxRenderer = new SkyboxRenderer(gl);
@@ -113,16 +118,23 @@ public class RenderingSystem : IDisposable
         
         RenderPrePostComponents(scene, deltaTime);
         
+        if (!_probeBaked)
+        {
+            _reflectionProbe.Bake(scene);
+            _probeBaked = true;
+        }
+        
         _post.BeginScene();
         RenderCentralComponents(scene, deltaTime);
         
         var activeSky = scene.Skyboxes.Active;
+        var useProbe  = _reflectionProbe.Baked;
         var iblInputs = new IblResolveInputs(
-            PrefilterMap:     activeSky?.PrefilteredMap ?? 0,
+            PrefilterMap:     useProbe ? _reflectionProbe.PrefilteredMap : (activeSky?.PrefilteredMap ?? 0),
             BrdfLut:          _ibl.BrdfLut,
-            MaxReflectionLod: _ibl.MaxReflectionLod,
-            Intensity:        _config.IBLConfig.IblIntensity,
-            HasIbl:           activeSky is { IblBaked: true });
+            MaxReflectionLod: useProbe ? _reflectionProbe.MaxReflectionLod : _ibl.MaxReflectionLod,
+            Intensity:        useProbe ? _config.ReflectionProbe.Intensity : _config.IBLConfig.IblIntensity,
+            HasIbl:           useProbe || activeSky is { IblBaked: true });
         
         using (_context.Profiler.Measure("Post"))
             _post.Composite(scene.Cameras.Active, _prepass.DepthTexture, _prepass.NormalTexture,
@@ -259,6 +271,7 @@ public class RenderingSystem : IDisposable
         _ssao.Dispose();
         _bufferDebug.Dispose();
         _ibl.Dispose();
+        _reflectionProbe.Dispose();
         _shadows.Dispose();
         _context.Profiler.Dispose();
         _instances.Dispose();

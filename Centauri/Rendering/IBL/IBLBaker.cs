@@ -69,34 +69,8 @@ public sealed class IBLBaker : IDisposable
             _gl.BindTexture(TextureTarget.TextureCubeMap, env);
             _gl.GenerateMipmap(TextureTarget.TextureCubeMap);
     
-            // 2) irradiance
-            var irr = CreateCubemap(_config.IrradianceSize, mips: false);
-            _irradiance.Use();
-            _irradiance.SetUniform("uProjection", _proj);
-            _irradiance.SetUniform("uEnv", 0);
-            _irradiance.SetUniform("uMaxRadiance", _config.MaxRadiance); 
-        
-            _gl.ActiveTexture(TextureUnit.Texture0);
-            _gl.BindTexture(TextureTarget.TextureCubeMap, env);
-            RenderToCube(irr, _config.IrradianceSize, 0, _irradiance);
-    
-            // 3) prefilter (one render per mip / roughness)
-            var pre = CreateCubemap(_config.PrefilterSize, mips: true);
-            _prefilter.Use();
-            _prefilter.SetUniform("uProjection", _proj);
-            _prefilter.SetUniform("uEnv", 0);
-            _prefilter.SetUniform("uResolution", _config.EnvSize);
-            _prefilter.SetUniform("uMaxRadiance", _config.MaxRadiance);
-        
-            _gl.ActiveTexture(TextureUnit.Texture0);
-            _gl.BindTexture(TextureTarget.TextureCubeMap, env);
-        
-            for (var mip = 0; mip < _config.PrefilterMips; mip++)
-            {
-                var size = (uint)(_config.PrefilterSize * MathF.Pow(0.5f, mip));
-                _prefilter.SetUniform("uRoughness", mip / (float)(_config.PrefilterMips - 1));
-                RenderToCube(pre, size, mip, _prefilter);
-            }
+            var irr = ConvolveIrradiance(env);
+            var pre = PrefilterEnvironment(env, _config.EnvSize);
     
             _gl.DeleteTexture(env);
             _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
@@ -110,6 +84,43 @@ public sealed class IBLBaker : IDisposable
         {
             _gl.Enable(EnableCap.CullFace);
         }
+    }
+    
+    public uint ConvolveIrradiance(uint env)
+    {
+        var irr = CreateCubemap(_config.IrradianceSize, mips: false);
+        _irradiance.Use();
+        _irradiance.SetUniform("uProjection", _proj);
+        _irradiance.SetUniform("uEnv", 0);
+        _irradiance.SetUniform("uMaxRadiance", _config.MaxRadiance);
+
+        _gl.ActiveTexture(TextureUnit.Texture0);
+        _gl.BindTexture(TextureTarget.TextureCubeMap, env);
+        RenderToCube(irr, _config.IrradianceSize, 0, _irradiance);
+
+        return irr;
+    }
+    
+    public uint PrefilterEnvironment(uint env, uint envSize)
+    {
+        var pre = CreateCubemap(_config.PrefilterSize, mips: true);
+        _prefilter.Use();
+        _prefilter.SetUniform("uProjection", _proj);
+        _prefilter.SetUniform("uEnv", 0);
+        _prefilter.SetUniform("uResolution", envSize);
+        _prefilter.SetUniform("uMaxRadiance", _config.MaxRadiance);
+
+        _gl.ActiveTexture(TextureUnit.Texture0);
+        _gl.BindTexture(TextureTarget.TextureCubeMap, env);
+
+        for (var mip = 0; mip < _config.PrefilterMips; mip++)
+        {
+            var size = (uint)(_config.PrefilterSize * MathF.Pow(0.5f, mip));
+            _prefilter.SetUniform("uRoughness", mip / (float)(_config.PrefilterMips - 1));
+            RenderToCube(pre, size, mip, _prefilter);
+        }
+
+        return pre;
     }
 
     private void RenderToCube(uint cubemap, uint size, int mip, GLShader shader)
@@ -167,7 +178,7 @@ public sealed class IBLBaker : IDisposable
         return lut;
     }
 
-    private unsafe uint CreateCubemap(uint size, bool mips)
+    public unsafe uint CreateCubemap(uint size, bool mips)
     {
         var id = _gl.GenTexture();
         _gl.BindTexture(TextureTarget.TextureCubeMap, id);
