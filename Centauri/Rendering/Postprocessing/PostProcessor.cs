@@ -31,7 +31,8 @@ public readonly record struct PlanarResolveInputs (
     bool  Has,
     float Height,
     float Intensity,
-    float Distortion
+    float Distortion,
+    float Blur
 );
 
 public sealed class PostProcessor : IDisposable
@@ -95,7 +96,7 @@ public sealed class PostProcessor : IDisposable
                 ibl.ProbePrefilterMap, ibl.ProbeMaxReflectionLod, ibl.ProbeIntensity, ibl.HasProbe,
                 ibl.ProbePosition, ibl.ProbeBoxMin, ibl.ProbeBoxMax, ibl.ProbeBoxFalloff,
                 ssaoTex, ssaoActive,
-                planar.Map, planar.Has, planar.Height, planar.Intensity, planar.Distortion);
+                planar.Map, planar.Has, planar.Height, planar.Intensity, planar.Distortion, planar.Blur);
         
         var taaActive = taaAvailable && _config.TAA.Enabled;
         var ssrInTonemap = ssrActive && !taaActive;

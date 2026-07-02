@@ -24,19 +24,17 @@ public sealed class PlanarReflectionSection : ISection
         var bound = !string.IsNullOrEmpty(conf.ReflectorEntity);
         if (bound)
             ImGui.TextDisabled($"Plane bound to \"{conf.ReflectorEntity}\" (tracks its top).");
-
-        // The reflector's world-space Y. When bound to an entity the plane tracks that entity's
-        // top and this value is only the fallback; otherwise it must match the floor's top
-        // surface, or the reflection sits at the wrong height / the up-facing mask misses it.
+        
         Widgets.DragRow(bound ? "Plane Height (fallback)" : "Plane Height",
             conf.PlaneHeight, v => conf.PlaneHeight = v,
             0.05f, -100f, 100f, "%.2f", -1.5f);
 
         Widgets.DragRow("Intensity", conf.Intensity, v => conf.Intensity = v,
             0.01f, 0f, 4f, "%.2f", 1f);
-
-        // Ripple offset driven by the surface normal — 0 is a perfect mirror; raise it once the
-        // water surface writes a perturbed (wave) normal to fake waves.
+        
+        Widgets.DragRow("Blur", conf.Blur, v => conf.Blur = v,
+            0.05f, 0f, 8f, "%.2f", 3f);
+        
         Widgets.DragRow("Distortion", conf.Distortion, v => conf.Distortion = v,
             0.001f, 0f, 0.2f, "%.3f", 0f);
 

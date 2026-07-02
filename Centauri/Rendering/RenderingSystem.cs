@@ -163,7 +163,8 @@ public class RenderingSystem : IDisposable
             Has:        planarCfg.Enabled,
             Height:     _planar.PlaneHeight,
             Intensity:  _planar.Intensity,
-            Distortion: _planar.Distortion
+            Distortion: _planar.Distortion,
+            Blur:       _planar.Blur
         );
         
         using (_context.Profiler.Measure("Post"))

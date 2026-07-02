@@ -74,7 +74,8 @@ public sealed class SSRPass : IDisposable
         uint probeMap, float probeMaxReflectionLod, float probeIntensity, bool hasProbe,
         Vector3 probePosition, Vector3 probeBoxMin, Vector3 probeBoxMax, float probeBoxFalloff,
         uint ssaoTex, bool ssaoActive,
-        uint planarMap, bool hasPlanar, float planarHeight, float planarIntensity, float planarDistortion)
+        uint planarMap, bool hasPlanar, float planarHeight, float planarIntensity, float planarDistortion,
+        float planarBlur)
     {
         var proj = camera.GetProjectionMatrix();
         Matrix4x4.Invert(proj, out var invProj);
@@ -96,6 +97,10 @@ public sealed class SSRPass : IDisposable
         _shader.SetUniform("uRoughnessCutoff", _config.RoughnessCutoff);
         _shader.SetUniform("uSilhouetteThreshold", _config.SilhouetteThreshold);
         _shader.SetUniform("uTexel", new Vector2(1f / _target.Width, 1f / _target.Height));
+        
+        _shader.SetUniform("uInvView",      invView);
+        _shader.SetUniform("uHasPlanar",    hasPlanar ? 1 : 0);
+        _shader.SetUniform("uPlanarHeight", planarHeight);
 
         _shader.SetUniform("uScene",    0);
         _shader.SetUniform("uDepth",    1);
@@ -154,6 +159,7 @@ public sealed class SSRPass : IDisposable
         _resolve.SetUniform("uPlanarHeight",     planarHeight);
         _resolve.SetUniform("uPlanarIntensity",  planarIntensity);
         _resolve.SetUniform("uPlanarDistortion", planarDistortion);
+        _resolve.SetUniform("uPlanarBlur",       planarBlur);
 
         Bind(TextureUnit.Texture0, _blurTarget.ColorTextures[0]);
         Bind(TextureUnit.Texture1, depthTex);
@@ -164,7 +170,6 @@ public sealed class SSRPass : IDisposable
         BindCube(TextureUnit.Texture6, probeMap);
         Bind(TextureUnit.Texture7, ssaoTex);
         Bind(TextureUnit.Texture8, planarMap);
-
 
         DrawFullscreen();
 

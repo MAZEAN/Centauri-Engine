@@ -37,9 +37,10 @@ public sealed class PlanarReflectionPass : IDisposable
 
     public uint  ReflectionTexture => _target.ColorTextures[0];
     public bool  Enabled     => _config.Enabled;
-    public float PlaneHeight => _resolvedHeight;   // resolved in Render(): reflector entity's top if bound, else config
+    public float PlaneHeight => _resolvedHeight;
     public float Intensity   => _config.Intensity;
     public float Distortion  => _config.Distortion;
+    public float Blur        => _config.Blur;
 
     public PlanarReflectionPass(GL gl, PlanarReflectionConfig config, MainRenderer main,
         SkyboxRenderer skybox, uint width, uint height, uint samples)
@@ -146,6 +147,11 @@ public sealed class PlanarReflectionPass : IDisposable
             RenderbufferTarget.Renderbuffer, _msaaDepth);
 
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        _gl.BindTexture(TextureTarget.Texture2D, _target.ColorTextures[0]);
+        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter,
+            (int)GLEnum.LinearMipmapLinear);
+        _gl.GenerateMipmap(TextureTarget.Texture2D);
+        _gl.BindTexture(TextureTarget.Texture2D, 0);
     }
 
     private void DestroyMsaa()

@@ -25,7 +25,7 @@
 * [ ] Water simulation (Sea of Thieves algorithm)
 * [ ] Foliage rendering
 
-### Enhancements
+## Enhancements
 
 * [x] Performance graphs
 * [x] Light editing
@@ -47,4 +47,11 @@
 ## Bug Fixes
 
 ---
+
+## Notes
+
+* The current design switches rather than combines.
+A more advanced setup uses planar as the floor's base and lets SSR add perspective-accurate contact reflections
+on top (mix(planar, ssr, ssrConfidence)) — better for objects standing in water.
+Worth doing when you add real water, alongside the distortion wave normals.
 

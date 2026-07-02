@@ -36,6 +36,7 @@ uniform int       uHasPlanar;
 uniform float     uPlanarHeight;
 uniform float     uPlanarIntensity;
 uniform float     uPlanarDistortion;
+uniform float     uPlanarBlur;
 
 vec3 viewPos(vec2 uv)
 {
@@ -116,7 +117,7 @@ void main()
         if (planarMask > 0.0)
         {
             vec2 duv        = Nworld.xz * uPlanarDistortion;   // 0 for a perfectly flat plane
-            vec3 planarSpec = texture(uPlanarMap, vUv + duv).rgb * W * uPlanarIntensity;
+            vec3 planarSpec = textureLod(uPlanarMap, vUv + duv, roughness * uPlanarBlur).rgb * W * uPlanarIntensity;
             targetSpec      = mix(targetSpec, planarSpec, planarMask);
         }
     }

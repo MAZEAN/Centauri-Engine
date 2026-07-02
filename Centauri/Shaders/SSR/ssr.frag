@@ -27,6 +27,10 @@ uniform float uRoughnessCutoff;
 uniform float uSilhouetteThreshold;   // relative depth-jump ratio that flags a silhouette edge
 uniform vec2  uTexel;                 // 1 / this target's resolution
 
+uniform mat4  uInvView;
+uniform int   uHasPlanar;
+uniform float uPlanarHeight;
+
 // reconstruct view-space position from stored depth (matches ssao.frag / CascadeBuilder)
 vec3 viewPos(vec2 uv)
 {
@@ -70,6 +74,16 @@ void main()
 
     vec3 P = viewPos(vUv);                                  // view-space position
     vec3 N = normalize(texture(uNormal, vUv).xyz * 2.0 - 1.0);
+
+    if (uHasPlanar == 1)
+    {
+        vec3  wPos = (uInvView * vec4(P, 1.0)).xyz;
+        vec3  wN   = normalize(mat3(uInvView) * N);
+        float hMask = 1.0 - smoothstep(0.15, 0.35, abs(wPos.y - uPlanarHeight));
+        float fMask = smoothstep(0.7, 0.95, wN.y);
+        if (hMask * fMask > 0.5) { FragColor = vec4(0.0); return; }
+    }
+
     vec3 V = normalize(P);                                  // camera→fragment (cam at origin)
     vec3 R = normalize(reflect(V, N));                      // reflection direction
 
