@@ -97,7 +97,7 @@ public class RenderingSystem : IDisposable
         _prepass = new GeometryPrepass(_gl, _config, (uint)framebufferSize.X, (uint)framebufferSize.Y, _instances);
         _ssao    = new SsaoPass(_gl, _config.SSAO, (uint)framebufferSize.X, (uint)framebufferSize.Y);
         _planar  = new PlanarReflectionPass(_gl, _config.PlanarReflection, _mainRenderer, _skyboxRenderer,
-            (uint)framebufferSize.X, (uint)framebufferSize.Y);
+            (uint)framebufferSize.X, (uint)framebufferSize.Y, (uint)_config.Window.Samples);
         _bufferDebug = new BufferDebugView(_gl);
     }
     

@@ -16,6 +16,7 @@ public sealed class RenderTarget : IDisposable
     private readonly GLEnum _filter;
 
     private uint _fbo;
+    public uint   Framebuffer   => _fbo;   // for MSAA blit-resolve into this target
 
     public uint[] ColorTextures { get; private set; } = [];
     public uint   DepthTexture  { get; private set; }

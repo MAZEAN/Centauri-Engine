@@ -27,11 +27,13 @@ public sealed class PlanarReflectionPass : IDisposable
     private readonly PlanarReflectionConfig _config;
     private readonly MainRenderer _main;
     private readonly SkyboxRenderer _skybox;
+    
     private readonly CullingSystem _noCulling = new();   // never enabled -> everything is visible in the mirror
-
     private readonly RenderTarget _target;
 
     private float _resolvedHeight;
+    private readonly uint _samples;
+    private uint _msaaFbo, _msaaColor, _msaaDepth;
 
     public uint  ReflectionTexture => _target.ColorTextures[0];
     public bool  Enabled     => _config.Enabled;
@@ -40,22 +42,27 @@ public sealed class PlanarReflectionPass : IDisposable
     public float Distortion  => _config.Distortion;
 
     public PlanarReflectionPass(GL gl, PlanarReflectionConfig config, MainRenderer main,
-        SkyboxRenderer skybox, uint width, uint height)
+        SkyboxRenderer skybox, uint width, uint height, uint samples)
     {
         _gl = gl;
         _config = config;
         _main = main;
         _skybox = skybox;
+        _samples = Math.Max(1u, samples);
 
         var div = _config.HalfResolution ? 2u : 1u;
         _target = new RenderTarget(gl, Math.Max(1u, width / div), Math.Max(1u, height / div),
-            [InternalFormat.Rgba16f], withDepth: true, filter: GLEnum.Linear);
+            [InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Linear);
+        AllocateMsaa();
     }
 
     public void Resize(uint width, uint height)
     {
         var div = _config.HalfResolution ? 2u : 1u;
         _target.Resize(Math.Max(1u, width / div), Math.Max(1u, height / div));
+        
+        DestroyMsaa();
+        AllocateMsaa();
     }
 
     public void Render(Scene scene, float deltaTime, ref FrameStats stats)
@@ -66,10 +73,7 @@ public sealed class PlanarReflectionPass : IDisposable
         var h = ResolvePlaneHeight(scene);
         _resolvedHeight = h;
 
-        // Reflect world space across the horizontal plane y = h, then view with the main
-        // camera: (x, y, z) -> (x, 2h - y, z). System.Numerics uses row vectors (v * M), so
-        // the reflected view is (reflect * mainView) and reflected geometry is what the mirror
-        // camera sees.
+        
         var reflect = new Matrix4x4(
             1f,    0f, 0f, 0f,
             0f,   -1f, 0f, 0f,
@@ -79,17 +83,15 @@ public sealed class PlanarReflectionPass : IDisposable
         var reflView = reflect * camera.GetViewMatrix();
         var reflPos  = new Vector3(camera.Position.X, 2f * h - camera.Position.Y, camera.Position.Z);
         var proj     = camera.GetProjectionMatrix();
-
-        // no culling: the main frustum's visibility set is wrong for the mirrored view, so draw
-        // everything (bounded cheaply by the half-res target).
+        
         _noCulling.Update(scene, camera, enabled: false, cellSize: 16f, oversizeFactor: 8f);
 
-        _target.Bind();
-        _target.Clear(0f, 0f, 0f, 1f);
+        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, _msaaFbo);
+        _gl.Viewport(0, 0, _target.Width, _target.Height);
+        _gl.ClearColor(0f, 0f, 0f, 1f);
+        _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
         _gl.Enable(EnableCap.DepthTest);
-
-        // sky first — fills the reflection wherever no geometry is hit (SkyboxRenderer disables
-        // face culling itself, so the mirrored winding is a non-issue here)
+        
         _skybox.Render(scene, reflView, proj);
         
         const float eps = 0.02f;
@@ -101,13 +103,15 @@ public sealed class PlanarReflectionPass : IDisposable
         _main.Render(scene, deltaTime, ref stats, ssaoTexture: 0, ssaoActive: false,
             _noCulling, camera, reflView, reflPos, clip);
         _gl.FrontFace(FrontFaceDirection.Ccw);
-
+        
+        _gl.BindFramebuffer(FramebufferTarget.ReadFramebuffer, _msaaFbo);
+        _gl.BindFramebuffer(FramebufferTarget.DrawFramebuffer, _target.Framebuffer);
+        _gl.BlitFramebuffer(0, 0, (int)_target.Width, (int)_target.Height,
+            0, 0, (int)_target.Width, (int)_target.Height,
+            ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
     }
-
-    // The reflector surface height. If ReflectorEntity names a scene entity, track the top of
-    // its world AABB (so the plane auto-matches the floor and follows it if it moves); otherwise
-    // fall back to the authored PlaneHeight. This also keeps the resolve's height mask exact.
+    
     private float ResolvePlaneHeight(Scene scene)
     {
         if (string.IsNullOrEmpty(_config.ReflectorEntity))
@@ -119,6 +123,41 @@ public sealed class PlanarReflectionPass : IDisposable
 
         return _config.PlaneHeight;   // named entity not found this frame
     }
+    
+    private void AllocateMsaa()
+    {
+        uint w = _target.Width, h = _target.Height;
 
-    public void Dispose() => _target.Dispose();
+        _msaaFbo = _gl.GenFramebuffer();
+        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, _msaaFbo);
+
+        _msaaColor = _gl.GenRenderbuffer();
+        _gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, _msaaColor);
+        _gl.RenderbufferStorageMultisample(RenderbufferTarget.Renderbuffer, _samples,
+            InternalFormat.Rgba16f, w, h);
+        _gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
+            RenderbufferTarget.Renderbuffer, _msaaColor);
+
+        _msaaDepth = _gl.GenRenderbuffer();
+        _gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, _msaaDepth);
+        _gl.RenderbufferStorageMultisample(RenderbufferTarget.Renderbuffer, _samples,
+            InternalFormat.DepthComponent24, w, h);
+        _gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment,
+            RenderbufferTarget.Renderbuffer, _msaaDepth);
+
+        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+    }
+
+    private void DestroyMsaa()
+    {
+        _gl.DeleteFramebuffer(_msaaFbo);
+        _gl.DeleteRenderbuffer(_msaaColor);
+        _gl.DeleteRenderbuffer(_msaaDepth);
+    }
+
+    public void Dispose()
+    {
+        _target.Dispose();
+        DestroyMsaa();
+    }
 }

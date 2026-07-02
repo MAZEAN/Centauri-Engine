@@ -61,7 +61,7 @@
     "planeHeight": -1.5,
     "intensity": 1.0,
     "distortion": 0.0,
-    "halfResolution": true
+    "halfResolution": false
   },
   "shadows": {
     "enabled": true,
