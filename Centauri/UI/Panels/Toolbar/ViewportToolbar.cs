@@ -23,8 +23,17 @@ public sealed class ViewportToolbar
 
     private readonly ImFontPtr _font;
     private readonly AppConfig _config;
-    
-    private static readonly ShadingMode[] Modes = Enum.GetValues<ShadingMode>();
+
+    private static readonly ShadingMode[] Modes      = Enum.GetValues<ShadingMode>();
+    private static readonly string[]      ModeLabels = Array.ConvertAll(Modes, m => m.ToString());
+
+    private static readonly ViewMode[] ViewModes      = Enum.GetValues<ViewMode>();
+    private static readonly string[]   ViewModeLabels = Array.ConvertAll(ViewModes, m => m.ToString());
+
+    // Depends only on _font (fixed for the toolbar's lifetime), so it's computed once on first
+    // use rather than every frame — Enum.GetValues() + N ToString()/CalcTextSize() calls used
+    // to run per frame just to find a width that never actually changes.
+    private float? _maxModeWidth;
 
     public ViewportToolbar(ImFontPtr font, AppConfig config)
     {
@@ -66,7 +75,7 @@ public sealed class ViewportToolbar
             if (selected) 
                 ImGui.PushStyleColor(ImGuiCol.Button, ColorPalette.Accent);
 
-            if (ImGui.Button(Modes[i].ToString()))
+            if (ImGui.Button(ModeLabels[i]))
                 _config.Debug.Shading = Modes[i];
 
             if (selected) 
@@ -83,7 +92,7 @@ public sealed class ViewportToolbar
 
         var mode  = _config.Input.Mode;
         var color = mode == ViewMode.Fly ? ColorPalette.Amber : ColorPalette.Green;
-        var label = mode.ToString();
+        var label = ViewModeLabels[(int)mode];
 
         ImGui.TextColored(color, label);
 
@@ -96,12 +105,15 @@ public sealed class ViewportToolbar
         }
     }
 
-    private static float MaxModeWidth()
+    private float MaxModeWidth()
     {
+        if (_maxModeWidth is { } cached) return cached;
+
         var w = 0f;
-        foreach (var m in Enum.GetValues<ViewMode>())
-            w = MathF.Max(w, ImGui.CalcTextSize(m.ToString()).X);
-        
+        foreach (var label in ViewModeLabels)
+            w = MathF.Max(w, ImGui.CalcTextSize(label).X);
+
+        _maxModeWidth = w;
         return w;
     }
 

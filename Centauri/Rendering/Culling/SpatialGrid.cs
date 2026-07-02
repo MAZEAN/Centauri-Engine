@@ -130,7 +130,7 @@ public sealed class SpatialGrid
                 }
                 
                 foreach (var e in cell)
-                    if (!results.Contains(e) && frustum.IsVisibleAABB(e.GetWorldBounds()))
+                    if (frustum.IsVisibleAABB(e.GetWorldBounds()))
                         results.Add(e);
             }
     }

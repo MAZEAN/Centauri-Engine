@@ -59,9 +59,8 @@ public class RenderingSystem : IDisposable
     
     private bool _probeBaked;
     private bool? _skyIsDay;
-    
-    private float _fpsTimer;
-    private int   _frameCount;
+
+    private readonly FrameTimeTracker _frameTime = new();
     
     public bool ImGuiWantsMouse    => _ui.WantsMouse;
     public bool ImGuiWantsKeyboard => _ui.WantsKeyboard;
@@ -113,7 +112,10 @@ public class RenderingSystem : IDisposable
     public void Update(float deltaTime)
     {
         _ui.Update(deltaTime);
-        UpdateFPSCounter(deltaTime);
+
+        _frameTime.Update(deltaTime);
+        _context.Stats.FPS       = _frameTime.FPS;
+        _context.Stats.FrameTime = _frameTime.FrameTime;
     }
 
     public void Render(Scene scene, float deltaTime)
@@ -167,9 +169,9 @@ public class RenderingSystem : IDisposable
             Blur:       _planar.Blur
         );
         
+        var gBuffer = new GBufferTextures(_prepass.DepthTexture, _prepass.NormalTexture, _prepass.MaterialTexture);
         using (_context.Profiler.Measure("Post"))
-            _post.Composite(scene.Cameras.Active, _prepass.DepthTexture, _prepass.NormalTexture,
-                _prepass.MaterialTexture, _context.SsrActive, _context.TaaActive, in iblInputs,
+            _post.Composite(scene.Cameras.Active, in gBuffer, _context.SsrActive, _context.TaaActive, in iblInputs,
                 _ssao.AoTexture, _context.SsaoActive, in planarInputs);
         
         RenderAfterPostComponents(scene, deltaTime);
@@ -266,21 +268,6 @@ public class RenderingSystem : IDisposable
         _context.Stats.GridRows     = grid.Rows;
         _context.Stats.GridOccupied = grid.OccupiedCells;
         _context.Stats.GridVisited  = grid.VisitedCells;
-    }
-    
-    private void UpdateFPSCounter(float deltaTime)
-    {
-        // FPS + frame time smoothed over 1 second
-        _fpsTimer   += deltaTime;
-        _frameCount += 1;
-
-        if (_fpsTimer >= 1.0f)
-        {
-            _context.Stats.FPS       = _frameCount / _fpsTimer;
-            _context.Stats.FrameTime = 1000f / _context.Stats.FPS;
-            _frameCount      = 0;
-            _fpsTimer        = 0f;
-        }
     }
     
     public void Resize(uint width, uint height)

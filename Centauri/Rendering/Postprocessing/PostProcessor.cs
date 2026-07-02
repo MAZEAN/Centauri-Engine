@@ -10,6 +10,13 @@ using World;
 using Reflections.SSR;
 using TAA;
 
+// The three prepass outputs every post-process pass reads from (depth + view-space normal + roughness/metallic).
+public readonly record struct GBufferTextures (
+    uint Depth,
+    uint Normal,
+    uint Material
+);
+
 public readonly record struct IblResolveInputs (
     uint  PrefilterMap,
     uint  BrdfLut,
@@ -81,7 +88,7 @@ public sealed class PostProcessor : IDisposable
     public Vector2 NextTaaJitter() => _taa.NextJitter(_width, _height);
     public uint VelocityTexture => _taa.VelocityTexture;   // TAA motion vectors, for the debug view
 
-    public void Composite(Camera camera, uint depthTex, uint normalTex, uint materialTex,
+    public void Composite(Camera camera, in GBufferTextures gBuffer,
         bool ssrAvailable, bool taaAvailable, in IblResolveInputs ibl, uint ssaoTex, bool ssaoActive,
         in PlanarResolveInputs planar)
     {
@@ -91,18 +98,13 @@ public sealed class PostProcessor : IDisposable
 
         var ssrActive = ssrAvailable && _config.SSR.Enabled;
         if (ssrActive)
-            _ssr.Render(sceneColor, depthTex, normalTex, materialTex, camera,
-                ibl.PrefilterMap, ibl.BrdfLut, ibl.MaxReflectionLod, ibl.Intensity, ibl.HasIbl,
-                ibl.ProbePrefilterMap, ibl.ProbeMaxReflectionLod, ibl.ProbeIntensity, ibl.HasProbe,
-                ibl.ProbePosition, ibl.ProbeBoxMin, ibl.ProbeBoxMax, ibl.ProbeBoxFalloff,
-                ssaoTex, ssaoActive,
-                planar.Map, planar.Has, planar.Height, planar.Intensity, planar.Distortion, planar.Blur);
-        
+            _ssr.Render(sceneColor, in gBuffer, camera, in ibl, ssaoTex, ssaoActive, in planar);
+
         var taaActive = taaAvailable && _config.TAA.Enabled;
         var ssrInTonemap = ssrActive && !taaActive;
         if (taaActive)
         {
-            _taa.Render(sceneColor, ssrActive ? _ssr.ReflectionTexture : 0, ssrActive, depthTex, camera);
+            _taa.Render(sceneColor, ssrActive ? _ssr.ReflectionTexture : 0, ssrActive, gBuffer.Depth, camera);
             sceneColor = _taa.OutputTexture;
         }
         

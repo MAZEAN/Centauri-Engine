@@ -8,6 +8,7 @@ using World;
 using Graphics.Resources;
 using Utils.Misc;
 using Targets;
+using Postprocessing;
 
 // Screen-space reflections: ray-marches the prepass depth buffer and samples the resolved
 // HDR scene to build a reflection term, weighted per-surface by the prepass material buffer
@@ -69,20 +70,28 @@ public sealed class SSRPass : IDisposable
         _resolveTarget.Resize(width / _resDivisor, height / _resDivisor);
     }
 
-    public void Render(uint sceneTex, uint depthTex, uint normalTex, uint materialTex, Camera camera,
-        uint prefilterMap, uint brdfLut, float maxReflectionLod, float iblIntensity, bool hasIbl,
-        uint probeMap, float probeMaxReflectionLod, float probeIntensity, bool hasProbe,
-        Vector3 probePosition, Vector3 probeBoxMin, Vector3 probeBoxMax, float probeBoxFalloff,
-        uint ssaoTex, bool ssaoActive,
-        uint planarMap, bool hasPlanar, float planarHeight, float planarIntensity, float planarDistortion,
-        float planarBlur)
+    public void Render(uint sceneTex, in GBufferTextures gBuffer, Camera camera,
+        in IblResolveInputs ibl, uint ssaoTex, bool ssaoActive, in PlanarResolveInputs planar)
     {
         var proj = camera.GetProjectionMatrix();
         Matrix4x4.Invert(proj, out var invProj);
         Matrix4x4.Invert(camera.GetViewMatrix(), out var invView);
 
         SetRenderState();
-        
+
+        RenderMarch(sceneTex, gBuffer, proj, invProj, invView, planar);
+        RenderBlur(gBuffer.Material);
+        RenderResolve(gBuffer, invProj, invView, ibl, ssaoTex, ssaoActive, planar);
+
+        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+
+        ResetRenderState();
+    }
+
+    // Ray-marches the depth buffer and samples the resolved scene to find each pixel's reflection hit.
+    private void RenderMarch(uint sceneTex, in GBufferTextures gBuffer, Matrix4x4 proj, Matrix4x4 invProj,
+        Matrix4x4 invView, in PlanarResolveInputs planar)
+    {
         _target.Bind();
         _target.Clear(0f, 0f, 0f, 0f);
 
@@ -97,37 +106,46 @@ public sealed class SSRPass : IDisposable
         _shader.SetUniform("uRoughnessCutoff", _config.RoughnessCutoff);
         _shader.SetUniform("uSilhouetteThreshold", _config.SilhouetteThreshold);
         _shader.SetUniform("uTexel", new Vector2(1f / _target.Width, 1f / _target.Height));
-        
+
         _shader.SetUniform("uInvView",      invView);
-        _shader.SetUniform("uHasPlanar",    hasPlanar ? 1 : 0);
-        _shader.SetUniform("uPlanarHeight", planarHeight);
+        _shader.SetUniform("uHasPlanar",    planar.Has ? 1 : 0);
+        _shader.SetUniform("uPlanarHeight", planar.Height);
 
         _shader.SetUniform("uScene",    0);
         _shader.SetUniform("uDepth",    1);
         _shader.SetUniform("uNormal",   2);
         _shader.SetUniform("uMaterial", 3);
-        
-        Bind(TextureUnit.Texture0, sceneTex);
-        Bind(TextureUnit.Texture1, depthTex);
-        Bind(TextureUnit.Texture2, normalTex);
-        Bind(TextureUnit.Texture3, materialTex);
-        DrawFullscreen();
 
+        Bind(TextureUnit.Texture0, sceneTex);
+        Bind(TextureUnit.Texture1, gBuffer.Depth);
+        Bind(TextureUnit.Texture2, gBuffer.Normal);
+        Bind(TextureUnit.Texture3, gBuffer.Material);
+        DrawFullscreen();
+    }
+
+    // Blurs the raw hit buffer, spread proportional to surface roughness.
+    private void RenderBlur(uint materialTex)
+    {
         _blurTarget.Bind();
         _blur.Use();
         _blur.SetUniform("uSsr",      0);
         _blur.SetUniform("uMaterial", 1);
         _blur.SetUniform("uTexel", new Vector2(1f / _blurTarget.Width, 1f / _blurTarget.Height));
         _blur.SetUniform("uRoughnessCutoff", _config.RoughnessCutoff);
-        
+
         Bind(TextureUnit.Texture0, _target.ColorTextures[0]);
         Bind(TextureUnit.Texture1, materialTex);
-        
+
         DrawFullscreen();
-        
+    }
+
+    // Blends the blurred SSR hits against the IBL/probe/planar fallbacks into the final reflection term.
+    private void RenderResolve(in GBufferTextures gBuffer, Matrix4x4 invProj, Matrix4x4 invView,
+        in IblResolveInputs ibl, uint ssaoTex, bool ssaoActive, in PlanarResolveInputs planar)
+    {
         _resolveTarget.Bind();
         _resolveTarget.Clear(0f, 0f, 0f, 0f);
-        
+
         _resolve.Use();
         _resolve.SetUniform("uSsr",          0);
         _resolve.SetUniform("uDepth",        1);
@@ -136,46 +154,42 @@ public sealed class SSRPass : IDisposable
         _resolve.SetUniform("uPrefilterMap", 4);
         _resolve.SetUniform("uBrdfLUT",      5);
         _resolve.SetUniform("uProbeMap",     6);
-        
+
         _resolve.SetUniform("uInvProjection",    invProj);
         _resolve.SetUniform("uInvView",          invView);
-        _resolve.SetUniform("uMaxReflectionLod", maxReflectionLod);
-        _resolve.SetUniform("uIblIntensity",     iblIntensity);
-        _resolve.SetUniform("uHasIBL",           hasIbl ? 1 : 0);
-        
-        _resolve.SetUniform("uProbeMaxReflectionLod", probeMaxReflectionLod);
-        _resolve.SetUniform("uProbeIntensity",        probeIntensity);
-        _resolve.SetUniform("uHasProbe",              hasProbe ? 1 : 0);
-        _resolve.SetUniform("uProbePosition",         probePosition);
-        _resolve.SetUniform("uProbeBoxMin",           probeBoxMin);
-        _resolve.SetUniform("uProbeBoxMax",           probeBoxMax);
-        _resolve.SetUniform("uProbeBoxFalloff",       probeBoxFalloff);
+        _resolve.SetUniform("uMaxReflectionLod", ibl.MaxReflectionLod);
+        _resolve.SetUniform("uIblIntensity",     ibl.Intensity);
+        _resolve.SetUniform("uHasIBL",           ibl.HasIbl ? 1 : 0);
+
+        _resolve.SetUniform("uProbeMaxReflectionLod", ibl.ProbeMaxReflectionLod);
+        _resolve.SetUniform("uProbeIntensity",        ibl.ProbeIntensity);
+        _resolve.SetUniform("uHasProbe",              ibl.HasProbe ? 1 : 0);
+        _resolve.SetUniform("uProbePosition",         ibl.ProbePosition);
+        _resolve.SetUniform("uProbeBoxMin",           ibl.ProbeBoxMin);
+        _resolve.SetUniform("uProbeBoxMax",           ibl.ProbeBoxMax);
+        _resolve.SetUniform("uProbeBoxFalloff",       ibl.ProbeBoxFalloff);
 
         _resolve.SetUniform("uSsaoMap",  7);
         _resolve.SetUniform("uHasSSAO",  ssaoActive ? 1 : 0);
-        
+
         _resolve.SetUniform("uPlanarMap",        8);
-        _resolve.SetUniform("uHasPlanar",        hasPlanar ? 1 : 0);
-        _resolve.SetUniform("uPlanarHeight",     planarHeight);
-        _resolve.SetUniform("uPlanarIntensity",  planarIntensity);
-        _resolve.SetUniform("uPlanarDistortion", planarDistortion);
-        _resolve.SetUniform("uPlanarBlur",       planarBlur);
+        _resolve.SetUniform("uHasPlanar",        planar.Has ? 1 : 0);
+        _resolve.SetUniform("uPlanarHeight",     planar.Height);
+        _resolve.SetUniform("uPlanarIntensity",  planar.Intensity);
+        _resolve.SetUniform("uPlanarDistortion", planar.Distortion);
+        _resolve.SetUniform("uPlanarBlur",       planar.Blur);
 
         Bind(TextureUnit.Texture0, _blurTarget.ColorTextures[0]);
-        Bind(TextureUnit.Texture1, depthTex);
-        Bind(TextureUnit.Texture2, normalTex);
-        Bind(TextureUnit.Texture3, materialTex);
-        BindCube(TextureUnit.Texture4, prefilterMap);
-        Bind(TextureUnit.Texture5, brdfLut);
-        BindCube(TextureUnit.Texture6, probeMap);
+        Bind(TextureUnit.Texture1, gBuffer.Depth);
+        Bind(TextureUnit.Texture2, gBuffer.Normal);
+        Bind(TextureUnit.Texture3, gBuffer.Material);
+        BindCube(TextureUnit.Texture4, ibl.PrefilterMap);
+        Bind(TextureUnit.Texture5, ibl.BrdfLut);
+        BindCube(TextureUnit.Texture6, ibl.ProbePrefilterMap);
         Bind(TextureUnit.Texture7, ssaoTex);
-        Bind(TextureUnit.Texture8, planarMap);
+        Bind(TextureUnit.Texture8, planar.Map);
 
         DrawFullscreen();
-
-        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-        
-        ResetRenderState();
     }
 
     private void Bind(TextureUnit unit, uint tex)

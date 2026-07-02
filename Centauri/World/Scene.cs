@@ -33,13 +33,27 @@ public class Scene
         Revision++;
     }
     
+    // Caches the last {type, result} pair keyed by Revision, since global-toggle components
+    // (e.g. DayNightCycle) get looked up by FindComponent every frame from multiple call sites
+    // but the scene's entity/component list only actually changes when Revision changes.
+    private Type?      _lastFindType;
+    private Component? _lastFindResult;
+    private int         _lastFindRevision = -1;
+
     // first component of type T across the scene, or null — handy for global toggles
     public T? FindComponent<T>() where T : Component
     {
+        if (_lastFindRevision == Revision && _lastFindType == typeof(T))
+            return (T?)_lastFindResult;
+
+        T? found = null;
         foreach (var e in _entities)
-            if (e.GetComponent<T>() is { } c)
-                return c;
-        return null;
+            if (e.GetComponent<T>() is { } c) { found = c; break; }
+
+        _lastFindType     = typeof(T);
+        _lastFindResult   = found;
+        _lastFindRevision = Revision;
+        return found;
     }
 
     public Entity? Pick(Ray ray)

@@ -17,6 +17,18 @@ using IBL;
 using Shadows;
 using Helper;
 
+public readonly record struct RenderRequest(
+    Scene Scene,
+    float DeltaTime,
+    uint SsaoTexture,
+    bool SsaoActive,
+    CullingSystem Culling,
+    Camera Camera,
+    Matrix4x4 View,
+    Vector3 Position,
+    Vector4 ClipPlane = default
+);
+
 public class MainRenderer : IDisposable
 {
     private readonly GL _gl;
@@ -70,31 +82,35 @@ public class MainRenderer : IDisposable
         _instanceBuffer = instances;
     }
 
-    public void Render(Scene scene, float deltaTime, ref FrameStats stats, uint ssaoTexture, bool ssaoActive, CullingSystem culling)
-        => Render(scene, deltaTime, ref stats, ssaoTexture, ssaoActive, culling, scene.Cameras.Active, scene.Cameras.Active.GetViewMatrix(), scene.Cameras.Active.Position);
-    
-    public void Render(Scene scene, float deltaTime, ref FrameStats stats, uint ssaoTexture, bool ssaoActive,
-        CullingSystem culling, Camera camera, Matrix4x4 view, Vector3 position, Vector4 clipPlane = default)
+    public void Render(Scene scene, float deltaTime, ref FrameStats stats,
+        uint ssaoTexture, bool ssaoActive, CullingSystem culling)
+    {
+        var camera = scene.Cameras.Active;
+        Render(new RenderRequest(scene, deltaTime, ssaoTexture, ssaoActive, culling,
+            camera, camera.GetViewMatrix(), camera.Position), ref stats);
+    }
+
+    public void Render(in RenderRequest request, ref FrameStats stats)
     {
         var context = new RenderContext(
-            camera,
-            view,
-            position,
-            DaylightIblScale(scene),
-            ssaoActive,
-            culling,
-            clipPlane
+            request.Camera,
+            request.View,
+            request.Position,
+            DaylightIblScale(request.Scene),
+            request.SsaoActive,
+            request.Culling,
+            request.ClipPlane
         );
-        BeginFrame(scene, deltaTime, ref stats, ssaoTexture, ssaoActive);
+        BeginFrame(request.Scene, request.DeltaTime, ref stats, request.SsaoTexture, request.SsaoActive);
 
-        var batches = _batcher.GetBatches(scene);
+        var batches = _batcher.GetBatches(request.Scene);
 
         stats.RenderableEntities = _batcher.RenderableEntities;
         stats.TwoSidedEntities   = _batcher.TwoSidedEntities;
 
         foreach (var batch in batches)
             DrawBatch(batch, context, ref stats);
-        
+
         ResetSurfaceRenderState();
     }
 

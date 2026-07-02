@@ -101,8 +101,8 @@ public sealed class PlanarReflectionPass : IDisposable
         // Mirroring flips triangle winding: front faces become back faces. Flip the winding
         // convention for the geometry pass so back-face culling keeps the correct (front) faces.
         _gl.FrontFace(FrontFaceDirection.CW);
-        _main.Render(scene, deltaTime, ref stats, ssaoTexture: 0, ssaoActive: false,
-            _noCulling, camera, reflView, reflPos, clip);
+        _main.Render(new RenderRequest(scene, deltaTime, SsaoTexture: 0, SsaoActive: false,
+            _noCulling, camera, reflView, reflPos, clip), ref stats);
         _gl.FrontFace(FrontFaceDirection.Ccw);
         
         _gl.BindFramebuffer(FramebufferTarget.ReadFramebuffer, _msaaFbo);

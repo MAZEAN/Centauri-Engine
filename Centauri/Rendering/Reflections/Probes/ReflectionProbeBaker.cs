@@ -99,8 +99,8 @@ public sealed class ReflectionProbeBaker : IDisposable
             _skyboxRenderer.Render(scene, views[i], proj);
 
             var stats = new FrameStats();
-            _mainRenderer.Render(scene, 0f, ref stats, ssaoTexture: 0, ssaoActive: false, _noCulling,
-                _probeCamera, views[i], Position);
+            _mainRenderer.Render(new RenderRequest(scene, DeltaTime: 0f, SsaoTexture: 0, SsaoActive: false,
+                _noCulling, _probeCamera, views[i], Position), ref stats);
         }
 
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
