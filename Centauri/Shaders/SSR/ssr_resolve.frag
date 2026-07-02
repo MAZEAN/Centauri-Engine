@@ -82,27 +82,22 @@ void main()
     float fallbackIntensity = uIblIntensity;
     if (uHasProbe == 1)
     {
-        vec3  outsideVec  = max(uProbeBoxMin - worldPos, worldPos - uProbeBoxMax);
-        float outside     = max(outsideVec.x, max(outsideVec.y, outsideVec.z));
-        float probeWeight = 1.0 - smoothstep(0.0, uProbeBoxFalloff, max(outside, 0.0));
+        vec3  invR = 1.0 / Rworld;
+        vec3  t1   = (uProbeBoxMax - worldPos) * invR;
+        vec3  t2   = (uProbeBoxMin - worldPos) * invR;
+        vec3  tmax = max(t1, t2);
+        float dist = max(min(tmax.x, min(tmax.y, tmax.z)), 0.0);
+        vec3  dir  = (worldPos + Rworld * dist) - uProbePosition;
 
-        if (probeWeight > 0.0)
-        {
-            vec3  invR = 1.0 / Rworld;
-            vec3  t1   = (uProbeBoxMax - worldPos) * invR;
-            vec3  t2   = (uProbeBoxMin - worldPos) * invR;
-            vec3  tmax = max(t1, t2);
-            float dist = max(min(tmax.x, min(tmax.y, tmax.z)), 0.0);
-            vec3  hit  = worldPos + Rworld * dist;
-            vec3  dir  = hit - uProbePosition;
+        // MODE A: raw probe content the floor samples (sharp mip)
+        FragColor = vec4(textureLod(uProbeMap, dir, 0.0).rgb, 1.0);
 
-            vec3 preP      = textureLod(uProbeMap, dir, roughness * uProbeMaxReflectionLod).rgb;
-            vec3 probeSpec = preP * W * uProbeIntensity;
-
-            fallbackSpec      = mix(skyboxSpec, probeSpec,       probeWeight);
-            fallbackIntensity = mix(uIblIntensity, uProbeIntensity, probeWeight);
-        }
+        // MODE B: sampling-direction elevation (comment out MODE A to use)
+        // vec3 d = normalize(dir);
+        // FragColor = vec4(step(abs(d.y), 0.12), max(d.y, 0.0), max(-d.y, 0.0), 1.0);
+        return;
     }
+    FragColor = vec4(0.0); return;
 
     vec3 ssrSpec = ssr.rgb * W * fallbackIntensity;
 

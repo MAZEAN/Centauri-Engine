@@ -30,7 +30,7 @@ void main()
     vec3 color = texture(uHdr, vUv).rgb;
 
     if (uHasSsr == 1)
-        color += texture(uSsr, vUv).rgb;
+        color = texture(uSsr, vUv).rgb;
     
     // ── add bloom in linear HDR space, before tonemapping ──
     if (uHasBloom == 1)
