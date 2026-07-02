@@ -82,22 +82,27 @@ void main()
     float fallbackIntensity = uIblIntensity;
     if (uHasProbe == 1)
     {
-        vec3  invR = 1.0 / Rworld;
-        vec3  t1   = (uProbeBoxMax - worldPos) * invR;
-        vec3  t2   = (uProbeBoxMin - worldPos) * invR;
-        vec3  tmax = max(t1, t2);
-        float dist = max(min(tmax.x, min(tmax.y, tmax.z)), 0.0);
-        vec3  dir  = (worldPos + Rworld * dist) - uProbePosition;
+        // Fragment gate: the probe is only authoritative for surfaces inside its box volume,
+        // fading out over uProbeBoxFalloff so its influence doesn't pop at the boundary.
+        vec3  outsideVec  = max(uProbeBoxMin - worldPos, worldPos - uProbeBoxMax);
+        float outside     = max(outsideVec.x, max(outsideVec.y, outsideVec.z));
+        float probeWeight = 1.0 - smoothstep(0.0, uProbeBoxFalloff, max(outside, 0.0));
 
-        // MODE A: raw probe content the floor samples (sharp mip)
-        FragColor = vec4(textureLod(uProbeMap, dir, 0.0).rgb, 1.0);
+        if (probeWeight > 0.0)
+        {
+            // Sample the probe with the true reflection direction (no parallax box-projection).
+            // The probe cubemap baked BOTH the sky and the scene objects from its capture point,
+            // so Rworld returns the sky where it points up and the objects where it points at the
+            // cluster -- exactly the occluded reflections SSR can't see. Box-projection only holds
+            // when the box proxies real enclosing geometry (an indoor room); on an open scene its
+            // top plane re-aims every upward reflection to a flat horizontal sample of the sky.
+            vec3 preP      = textureLod(uProbeMap, Rworld, roughness * uProbeMaxReflectionLod).rgb;
+            vec3 probeSpec = preP * W * uProbeIntensity;
 
-        // MODE B: sampling-direction elevation (comment out MODE A to use)
-        // vec3 d = normalize(dir);
-        // FragColor = vec4(step(abs(d.y), 0.12), max(d.y, 0.0), max(-d.y, 0.0), 1.0);
-        return;
+            fallbackSpec      = mix(skyboxSpec, probeSpec,       probeWeight);
+            fallbackIntensity = mix(uIblIntensity, uProbeIntensity, probeWeight);
+        }
     }
-    FragColor = vec4(0.0); return;
 
     vec3 ssrSpec = ssr.rgb * W * fallbackIntensity;
 
