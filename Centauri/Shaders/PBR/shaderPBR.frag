@@ -52,6 +52,7 @@ struct SpotLight {
 
 // ─── uniforms ─────────────────────────────────────────────────────────────────
 uniform vec3 uCameraPos;
+uniform vec4 uClipPlane;
 
 // Materials
 uniform sampler2D uAlbedoMap;    // slot 0 — base color
@@ -292,6 +293,8 @@ void ShowShadowCascadesView(vec3 color, vec4  albedoSample) {
 // ─── main ─────────────────────────────────────────────────────────────────────
 void main()
 {
+    if (dot(vec4(fFragPos, 1.0), uClipPlane) < 0.0) discard;
+    
     vec4  albedoSample = uHasAlbedo    == 1 ? texture(uAlbedoMap,    fUv) : uColor;
     float roughness    = uHasRoughness == 1 ? texture(uRoughnessMap, fUv).r : uRoughnessScalar;
     float metallic     = uHasMetallic  == 1 ? texture(uMetallicMap,  fUv).r : uMetallicScalar;

@@ -46,7 +46,8 @@ public class MainRenderer : IDisposable
         Vector3 CameraPosition,
         float IblScale,
         bool SsaoActive,
-        CullingSystem Culling
+        CullingSystem Culling,
+        Vector4 ClipPlane 
     );
 
     private GLShader? _activeShader;
@@ -73,7 +74,7 @@ public class MainRenderer : IDisposable
         => Render(scene, deltaTime, ref stats, ssaoTexture, ssaoActive, culling, scene.Cameras.Active, scene.Cameras.Active.GetViewMatrix(), scene.Cameras.Active.Position);
     
     public void Render(Scene scene, float deltaTime, ref FrameStats stats, uint ssaoTexture, bool ssaoActive,
-        CullingSystem culling, Camera camera, Matrix4x4 view, Vector3 position) 
+        CullingSystem culling, Camera camera, Matrix4x4 view, Vector3 position, Vector4 clipPlane = default)
     {
         var context = new RenderContext(
             camera,
@@ -81,7 +82,8 @@ public class MainRenderer : IDisposable
             position,
             DaylightIblScale(scene),
             ssaoActive,
-            culling
+            culling,
+            clipPlane
         );
         BeginFrame(scene, deltaTime, ref stats, ssaoTexture, ssaoActive);
 
@@ -222,6 +224,7 @@ public class MainRenderer : IDisposable
 
         shader.SetUniform("uView",      context.View);
         shader.SetUniform("uCameraPos", context.CameraPosition);
+        shader.SetUniform("uClipPlane", context.ClipPlane);
         _uniforms.UploadGlobals(shader, context.Camera, _iblActive, context.IblScale, context.SsaoActive);
 
         _activeShader = shader;

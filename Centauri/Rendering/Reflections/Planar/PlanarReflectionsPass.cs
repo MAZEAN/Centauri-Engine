@@ -91,12 +91,15 @@ public sealed class PlanarReflectionPass : IDisposable
         // sky first — fills the reflection wherever no geometry is hit (SkyboxRenderer disables
         // face culling itself, so the mirrored winding is a non-issue here)
         _skybox.Render(scene, reflView, proj);
+        
+        const float eps = 0.02f;
+        var clip = new Vector4(0f, 1f, 0f, eps - h);
 
         // Mirroring flips triangle winding: front faces become back faces. Flip the winding
         // convention for the geometry pass so back-face culling keeps the correct (front) faces.
         _gl.FrontFace(FrontFaceDirection.CW);
         _main.Render(scene, deltaTime, ref stats, ssaoTexture: 0, ssaoActive: false,
-            _noCulling, camera, reflView, reflPos);
+            _noCulling, camera, reflView, reflPos, clip);
         _gl.FrontFace(FrontFaceDirection.Ccw);
 
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
