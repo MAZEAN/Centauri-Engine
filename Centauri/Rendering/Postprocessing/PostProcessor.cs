@@ -1,6 +1,7 @@
 namespace Centauri.Rendering.Postprocessing;
 
 using Silk.NET.OpenGL;
+using System.Numerics;
 
 using Graphics.Resources;
 using Utils.Misc;
@@ -15,10 +16,14 @@ public readonly record struct IblResolveInputs (
     float MaxReflectionLod,
     float Intensity,
     bool  HasIbl,
-    uint  ProbePrefilterMap,   // reflection probe — optional, better fallback TARGET only
+    uint  ProbePrefilterMap,
     float ProbeMaxReflectionLod,
     float ProbeIntensity,
-    bool  HasProbe
+    bool  HasProbe,
+    Vector3 ProbePosition,   // capture point (cubemap sampling center)
+    Vector3 ProbeBoxMin,     // parallax box, world space
+    Vector3 ProbeBoxMax,
+    float ProbeBoxFalloff
 );
 
 public sealed class PostProcessor : IDisposable
@@ -64,7 +69,7 @@ public sealed class PostProcessor : IDisposable
 
     public void BeginScene() => _hdr.Bind();
     
-    public System.Numerics.Vector2 NextTaaJitter() => _taa.NextJitter(_width, _height);
+    public Vector2 NextTaaJitter() => _taa.NextJitter(_width, _height);
     public uint VelocityTexture => _taa.VelocityTexture;   // TAA motion vectors, for the debug view
 
     public void Composite(Camera camera, uint depthTex, uint normalTex, uint materialTex,
@@ -79,6 +84,7 @@ public sealed class PostProcessor : IDisposable
             _ssr.Render(sceneColor, depthTex, normalTex, materialTex, camera,
                 ibl.PrefilterMap, ibl.BrdfLut, ibl.MaxReflectionLod, ibl.Intensity, ibl.HasIbl,
                 ibl.ProbePrefilterMap, ibl.ProbeMaxReflectionLod, ibl.ProbeIntensity, ibl.HasProbe,
+                ibl.ProbePosition, ibl.ProbeBoxMin, ibl.ProbeBoxMax, ibl.ProbeBoxFalloff,
                 ssaoTex, ssaoActive);
         
         var taaActive = taaAvailable && _config.TAA.Enabled;

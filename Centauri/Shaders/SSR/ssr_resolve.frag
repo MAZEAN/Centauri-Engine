@@ -21,6 +21,10 @@ uniform samplerCube uProbeMap;
 uniform float uProbeMaxReflectionLod;
 uniform float uProbeIntensity;
 uniform int   uHasProbe;
+uniform vec3  uProbePosition;    // probe capture point (cubemap sampling center)
+uniform vec3  uProbeBoxMin;      // parallax box (world space)
+uniform vec3  uProbeBoxMax;
+uniform float uProbeBoxFalloff;
 
 // same screen-space AO the lit pass multiplies its ambient (incl. IBL specular) by. The
 // resolve must apply the SAME attenuation or it over-subtracts skyboxSpec in AO'd areas.
@@ -63,8 +67,9 @@ void main()
     vec2 brdf = texture(uBrdfLUT, vec2(NoV, roughness)).rg;
     vec3 W    = F * brdf.x + brdf.y;          // specular env-BRDF weight (split-sum)
 
-    vec3 Rview  = reflect(-V, N);
-    vec3 Rworld = normalize(mat3(uInvView) * Rview);
+    vec3 Rview   = reflect(-V, N);
+    vec3 Rworld  = normalize(mat3(uInvView) * Rview);
+    vec3 worldPos = (uInvView * vec4(P, 1.0)).xyz;
     
     vec3 skyboxSpec = vec3(0.0);
     if (uHasIBL == 1)
@@ -77,9 +82,26 @@ void main()
     float fallbackIntensity = uIblIntensity;
     if (uHasProbe == 1)
     {
-        vec3 preP = textureLod(uProbeMap, Rworld, roughness * uProbeMaxReflectionLod).rgb;
-        fallbackSpec      = preP * W * uProbeIntensity;
-        fallbackIntensity = uProbeIntensity;
+        vec3  outsideVec  = max(uProbeBoxMin - worldPos, worldPos - uProbeBoxMax);
+        float outside     = max(outsideVec.x, max(outsideVec.y, outsideVec.z));
+        float probeWeight = 1.0 - smoothstep(0.0, uProbeBoxFalloff, max(outside, 0.0));
+
+        if (probeWeight > 0.0)
+        {
+            vec3  invR = 1.0 / Rworld;
+            vec3  t1   = (uProbeBoxMax - worldPos) * invR;
+            vec3  t2   = (uProbeBoxMin - worldPos) * invR;
+            vec3  tmax = max(t1, t2);
+            float dist = max(min(tmax.x, min(tmax.y, tmax.z)), 0.0);
+            vec3  hit  = worldPos + Rworld * dist;
+            vec3  dir  = hit - uProbePosition;
+
+            vec3 preP      = textureLod(uProbeMap, dir, roughness * uProbeMaxReflectionLod).rgb;
+            vec3 probeSpec = preP * W * uProbeIntensity;
+
+            fallbackSpec      = mix(skyboxSpec, probeSpec,       probeWeight);
+            fallbackIntensity = mix(uIblIntensity, uProbeIntensity, probeWeight);
+        }
     }
 
     vec3 ssrSpec = ssr.rgb * W * fallbackIntensity;

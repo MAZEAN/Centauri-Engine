@@ -130,7 +130,10 @@ public class RenderingSystem : IDisposable
         RenderCentralComponents(scene, deltaTime);
         
         var activeSky   = scene.Skyboxes.Active;
-        var probeActive = _config.ReflectionProbe.Enabled && _reflectionProbe.Baked;
+        var probeCfg    = _config.ReflectionProbe;
+        var probeActive = probeCfg.Enabled && _reflectionProbe.Baked;
+        var boxCenter   = new System.Numerics.Vector3(probeCfg.BoxCenter[0], probeCfg.BoxCenter[1], probeCfg.BoxCenter[2]);
+        var boxHalf     = new System.Numerics.Vector3(probeCfg.BoxSize[0],   probeCfg.BoxSize[1],   probeCfg.BoxSize[2]);
         var iblInputs = new IblResolveInputs(
             PrefilterMap:     activeSky?.PrefilteredMap ?? 0,
             BrdfLut:          _ibl.BrdfLut,
@@ -139,8 +142,12 @@ public class RenderingSystem : IDisposable
             HasIbl:           activeSky is { IblBaked: true },
             ProbePrefilterMap:     probeActive ? _reflectionProbe.PrefilteredMap : 0,
             ProbeMaxReflectionLod: _reflectionProbe.MaxReflectionLod,
-            ProbeIntensity:        _config.ReflectionProbe.Intensity,
-            HasProbe:              probeActive
+            ProbeIntensity:        probeCfg.Intensity,
+            HasProbe:              probeActive,
+            ProbePosition:         _reflectionProbe.Position,
+            ProbeBoxMin:           boxCenter - boxHalf,
+            ProbeBoxMax:           boxCenter + boxHalf,
+            ProbeBoxFalloff:       MathF.Max(probeCfg.BoxFalloff, 1e-3f)
             );
         
         using (_context.Profiler.Measure("Post"))

@@ -72,6 +72,7 @@ public sealed class SSRPass : IDisposable
     public void Render(uint sceneTex, uint depthTex, uint normalTex, uint materialTex, Camera camera,
         uint prefilterMap, uint brdfLut, float maxReflectionLod, float iblIntensity, bool hasIbl,
         uint probeMap, float probeMaxReflectionLod, float probeIntensity, bool hasProbe,
+        Vector3 probePosition, Vector3 probeBoxMin, Vector3 probeBoxMax, float probeBoxFalloff,
         uint ssaoTex, bool ssaoActive)
     {
         var proj = camera.GetProjectionMatrix();
@@ -139,6 +140,10 @@ public sealed class SSRPass : IDisposable
         _resolve.SetUniform("uProbeMaxReflectionLod", probeMaxReflectionLod);
         _resolve.SetUniform("uProbeIntensity",        probeIntensity);
         _resolve.SetUniform("uHasProbe",              hasProbe ? 1 : 0);
+        _resolve.SetUniform("uProbePosition",         probePosition);
+        _resolve.SetUniform("uProbeBoxMin",           probeBoxMin);
+        _resolve.SetUniform("uProbeBoxMax",           probeBoxMax);
+        _resolve.SetUniform("uProbeBoxFalloff",       probeBoxFalloff);
 
         _resolve.SetUniform("uSsaoMap",  7);
         _resolve.SetUniform("uHasSSAO",  ssaoActive ? 1 : 0);
