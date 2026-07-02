@@ -31,9 +31,11 @@ public sealed class PlanarReflectionPass : IDisposable
 
     private readonly RenderTarget _target;
 
+    private float _resolvedHeight;
+
     public uint  ReflectionTexture => _target.ColorTextures[0];
     public bool  Enabled     => _config.Enabled;
-    public float PlaneHeight => _config.PlaneHeight;
+    public float PlaneHeight => _resolvedHeight;   // resolved in Render(): reflector entity's top if bound, else config
     public float Intensity   => _config.Intensity;
     public float Distortion  => _config.Distortion;
 
@@ -61,7 +63,8 @@ public sealed class PlanarReflectionPass : IDisposable
         if (!_config.Enabled) return;
 
         var camera = scene.Cameras.Active;
-        var h = _config.PlaneHeight;
+        var h = ResolvePlaneHeight(scene);
+        _resolvedHeight = h;
 
         // Reflect world space across the horizontal plane y = h, then view with the main
         // camera: (x, y, z) -> (x, 2h - y, z). System.Numerics uses row vectors (v * M), so
@@ -97,6 +100,21 @@ public sealed class PlanarReflectionPass : IDisposable
         _gl.FrontFace(FrontFaceDirection.Ccw);
 
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+    }
+
+    // The reflector surface height. If ReflectorEntity names a scene entity, track the top of
+    // its world AABB (so the plane auto-matches the floor and follows it if it moves); otherwise
+    // fall back to the authored PlaneHeight. This also keeps the resolve's height mask exact.
+    private float ResolvePlaneHeight(Scene scene)
+    {
+        if (string.IsNullOrEmpty(_config.ReflectorEntity))
+            return _config.PlaneHeight;
+
+        foreach (var entity in scene.Entities)
+            if (entity.Model is not null && entity.Name == _config.ReflectorEntity)
+                return entity.GetWorldBounds().Max.Y;
+
+        return _config.PlaneHeight;   // named entity not found this frame
     }
 
     public void Dispose() => _target.Dispose();

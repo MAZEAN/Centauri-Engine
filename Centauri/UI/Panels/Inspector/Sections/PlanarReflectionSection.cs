@@ -21,9 +21,15 @@ public sealed class PlanarReflectionSection : ISection
 
         Widgets.CheckRow("Enabled", conf.Enabled, v => conf.Enabled = v);
 
-        // The reflector's world-space Y — must match the floor's top surface, or the
-        // reflection sits at the wrong height / the up-facing mask misses it.
-        Widgets.DragRow("Plane Height", conf.PlaneHeight, v => conf.PlaneHeight = v,
+        var bound = !string.IsNullOrEmpty(conf.ReflectorEntity);
+        if (bound)
+            ImGui.TextDisabled($"Plane bound to \"{conf.ReflectorEntity}\" (tracks its top).");
+
+        // The reflector's world-space Y. When bound to an entity the plane tracks that entity's
+        // top and this value is only the fallback; otherwise it must match the floor's top
+        // surface, or the reflection sits at the wrong height / the up-facing mask misses it.
+        Widgets.DragRow(bound ? "Plane Height (fallback)" : "Plane Height",
+            conf.PlaneHeight, v => conf.PlaneHeight = v,
             0.05f, -100f, 100f, "%.2f", -1.5f);
 
         Widgets.DragRow("Intensity", conf.Intensity, v => conf.Intensity = v,
