@@ -19,7 +19,8 @@ using DebugView;
 using Profiling;
 using SSAO;
 using Culling;
-using Probes;
+using Reflections.Probes;
+using Reflections.Planar;
 
 internal sealed class RenderContext
 {
@@ -51,6 +52,7 @@ public class RenderingSystem : IDisposable
     private PostProcessor _post = null!;
     private GeometryPrepass _prepass = null!;
     private SsaoPass _ssao = null!;
+    private PlanarReflectionPass _planar = null!;
     private BufferDebugView _bufferDebug = null!;
     
     private readonly RenderContext _context = new();
@@ -94,6 +96,8 @@ public class RenderingSystem : IDisposable
         _ui   = new UISystem(_gl, _config, window, input);
         _prepass = new GeometryPrepass(_gl, _config, (uint)framebufferSize.X, (uint)framebufferSize.Y, _instances);
         _ssao    = new SsaoPass(_gl, _config.SSAO, (uint)framebufferSize.X, (uint)framebufferSize.Y);
+        _planar  = new PlanarReflectionPass(_gl, _config.PlanarReflection, _mainRenderer, _skyboxRenderer,
+            (uint)framebufferSize.X, (uint)framebufferSize.Y);
         _bufferDebug = new BufferDebugView(_gl);
     }
     
@@ -126,6 +130,9 @@ public class RenderingSystem : IDisposable
             _config.ReflectionProbe.Baked = _reflectionProbe.Baked;
         }
         
+        using (_context.Profiler.Measure("Planar"))
+            _planar.Render(scene, deltaTime, ref _context.Stats);
+        
         _post.BeginScene();
         RenderCentralComponents(scene, deltaTime);
         
@@ -150,10 +157,19 @@ public class RenderingSystem : IDisposable
             ProbeBoxFalloff:       MathF.Max(probeCfg.BoxFalloff, 1e-3f)
             );
         
+        var planarCfg    = _config.PlanarReflection;
+        var planarInputs = new PlanarResolveInputs(
+            Map:        planarCfg.Enabled ? _planar.ReflectionTexture : 0,
+            Has:        planarCfg.Enabled,
+            Height:     _planar.PlaneHeight,
+            Intensity:  _planar.Intensity,
+            Distortion: _planar.Distortion
+        );
+        
         using (_context.Profiler.Measure("Post"))
             _post.Composite(scene.Cameras.Active, _prepass.DepthTexture, _prepass.NormalTexture,
                 _prepass.MaterialTexture, _context.SsrActive, _context.TaaActive, in iblInputs,
-                _ssao.AoTexture, _context.SsaoActive);
+                _ssao.AoTexture, _context.SsaoActive, in planarInputs);
         
         RenderAfterPostComponents(scene, deltaTime);
     }

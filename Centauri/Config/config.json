@@ -47,13 +47,20 @@
     "brdfSize": 512
   },
   "reflectionProbe": {
-    "enabled": true,
+    "enabled": false,
     "position": [0, 2, -3],
     "resolution": 128,
     "intensity": 0.3,
     "boxCenter": [0, -1, -3],
     "boxSize": [20, 3, 20],
     "boxFalloff": 1.0
+  },
+  "planarReflection": {
+    "enabled": true,
+    "planeHeight": -1.5,
+    "intensity": 1.0,
+    "distortion": 0.0,
+    "halfResolution": true
   },
   "shadows": {
     "enabled": true,

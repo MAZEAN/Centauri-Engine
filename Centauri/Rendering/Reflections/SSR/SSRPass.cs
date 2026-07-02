@@ -1,4 +1,4 @@
-namespace Centauri.Rendering.SSR;
+namespace Centauri.Rendering.Reflections.SSR;
 
 using Silk.NET.OpenGL;
 using System.Numerics;
@@ -73,7 +73,8 @@ public sealed class SSRPass : IDisposable
         uint prefilterMap, uint brdfLut, float maxReflectionLod, float iblIntensity, bool hasIbl,
         uint probeMap, float probeMaxReflectionLod, float probeIntensity, bool hasProbe,
         Vector3 probePosition, Vector3 probeBoxMin, Vector3 probeBoxMax, float probeBoxFalloff,
-        uint ssaoTex, bool ssaoActive)
+        uint ssaoTex, bool ssaoActive,
+        uint planarMap, bool hasPlanar, float planarHeight, float planarIntensity, float planarDistortion)
     {
         var proj = camera.GetProjectionMatrix();
         Matrix4x4.Invert(proj, out var invProj);
@@ -147,6 +148,12 @@ public sealed class SSRPass : IDisposable
 
         _resolve.SetUniform("uSsaoMap",  7);
         _resolve.SetUniform("uHasSSAO",  ssaoActive ? 1 : 0);
+        
+        _resolve.SetUniform("uPlanarMap",        8);
+        _resolve.SetUniform("uHasPlanar",        hasPlanar ? 1 : 0);
+        _resolve.SetUniform("uPlanarHeight",     planarHeight);
+        _resolve.SetUniform("uPlanarIntensity",  planarIntensity);
+        _resolve.SetUniform("uPlanarDistortion", planarDistortion);
 
         Bind(TextureUnit.Texture0, _blurTarget.ColorTextures[0]);
         Bind(TextureUnit.Texture1, depthTex);
@@ -156,6 +163,8 @@ public sealed class SSRPass : IDisposable
         Bind(TextureUnit.Texture5, brdfLut);
         BindCube(TextureUnit.Texture6, probeMap);
         Bind(TextureUnit.Texture7, ssaoTex);
+        Bind(TextureUnit.Texture8, planarMap);
+
 
         DrawFullscreen();
 

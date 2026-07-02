@@ -1,4 +1,4 @@
-namespace Centauri.Rendering.Probes;
+namespace Centauri.Rendering.Reflections.Probes;
 
 using Silk.NET.OpenGL;
 using Silk.NET.Maths;

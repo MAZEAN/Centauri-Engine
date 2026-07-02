@@ -7,7 +7,7 @@ using Graphics.Resources;
 using Utils.Misc;
 using Config;
 using World;
-using SSR;
+using Reflections.SSR;
 using TAA;
 
 public readonly record struct IblResolveInputs (
@@ -24,6 +24,14 @@ public readonly record struct IblResolveInputs (
     Vector3 ProbeBoxMin,     // parallax box, world space
     Vector3 ProbeBoxMax,
     float ProbeBoxFalloff
+);
+
+public readonly record struct PlanarResolveInputs (
+    uint  Map,
+    bool  Has,
+    float Height,
+    float Intensity,
+    float Distortion
 );
 
 public sealed class PostProcessor : IDisposable
@@ -73,7 +81,8 @@ public sealed class PostProcessor : IDisposable
     public uint VelocityTexture => _taa.VelocityTexture;   // TAA motion vectors, for the debug view
 
     public void Composite(Camera camera, uint depthTex, uint normalTex, uint materialTex,
-        bool ssrAvailable, bool taaAvailable, in IblResolveInputs ibl, uint ssaoTex, bool ssaoActive)
+        bool ssrAvailable, bool taaAvailable, in IblResolveInputs ibl, uint ssaoTex, bool ssaoActive,
+        in PlanarResolveInputs planar)
     {
         _hdr.Resolve();
 
@@ -85,7 +94,8 @@ public sealed class PostProcessor : IDisposable
                 ibl.PrefilterMap, ibl.BrdfLut, ibl.MaxReflectionLod, ibl.Intensity, ibl.HasIbl,
                 ibl.ProbePrefilterMap, ibl.ProbeMaxReflectionLod, ibl.ProbeIntensity, ibl.HasProbe,
                 ibl.ProbePosition, ibl.ProbeBoxMin, ibl.ProbeBoxMax, ibl.ProbeBoxFalloff,
-                ssaoTex, ssaoActive);
+                ssaoTex, ssaoActive,
+                planar.Map, planar.Has, planar.Height, planar.Intensity, planar.Distortion);
         
         var taaActive = taaAvailable && _config.TAA.Enabled;
         var ssrInTonemap = ssrActive && !taaActive;

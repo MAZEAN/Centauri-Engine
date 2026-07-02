@@ -266,6 +266,15 @@ public sealed class SSRConfig : IJsonOnDeserialized
     }
 }
 
+public sealed class PlanarReflectionConfig
+{
+    [JsonPropertyName("enabled")]        public bool  Enabled        { get; set; } = true;
+    [JsonPropertyName("planeHeight")]    public float PlaneHeight    { get; set; } = -1.5f;  // world-space Y of the reflector surface
+    [JsonPropertyName("intensity")]      public float Intensity      { get; set; } = 1.0f;   // reflection strength (before Fresnel)
+    [JsonPropertyName("distortion")]     public float Distortion     { get; set; } = 0.0f;   // surface-normal ripple offset (0 = mirror)
+    [JsonPropertyName("halfResolution")] public bool  HalfResolution { get; set; } = true;   // render the mirror at half res (applied at startup/resize)
+}
+
 public sealed class TAAConfig : IJsonOnDeserialized
 {
     [JsonPropertyName("enabled")]  public bool  Enabled  { get; set; } = false;

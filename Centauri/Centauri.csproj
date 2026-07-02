@@ -47,5 +47,6 @@
     <ItemGroup>
       <Folder Include="Assets\Objects\Trees\" />
       <Folder Include="Assets\Textures\Bark\" />
+      <Folder Include="Rendering\Reflections\" />
     </ItemGroup>
 </Project>

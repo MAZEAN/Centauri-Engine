@@ -31,6 +31,12 @@ uniform float uProbeBoxFalloff;
 uniform sampler2D uSsaoMap;
 uniform int       uHasSSAO;
 
+uniform sampler2D uPlanarMap;
+uniform int       uHasPlanar;
+uniform float     uPlanarHeight;
+uniform float     uPlanarIntensity;
+uniform float     uPlanarDistortion;
+
 vec3 viewPos(vec2 uv)
 {
     float d   = texture(uDepth, uv).r;
@@ -82,20 +88,12 @@ void main()
     float fallbackIntensity = uIblIntensity;
     if (uHasProbe == 1)
     {
-        // Fragment gate: the probe is only authoritative for surfaces inside its box volume,
-        // fading out over uProbeBoxFalloff so its influence doesn't pop at the boundary.
         vec3  outsideVec  = max(uProbeBoxMin - worldPos, worldPos - uProbeBoxMax);
         float outside     = max(outsideVec.x, max(outsideVec.y, outsideVec.z));
         float probeWeight = 1.0 - smoothstep(0.0, uProbeBoxFalloff, max(outside, 0.0));
 
         if (probeWeight > 0.0)
         {
-            // Sample the probe with the true reflection direction (no parallax box-projection).
-            // The probe cubemap baked BOTH the sky and the scene objects from its capture point,
-            // so Rworld returns the sky where it points up and the objects where it points at the
-            // cluster -- exactly the occluded reflections SSR can't see. Box-projection only holds
-            // when the box proxies real enclosing geometry (an indoor room); on an open scene its
-            // top plane re-aims every upward reflection to a flat horizontal sample of the sky.
             vec3 preP      = textureLod(uProbeMap, Rworld, roughness * uProbeMaxReflectionLod).rgb;
             vec3 probeSpec = preP * W * uProbeIntensity;
 
@@ -108,12 +106,21 @@ void main()
 
     vec3 targetSpec = mix(fallbackSpec, ssrSpec, conf);
 
-    // Match the lit pass's AO attenuation. The scene already holds skyboxSpec * ssao (the lit
-    // pass multiplies its whole ambient term by ssao); scaling the delta by the same ssao makes
-    //   final = skyboxSpec*ssao + (targetSpec - skyboxSpec)*ssao = targetSpec*ssao,
-    // i.e. an AO-attenuated reflection. Without this the delta subtracts the FULL skyboxSpec
-    // while the scene only holds the darkened one, over-subtracting to black in contact-AO
-    // areas (the voids around the cube's base and its reflection).
+    if (uHasPlanar == 1)
+    {
+        vec3  Nworld     = normalize(mat3(uInvView) * N);
+        float heightMask = 1.0 - smoothstep(0.15, 0.35, abs(worldPos.y - uPlanarHeight));
+        float faceMask   = smoothstep(0.7, 0.95, Nworld.y);
+        float planarMask = heightMask * faceMask;
+
+        if (planarMask > 0.0)
+        {
+            vec2 duv        = Nworld.xz * uPlanarDistortion;   // 0 for a perfectly flat plane
+            vec3 planarSpec = texture(uPlanarMap, vUv + duv).rgb * W * uPlanarIntensity;
+            targetSpec      = mix(targetSpec, planarSpec, planarMask);
+        }
+    }
+    
     float ssao  = uHasSSAO == 1 ? texture(uSsaoMap, vUv).r : 1.0;
     vec3  delta = (targetSpec - skyboxSpec) * ssao;
 
