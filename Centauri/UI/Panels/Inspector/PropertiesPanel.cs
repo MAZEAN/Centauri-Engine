@@ -8,8 +8,8 @@ using Config;
 using Common;
 using Sections;
 
-// Hosts the Properties window chrome and drives an ordered list of inspector sections.
-// Adding a section is one entry in the list below + a class in Panels/Inspector/.
+internal readonly record struct SectionGroup(string Name, ISection[] Sections);
+
 public class PropertiesPanel
 {
     private const float Width   = 300f;
@@ -19,27 +19,36 @@ public class PropertiesPanel
     private const ImGuiWindowFlags Flags = Widgets.PanelBase;
 
     private readonly ImFontPtr _font;
-    private readonly ISection[] _sections;
+    
+    private readonly EntityInspectorSection _entitySection = new();
+    private readonly SectionGroup[] _groups;
 
     public PropertiesPanel(ImFontPtr font, AppConfig config)
     {
         _font = font;
-        _sections =
+        _groups =
         [
-            new EntityInspectorSection(),
-            new SkyboxSection(),
-            new ShadowSection(config),
-            new WindSection(config),
-            new SSAOSection(config),
-            new SSRSection(config),
-            new CullingSection(config),
-            new TAASection(config),
-            new BloomSection(config),
-            new ColorGradingSection(config.ColorGrading),
-            new IBLSection(config),
-            new ReflectionProbeSection(config),
-            new PlanarReflectionSection(config),
-            new ViewportSection(config)
+            new SectionGroup("Environment", [
+                new SkyboxSection(),
+                new ShadowSection(config),
+                new WindSection(config)
+            ]),
+            new SectionGroup("Reflections", [
+                new IBLSection(config),
+                new ReflectionProbeSection(config),
+                new PlanarReflectionSection(config),
+                new SSRSection(config)
+            ]),
+            new SectionGroup("Post FX", [
+                new SSAOSection(config),
+                new TAASection(config),
+                new BloomSection(config),
+                new ColorGradingSection(config.ColorGrading)
+            ]),
+            new SectionGroup("Scene", [
+                new CullingSection(config),
+                new ViewportSection(config)
+            ])
         ];
     }
 
@@ -55,12 +64,38 @@ public class PropertiesPanel
 
         ImGui.PushFont(_font);
 
-        foreach (var section in _sections)
-            section.Draw(scene);
+        DrawGroups(scene);
 
         ImGui.PopFont();
 
         ImGui.End();
+    }
+
+    private void DrawGroups(Scene scene)
+    {
+        _entitySection.Draw(scene);
+        ImGui.Separator();
+        ImGui.Spacing();
+        DrawGroupTabs(scene);
+    }
+    
+    private void DrawGroupTabs(Scene scene)
+    {
+        if (!ImGui.BeginTabBar("PropertyGroups"))
+            return;
+
+        foreach (var group in _groups)
+        {
+            if (!ImGui.BeginTabItem(group.Name)) continue;
+
+            ImGui.Spacing();
+            foreach (var section in group.Sections)
+                section.Draw(scene);
+
+            ImGui.EndTabItem();
+        }
+
+        ImGui.EndTabBar();
     }
 
     private static void SetupWindow()
