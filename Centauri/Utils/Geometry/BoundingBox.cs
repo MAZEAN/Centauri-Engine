@@ -34,17 +34,24 @@ public readonly struct BoundingBox
         return new BoundingBox(center - newExtents, center + newExtents);
     }
     
-    public Vector3[] GetBoxCorners() =>
-    [
-        new(Min.X, Min.Y, Min.Z), // 0 left  bottom back
-        new(Max.X, Min.Y, Min.Z), // 1 right bottom back
-        new(Min.X, Max.Y, Min.Z), // 2 left  top    back
-        new(Max.X, Max.Y, Min.Z), // 3 right top    back
-        new(Min.X, Min.Y, Max.Z), // 4 left  bottom front
-        new(Max.X, Min.Y, Max.Z), // 5 right bottom front
-        new(Min.X, Max.Y, Max.Z), // 6 left  top    front
-        new(Max.X, Max.Y, Max.Z), // 7 right top    front
-    ];
+    public Vector3[] GetBoxCorners()
+    {
+        var corners = new Vector3[8];
+        GetBoxCorners(corners);
+        return corners;
+    }
+    
+    public void GetBoxCorners(Span<Vector3> dest)
+    {
+        dest[0] = new Vector3(Min.X, Min.Y, Min.Z); // left  bottom back
+        dest[1] = new Vector3(Max.X, Min.Y, Min.Z); // right bottom back
+        dest[2] = new Vector3(Min.X, Max.Y, Min.Z); // left  top    back
+        dest[3] = new Vector3(Max.X, Max.Y, Min.Z); // right top    back
+        dest[4] = new Vector3(Min.X, Min.Y, Max.Z); // left  bottom front
+        dest[5] = new Vector3(Max.X, Min.Y, Max.Z); // right bottom front
+        dest[6] = new Vector3(Min.X, Max.Y, Max.Z); // left  top    front
+        dest[7] = new Vector3(Max.X, Max.Y, Max.Z); // right top    front
+    }
     
     public bool Contains(Vector3 point) =>
         point.X >= Min.X && point.X <= Max.X &&

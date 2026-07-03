@@ -78,12 +78,14 @@ public sealed class DebugRenderer : IDisposable
         if (!_config.Debug.ShowBoundingBoxes) return;
 
         _draw.Model(Matrix4x4.Identity);
-
+        
+        Span<Vector3> corners = stackalloc Vector3[8];
         foreach (var entity in scene.Entities)
         {
             var bounds  = entity.GetWorldBounds();
             var culled  = !cullingFrustum.IsVisibleAABB(bounds);
-            var corners = bounds.GetBoxCorners();
+            bounds.GetBoxCorners(corners);
+            
             var color   = culled ? ColorPalette.AABBCulled : ColorPalette.AABBStd;
 
             _draw.Color(color, FaceAlpha);          // translucent fill
@@ -98,10 +100,13 @@ public sealed class DebugRenderer : IDisposable
     {
         AssertActive();
         if (scene.Selected is not { } e || e.Model is null) return;
+        
+        Span<Vector3> corners = stackalloc Vector3[8];
+        e.GetWorldBounds().GetBoxCorners(corners);
 
         _draw.Model(Matrix4x4.Identity);
         _draw.Color(ColorPalette.Selected);
-        _draw.Lines(Shapes.BoxEdges(e.GetWorldBounds().GetBoxCorners()));
+        _draw.Lines(Shapes.BoxEdges(corners));
     }
     
     public void DrawCullingGrid(Scene scene, SpatialGrid grid)
@@ -110,6 +115,8 @@ public sealed class DebugRenderer : IDisposable
         if (!_config.Debug.ShowCullingGrid) return;
 
         _draw.Model(Matrix4x4.Identity);
+        
+        Span<Vector3> corners = stackalloc Vector3[8];
 
         for (var r = 0; r < grid.Rows; r++)
         {
@@ -117,7 +124,7 @@ public sealed class DebugRenderer : IDisposable
             {
                 if (grid.CellCount(c, r) == 0) continue;   // occupied cells only
 
-                var corners = grid.CellBounds(c, r).GetBoxCorners();
+                grid.CellBounds(c, r).GetBoxCorners(corners);
                 var visited = grid.CellVisited(c, r);
                 var color   = visited ? ColorPalette.GridVisited : ColorPalette.GridOccupied;
 
@@ -140,7 +147,7 @@ public sealed class DebugRenderer : IDisposable
             {
                 for (var c = c0; c <= c1; c++)
                 {
-                    var corners = grid.CellBounds(c, r).GetBoxCorners();
+                    grid.CellBounds(c, r).GetBoxCorners(corners);
                     
                     _draw.Color(ColorPalette.GridSelected, GridFaceSelectedAlpha);
                     _draw.Triangles(Shapes.BoxFaces(corners));
@@ -177,9 +184,12 @@ public sealed class DebugRenderer : IDisposable
 
     private void DrawFrustum(Camera cam)
     {
+        Span<Vector3> corners = stackalloc Vector3[8];
+        cam.GetFrustumCorners(corners);
+        
         _draw.Model(Matrix4x4.Identity);
         _draw.Color(ColorPalette.Frustum);
-        _draw.Lines(Shapes.BoxEdges(cam.GetFrustumCorners()));
+        _draw.Lines(Shapes.BoxEdges(corners));
     }
 
     private void AssertActive([CallerMemberName] string caller = "")

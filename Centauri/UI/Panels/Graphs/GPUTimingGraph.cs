@@ -23,6 +23,7 @@ internal sealed class GPUTimingGraph
     private const float SampleIntervalMs = 50f;    // one plotted point per 50 ms
     private const float WindowSeconds    = Capacity * SampleIntervalMs / 1000f;
     private const int   MaxZones         = 8;
+    private const int WarmupFrames = 10;
     
     private enum HeaderAlign { Left, Right }
 
@@ -43,9 +44,17 @@ internal sealed class GPUTimingGraph
     private readonly float[] _acc = new float[MaxZones];
     private float _accMs;
     private int   _accN;
+    
+    private int _framesSeen;
 
     public void Push(IReadOnlyList<GpuTiming> timings, float frameTimeMs)
     {
+        if (_framesSeen < WarmupFrames)
+        {
+            _framesSeen++;
+            return;
+        }
+        
         for (var i = 0; i < timings.Count; i++)
         {
             var slot = Slot(timings[i].Name);

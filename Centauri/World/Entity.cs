@@ -30,7 +30,9 @@ public class Entity : IDisposable
     // Geometry
     private BoundingBox _worldBounds;
     private bool _boundsDirty = true;
+    private bool? _anyTwoSided;
     private Transform _transform = new();
+    
     public Transform Transform
     {
         get => _transform;
@@ -79,9 +81,19 @@ public class Entity : IDisposable
     {
         get
         {
+            if (_anyTwoSided is { } cached) 
+                return cached;
+
+            var any = false;
             foreach (var m in _materials)
-                if (m is { TwoSided: true }) return true;
-            return false;
+                if (m is { TwoSided: true })
+                {
+                    any = true; 
+                    break;
+                }
+
+            _anyTwoSided = any;
+            return any;
         }
     }
     
@@ -92,6 +104,7 @@ public class Entity : IDisposable
 
         _materials[index]    = _materials[index]!.Clone();
         _ownsMaterial[index] = true;
+        _anyTwoSided         = null;
         return true;
     }
 

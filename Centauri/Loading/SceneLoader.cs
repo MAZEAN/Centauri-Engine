@@ -44,44 +44,56 @@ public class SceneLoader
     {
         foreach (var e in def.Entities)
         {
-            var model = !string.IsNullOrEmpty(e.Model)
-                ? _resourceSystem.Models.Get(e.Model)
-                : null;
-            
-            var materials = ResolveMaterials(e, model);
-            
-            Light? light = null;
-            if (e.Light is { } l)
-                light = CreateLight(l);
-
-            var entity = new Entity(model, materials, light);
-
-            entity.Name = e.Name;
-
-            entity.Transform.Position = new Vector3(e.Position[0], e.Position[1], e.Position[2]);
-            entity.Transform.Scale    = new Vector3(e.Scale[0],    e.Scale[1],    e.Scale[2]);
-            
-            entity.UvScale  = new Vector2(e.UvScale[0],  e.UvScale[1]);
-            entity.UvOffset = new Vector2(e.UvOffset[0], e.UvOffset[1]);
-            
-            entity.Enabled =  e.Enabled;
-
-            if (e.Rotation is { Length: 3 })
-                entity.Transform.SetEulerAngles(e.Rotation[0], e.Rotation[1], e.Rotation[2]);
-            
-            entity.Authored = new TransformSnapshot(
-                entity.Transform.Position,
-                entity.Transform.EulerAngles,
-                entity.Transform.Scale
-            );
-            
-            if (e.Components is { Count: > 0 })
-                foreach (var c in e.Components)
-                    entity.AddComponent(ComponentFactory.Create(c));
+            var entity = BuildEntity(e);
+            ApplyTransform(entity, e);
+            ApplyComponents(entity, e);
 
             _scene.AddEntity(entity);
         }
     }
+    
+    private Entity BuildEntity(EntityDefinition e)
+    {
+        var model = !string.IsNullOrEmpty(e.Model)
+            ? _resourceSystem.Models.Get(e.Model)
+            : null;
+        
+        var materials = ResolveMaterials(e, model);
+        var light = e.Light is { } l ? CreateLight(l) : null;
+        
+        var entity = new Entity(model, materials, light)
+        {
+            Name    = e.Name,
+            UvScale  = new Vector2(e.UvScale[0],  e.UvScale[1]),
+            UvOffset = new Vector2(e.UvOffset[0], e.UvOffset[1]),
+            Enabled  = e.Enabled
+        };
+        return entity;
+    }
+    
+    private static void ApplyTransform(Entity entity, EntityDefinition e)
+    {
+        entity.Transform.Position = new Vector3(e.Position[0], e.Position[1], e.Position[2]);
+        entity.Transform.Scale    = new Vector3(e.Scale[0],    e.Scale[1],    e.Scale[2]);
+
+        if (e.Rotation is { Length: 3 })
+            entity.Transform.SetEulerAngles(e.Rotation[0], e.Rotation[1], e.Rotation[2]);
+
+        entity.Authored = new TransformSnapshot(
+            entity.Transform.Position,
+            entity.Transform.EulerAngles,
+            entity.Transform.Scale
+        );
+    }
+
+    private static void ApplyComponents(Entity entity, EntityDefinition e)
+    {
+        if (e.Components is not { Count: > 0 }) return;
+
+        foreach (var c in e.Components)
+            entity.AddComponent(ComponentFactory.Create(c));
+    }
+
     
     private Material?[] ResolveMaterials(EntityDefinition e, Model? model)
     {

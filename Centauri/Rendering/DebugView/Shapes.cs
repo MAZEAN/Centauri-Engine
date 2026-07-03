@@ -28,14 +28,13 @@ internal static class Shapes
         2,3,7, 2,7,6   // top    (y = max)
     ];
 
-    public static float[] BoxEdges(Vector3[] corners) => Expand(corners, EdgeIndices);
-    public static float[] BoxFaces(Vector3[] corners) => Expand(corners, FaceIndices);
+    public static float[] BoxEdges(ReadOnlySpan<Vector3> corners) => Expand(corners, EdgeIndices);
+    public static float[] BoxFaces(ReadOnlySpan<Vector3> corners) => Expand(corners, FaceIndices);
 
-    // flatten the indexed corners into a packed xyz vertex array
-    private static float[] Expand(Vector3[] corners, int[] indices)
+    private static float[] Expand(ReadOnlySpan<Vector3> corners, int[] indices)
     {
         var v = new float[indices.Length * 3];
-        for (int i = 0; i < indices.Length; i++)
+        for (var i = 0; i < indices.Length; i++)
         {
             var p = corners[indices[i]];
             v[i * 3 + 0] = p.X;

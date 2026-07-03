@@ -25,7 +25,9 @@ public sealed class GeometryPrepass : IDisposable
     private readonly RenderTarget _target;
     
     private readonly ShaderBatcher _batcher = new();
-    private readonly List<InstanceData> _instanceData = new();
+    private readonly List<InstanceData> _instanceData = [];
+    
+    private bool? _cullEnabled;
 
     public uint NormalTexture   => _target.ColorTextures[0];
     public uint MaterialTexture => _target.ColorTextures[1];
@@ -63,9 +65,7 @@ public sealed class GeometryPrepass : IDisposable
         _target.Bind();
         _target.Clear();
 
-        _gl.Enable(EnableCap.DepthTest);
-        _gl.Enable(EnableCap.CullFace);
-        _gl.CullFace(TriangleFace.Back);
+        SetRenderState();
 
         _shader.Use();
         _shader.SetUniform("uView",       camera.GetViewMatrix());
@@ -115,12 +115,12 @@ public sealed class GeometryPrepass : IDisposable
             _shader.SetUniform("uAlphaTest", 1);
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.BindTexture(TextureTarget.Texture2D, albedo.Handle);
-            _gl.Disable(EnableCap.CullFace);
+            SetCullState(false);
         }
         else
         {
             _shader.SetUniform("uAlphaTest", 0);
-            _gl.Enable(EnableCap.CullFace);
+            SetCullState(true);
         }
     }
     
@@ -144,6 +144,23 @@ public sealed class GeometryPrepass : IDisposable
         _gl.BindTexture(TextureTarget.Texture2D, material.Roughness?.Handle ?? 0);
         _gl.ActiveTexture(TextureUnit.Texture3);
         _gl.BindTexture(TextureTarget.Texture2D, material.Metallic?.Handle ?? 0);
+    }
+    
+    private void SetCullState(bool enabled)
+    {
+        if (_cullEnabled == enabled) return;
+        _cullEnabled = enabled;
+
+        if (enabled) _gl.Enable(EnableCap.CullFace);
+        else         _gl.Disable(EnableCap.CullFace);
+    }
+
+    private void SetRenderState()
+    {
+        _gl.Enable(EnableCap.DepthTest);
+        _gl.CullFace(TriangleFace.Back);
+        _cullEnabled = null;
+        SetCullState(true);
     }
 
     public void Dispose()

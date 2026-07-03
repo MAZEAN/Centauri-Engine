@@ -8,7 +8,6 @@ using System.Numerics;
 using Config;
 using World;
 using Rendering;
-using World.Components;
 
 public class InputSystem : IDisposable
 {
@@ -23,6 +22,7 @@ public class InputSystem : IDisposable
     private Vector2 _mousePos;
 
     private readonly Dictionary<Camera, CameraController> _controllers = new();
+    private readonly DebugHotkeys _hotkeys;
 
     public InputSystem(IWindow window, Scene scene, AppConfig config, RenderingSystem renderingSystem)
     {
@@ -30,6 +30,8 @@ public class InputSystem : IDisposable
         _scene           = scene;
         _config          = config;
         _renderingSystem = renderingSystem;
+        
+        _hotkeys         = new DebugHotkeys(config, scene, ResetActiveController);
 
         Initialize();
     }
@@ -105,14 +107,7 @@ public class InputSystem : IDisposable
 
         if (_renderingSystem.ImGuiWantsKeyboard) return;
         
-        switch (key)
-        {
-            case Key.M:  _config.Debug.ToggleShowStatsOverlay();  break;
-            case Key.C:  _scene.Cameras.Cycle(); ResetActiveController();  break;
-            case Key.B:  _scene.Skyboxes.Cycle(); break;
-            case Key.N:  _scene.FindComponent<DayNightCycle>()?.Toggle(); break;
-            case Key.G:  _config.Debug.CycleShading(); break;
-        }
+        _hotkeys.Handle(key);
     }
 
     private void ToggleMode()

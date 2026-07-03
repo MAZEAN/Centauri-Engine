@@ -128,9 +128,7 @@ public class Camera
         proj.M32 += JitterNdc.Y;
         return proj;
     }
-
-    // Unjittered projection — used for culling/frustum and for TAA motion vectors so the
-    // per-frame jitter doesn't leak into reprojection.
+    
     public Matrix4x4 GetProjectionMatrixRaw()
     {
         if (AspectRatio <= 0)
@@ -139,8 +137,14 @@ public class Camera
         return Matrix4x4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(Zoom), AspectRatio, _config.Near, _config.Far);
     }
     
-    // camera-frustum corners in world space — debug visualization only
     public Vector3[] GetFrustumCorners()
+    {
+        var corners = new Vector3[8];
+        GetFrustumCorners(corners);
+        return corners;
+    }
+
+    public void GetFrustumCorners(Span<Vector3> dest)
     {
         var tanFov = MathF.Tan(MathHelper.DegreesToRadians(Zoom) / 2f);
 
@@ -151,20 +155,17 @@ public class Camera
         var nearWidth  = nearHeight * AspectRatio;
         var farHeight  = 2f * tanFov * far;
         var farWidth   = farHeight * AspectRatio;
-
+        
         var nearCenter = Position + Forward * near;
         var farCenter  = Position + Forward * far;
-
-        return
-        [
-            nearCenter + Up * (nearHeight * 0.5f) - Right * (nearWidth * 0.5f),
-            nearCenter + Up * (nearHeight * 0.5f) + Right * (nearWidth * 0.5f),
-            nearCenter - Up * (nearHeight * 0.5f) - Right * (nearWidth * 0.5f),
-            nearCenter - Up * (nearHeight * 0.5f) + Right * (nearWidth * 0.5f),
-            farCenter  + Up * (farHeight  * 0.5f) - Right * (farWidth  * 0.5f),
-            farCenter  + Up * (farHeight  * 0.5f) + Right * (farWidth  * 0.5f),
-            farCenter  - Up * (farHeight  * 0.5f) - Right * (farWidth  * 0.5f),
-            farCenter  - Up * (farHeight  * 0.5f) + Right * (farWidth  * 0.5f),
-        ];
+        
+        dest[0] = nearCenter + Up * (nearHeight * 0.5f) - Right * (nearWidth * 0.5f);
+        dest[1] = nearCenter + Up * (nearHeight * 0.5f) + Right * (nearWidth * 0.5f);
+        dest[2] = nearCenter - Up * (nearHeight * 0.5f) - Right * (nearWidth * 0.5f);
+        dest[3] = nearCenter - Up * (nearHeight * 0.5f) + Right * (nearWidth * 0.5f);
+        dest[4] = farCenter  + Up * (farHeight  * 0.5f) - Right * (farWidth  * 0.5f);
+        dest[5] = farCenter  + Up * (farHeight  * 0.5f) + Right * (farWidth  * 0.5f);
+        dest[6] = farCenter  - Up * (farHeight  * 0.5f) - Right * (farWidth  * 0.5f);
+        dest[7] = farCenter  - Up * (farHeight  * 0.5f) + Right * (farWidth  * 0.5f);
     }
 }
