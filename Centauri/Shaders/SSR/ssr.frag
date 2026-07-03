@@ -61,55 +61,27 @@ float silhouetteConfidence(vec2 uv, float hitViewZ)
 }
 
 
-void main()
+// Planar reflection owns the flat reflector (same up-facing-at-plane-height test the resolve
+// uses). Where it does, planar fully replaces SSR, so the march is skipped as wasted work.
+bool onPlanarReflector(vec3 P, vec3 N)
 {
-    float depth = texture(uDepth, vUv).r;
-    if (depth >= 1.0) { FragColor = vec4(0.0); return; }   // background — nothing to reflect
+    if (uHasPlanar != 1) return false;
 
-    vec2  mat       = texture(uMaterial, vUv).rg;
-    float roughness = mat.r;
-    float metallic  = mat.g;
+    vec3  wPos  = (uInvView * vec4(P, 1.0)).xyz;
+    vec3  wN    = normalize(mat3(uInvView) * N);
+    float hMask = 1.0 - smoothstep(0.15, 0.35, abs(wPos.y - uPlanarHeight));
+    float fMask = smoothstep(0.7, 0.95, wN.y);
+    return hMask * fMask > 0.5;
+}
 
-    if (roughness > uRoughnessCutoff) { FragColor = vec4(0.0); return; }
-
-    vec3 P = viewPos(vUv);                                  // view-space position
-    vec3 N = normalize(texture(uNormal, vUv).xyz * 2.0 - 1.0);
-
-    if (uHasPlanar == 1)
-    {
-        vec3  wPos = (uInvView * vec4(P, 1.0)).xyz;
-        vec3  wN   = normalize(mat3(uInvView) * N);
-        float hMask = 1.0 - smoothstep(0.15, 0.35, abs(wPos.y - uPlanarHeight));
-        float fMask = smoothstep(0.7, 0.95, wN.y);
-        if (hMask * fMask > 0.5) { FragColor = vec4(0.0); return; }
-    }
-
-    vec3 V = normalize(P);                                  // camera→fragment (cam at origin)
-    vec3 R = normalize(reflect(V, N));                      // reflection direction
-
-    // clamp the ray so it never crosses in front of the camera (view z must stay negative)
-    float rayLen = uMaxDistance;
-    if (R.z > 0.0)
-        rayLen = min(rayLen, (-0.05 - P.z) / R.z);
-    if (rayLen <= 0.0) { FragColor = vec4(0.0); return; }
-
-    vec3 Q = P + R * rayLen;                                // ray end, view space
-
-    // project both endpoints to screen
-    vec4 clipP = uProjection * vec4(P, 1.0);
-    vec4 clipQ = uProjection * vec4(Q, 1.0);
-    vec2 uvP   = (clipP.xy / clipP.w) * 0.5 + 0.5;
-    vec2 uvQ   = (clipQ.xy / clipQ.w) * 0.5 + 0.5;
-    
-    float invWP = 1.0 / clipP.w;
-    float invWQ = 1.0 / clipQ.w;
-
-    // ── uniform screen-space march ──
+// March the reflection ray in screen space between the projected endpoints; on the first
+// in-front→behind crossing, binary-refine and thickness-test it. Returns the hit UV.
+bool marchRay(vec2 uvP, vec2 uvQ, float invWP, float invWQ, out vec2 hitUv)
+{
     float stepS = 1.0 / float(uMaxSteps);
 
-    bool  hit    = false;
-    vec2  hitUv  = vec2(0.0);
-    float prevS  = 0.0;
+    hitUv = vec2(0.0);
+    float prevS    = 0.0;
     float prevDiff = 0.0;
 
     for (int i = 1; i <= uMaxSteps; i++)
@@ -148,30 +120,70 @@ void main()
             if (viewPos(muv).z - rayViewZ(invWP, invWQ, refS) < uThickness)
             {
                 hitUv = muv;
-                hit   = true;
+                return true;
             }
-            break;
+            return false;
         }
         prevS = s;
         prevDiff = diff;
     }
 
-    if (!hit) { FragColor = vec4(0.0); return; }
+    return false;
+}
 
-    vec3 hitPos = viewPos(hitUv);
+// Confidence the SSR hit is trustworthy: fades at screen edges, high roughness, long distance,
+// silhouettes (background bleeding past a foreground edge) and back-facing hits.
+float reflectionConfidence(vec2 hitUv, vec3 P, vec3 R, float roughness)
+{
+    vec3  hitPos    = viewPos(hitUv);
     vec3  hitNormal = normalize(texture(uNormal, hitUv).xyz * 2.0 - 1.0);
     float backFade  = 1.0 - smoothstep(0.0, 0.25, dot(hitNormal, R));
-    
+
     vec2  ef        = smoothstep(0.0, 0.15, hitUv) * (1.0 - smoothstep(0.85, 1.0, hitUv));
     float edgeFade  = ef.x * ef.y;
 
     float roughFade = 1.0 - smoothstep(uRoughnessCutoff * 0.5, uRoughnessCutoff, roughness);
-
     float distFade  = 1.0 - clamp(length(hitPos - P) / uMaxDistance, 0.0, 1.0);
     float silFade   = silhouetteConfidence(hitUv, hitPos.z);
 
+    return edgeFade * roughFade * distFade * silFade * backFade;
+}
+
+void main()
+{
+    float depth = texture(uDepth, vUv).r;
+    if (depth >= 1.0) { FragColor = vec4(0.0); return; }   // background — nothing to reflect
+
+    float roughness = texture(uMaterial, vUv).r;
+    if (roughness > uRoughnessCutoff) { FragColor = vec4(0.0); return; }
+
+    vec3 P = viewPos(vUv);                                  // view-space position
+    vec3 N = normalize(texture(uNormal, vUv).xyz * 2.0 - 1.0);
+
+    if (onPlanarReflector(P, N)) { FragColor = vec4(0.0); return; }
+
+    vec3 V = normalize(P);                                  // camera→fragment (cam at origin)
+    vec3 R = normalize(reflect(V, N));                      // reflection direction
+
+    // clamp the ray so it never crosses in front of the camera (view z must stay negative)
+    float rayLen = uMaxDistance;
+    if (R.z > 0.0)
+        rayLen = min(rayLen, (-0.05 - P.z) / R.z);
+    if (rayLen <= 0.0) { FragColor = vec4(0.0); return; }
+
+    vec3 Q = P + R * rayLen;                                // ray end, view space
+
+    // project both endpoints to screen
+    vec4 clipP = uProjection * vec4(P, 1.0);
+    vec4 clipQ = uProjection * vec4(Q, 1.0);
+    vec2 uvP   = (clipP.xy / clipP.w) * 0.5 + 0.5;
+    vec2 uvQ   = (clipQ.xy / clipQ.w) * 0.5 + 0.5;
+
+    vec2 hitUv;
+    if (!marchRay(uvP, uvQ, 1.0 / clipP.w, 1.0 / clipQ.w, hitUv)) { FragColor = vec4(0.0); return; }
+
     vec3  reflColor  = texture(uScene, hitUv).rgb * uIntensity;
-    float confidence = edgeFade * roughFade * distFade * silFade * backFade;
+    float confidence = reflectionConfidence(hitUv, P, R, roughness);
 
     FragColor = vec4(reflColor, confidence);   // rgb = reflected radiance, a = confidence
 }

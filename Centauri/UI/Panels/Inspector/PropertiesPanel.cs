@@ -8,7 +8,7 @@ using Config;
 using Common;
 using Sections;
 
-internal readonly record struct SectionGroup(string Name, ISection[] Sections);
+internal readonly record struct SectionGroup(string Name, Vector4 Accent, ISection[] Sections);
 
 public class PropertiesPanel
 {
@@ -28,24 +28,24 @@ public class PropertiesPanel
         _font = font;
         _groups =
         [
-            new SectionGroup("Environment", [
+            new SectionGroup("Environment", ColorPalette.Green, [
                 new SkyboxSection(),
                 new ShadowSection(config),
                 new WindSection(config)
             ]),
-            new SectionGroup("Reflections", [
+            new SectionGroup("Reflections", ColorPalette.Blue, [
                 new IBLSection(config),
                 new ReflectionProbeSection(config),
                 new PlanarReflectionSection(config),
                 new SSRSection(config)
             ]),
-            new SectionGroup("Post FX", [
+            new SectionGroup("Post FX", ColorPalette.Purple, [
                 new SSAOSection(config),
                 new TAASection(config),
                 new BloomSection(config),
                 new ColorGradingSection(config.ColorGrading)
             ]),
-            new SectionGroup("Scene", [
+            new SectionGroup("Scene", ColorPalette.Amber, [
                 new CullingSection(config),
                 new ViewportSection(config)
             ])
@@ -76,26 +76,17 @@ public class PropertiesPanel
         _entitySection.Draw(scene);
         ImGui.Separator();
         ImGui.Spacing();
-        DrawGroupTabs(scene);
-    }
-    
-    private void DrawGroupTabs(Scene scene)
-    {
-        if (!ImGui.BeginTabBar("PropertyGroups"))
-            return;
 
+        // Groups stack vertically: each is a colored, collapsible header with its sections
+        // indented beneath it.
         foreach (var group in _groups)
         {
-            if (!ImGui.BeginTabItem(group.Name)) continue;
-
-            ImGui.Spacing();
-            foreach (var section in group.Sections)
-                section.Draw(scene);
-
-            ImGui.EndTabItem();
+            var open = Widgets.BeginPanel(group.Name, group.Accent);
+            if (open)
+                foreach (var section in group.Sections)
+                    section.Draw(scene);
+            Widgets.EndPanel(open);
         }
-
-        ImGui.EndTabBar();
     }
 
     private static void SetupWindow()

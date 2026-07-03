@@ -290,31 +290,24 @@ void ShowShadowCascadesView(vec3 color, vec4  albedoSample) {
     FragColor = vec4(color * tint, albedoSample.a);
 }
 
-// ─── main ─────────────────────────────────────────────────────────────────────
-void main()
+// world-space shading normal: normal-map detail through the TBN when present (and valid),
+// else the interpolated vertex normal; flipped for back faces.
+vec3 SurfaceNormal()
 {
-    if (dot(vec4(fFragPos, 1.0), uClipPlane) < 0.0) discard;
-    
-    vec4  albedoSample = uHasAlbedo    == 1 ? texture(uAlbedoMap,    fUv) : uColor;
-    float roughness    = uHasRoughness == 1 ? texture(uRoughnessMap, fUv).r : uRoughnessScalar;
-    float metallic     = uHasMetallic  == 1 ? texture(uMetallicMap,  fUv).r : uMetallicScalar;
-    float ao           = texture(uAOMap, fUv).r;
-
-    vec3 albedo = pow(albedoSample.rgb, vec3(2.2));
-    if (albedoSample.a < 0.5) 
-        discard;
-
     vec3 T = fTBN[0];
     vec3 N = (uHasNormal == 1 && dot(T, T) > 1e-5)
         ? normalize(fTBN * (texture(uNormalMap, fUv).rgb * 2.0 - 1.0))
         : normalize(fNormal);
 
-    if (!gl_FrontFacing) 
+    if (!gl_FrontFacing)
         N = -N;
 
-    roughness = SpecularAARoughness(roughness, N);
+    return N;
+}
 
-    vec3 V  = normalize(uCameraPos - fFragPos);
+// analytic lights: directional (with CSM shadow + optional leaf translucency), point, spot.
+vec3 DirectLighting(vec3 N, vec3 V, vec3 albedo, float roughness, float metallic)
+{
     vec3 Lo = vec3(0.0);
 
     // directional
@@ -323,7 +316,7 @@ void main()
         vec3 L        = normalize(-uDir.direction.xyz);
         vec3 radiance = uDir.color.xyz * uDir.params.x;
         float shadow  = uHasShadow == 1 ? ShadowFactor(N, L) : 0.0;
-        
+
         Lo += CalcPBR(L, radiance, N, V, albedo, roughness, metallic) * (1.0 - shadow);
 
         if (uTranslucency > 0.0)
@@ -348,18 +341,23 @@ void main()
 
         vec3 Lp        = normalize(lightDir);
         vec3 radianceP = uPoints[i].color.xyz * uPoints[i].params.x * attenuation;
-        
+
         Lo += CalcPBR(Lp, radianceP, N, V, albedo, roughness, metallic);
     }
 
     // spotlights
     for (int i = 0; i < uCounts.y; i++)
         Lo += CalcSpotLight(uSpots[i], N, V, albedo, roughness, metallic);
-    
-    // ambient lighting
+
+    return Lo;
+}
+
+// image-based ambient (split-sum IBL) or a flat fallback, attenuated by AO / SSAO.
+vec3 AmbientLighting(vec3 N, vec3 V, vec3 albedo, float roughness, float metallic, float ao)
+{
     vec3 F0 = mix(vec3(0.04), albedo, metallic);
     vec3 ambient;
-    
+
     if (uHasIBL == 1) {
         vec3 kS = FresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
         vec3 kD = (1.0 - kS) * (1.0 - metallic);
@@ -381,14 +379,36 @@ void main()
         ambient *= texture(uSsaoMap, ssaoUv).r;
     }
 
+    return ambient;
+}
+
+// ─── main ─────────────────────────────────────────────────────────────────────
+void main()
+{
+    if (dot(vec4(fFragPos, 1.0), uClipPlane) < 0.0) discard;
+
+    vec4  albedoSample = uHasAlbedo    == 1 ? texture(uAlbedoMap,    fUv) : uColor;
+    float roughness    = uHasRoughness == 1 ? texture(uRoughnessMap, fUv).r : uRoughnessScalar;
+    float metallic     = uHasMetallic  == 1 ? texture(uMetallicMap,  fUv).r : uMetallicScalar;
+    float ao           = texture(uAOMap, fUv).r;
+
+    vec3 albedo = pow(albedoSample.rgb, vec3(2.2));
+    if (albedoSample.a < 0.5)
+        discard;
+
+    vec3 N    = SurfaceNormal();
+    roughness = SpecularAARoughness(roughness, N);
+    vec3 V    = normalize(uCameraPos - fFragPos);
+
+    vec3 Lo      = DirectLighting(N, V, albedo, roughness, metallic);
+    vec3 ambient = AmbientLighting(N, V, albedo, roughness, metallic, ao);
+
     vec3 color = ambient + Lo;
 
     if (uShowCascades == 1 && uHasShadow == 1) {
         ShowShadowCascadesView(color, albedoSample);
         return;
     }
-    
-    FragColor = vec4(color, albedoSample.a);
 
-    //FragColor = vec4(ambient, 1.0);
+    FragColor = vec4(color, albedoSample.a);
 }

@@ -52,6 +52,60 @@ vec3 FresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
     return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
+// Local reflection-probe fallback, box-bounded: blends the probe's prefiltered specular over
+// the skybox where the fragment is inside the probe volume. Also reports the blended intensity.
+vec3 probeFallback(vec3 skyboxSpec, vec3 Rworld, vec3 worldPos, vec3 W, float roughness,
+                   out float fallbackIntensity)
+{
+    fallbackIntensity = uIblIntensity;
+    if (uHasProbe != 1) return skyboxSpec;
+
+    vec3  outsideVec  = max(uProbeBoxMin - worldPos, worldPos - uProbeBoxMax);
+    float outside     = max(outsideVec.x, max(outsideVec.y, outsideVec.z));
+    float probeWeight = 1.0 - smoothstep(0.0, uProbeBoxFalloff, max(outside, 0.0));
+    if (probeWeight <= 0.0) return skyboxSpec;
+
+    vec3 preP      = textureLod(uProbeMap, Rworld, roughness * uProbeMaxReflectionLod).rgb;
+    vec3 probeSpec = preP * W * uProbeIntensity;
+
+    fallbackIntensity = mix(uIblIntensity, uProbeIntensity, probeWeight);
+    return mix(skyboxSpec, probeSpec, probeWeight);
+}
+
+// Planar reflection override on the flat reflector: samples the mirror texture with a
+// roughness-driven 9-tap tent blur and blends it in by the up-facing-at-plane-height mask.
+vec3 applyPlanar(vec3 targetSpec, vec3 worldPos, vec3 N, vec3 W, float roughness)
+{
+    if (uHasPlanar != 1) return targetSpec;
+
+    vec3  Nworld     = normalize(mat3(uInvView) * N);
+    float heightMask = 1.0 - smoothstep(0.15, 0.35, abs(worldPos.y - uPlanarHeight));
+    float faceMask   = smoothstep(0.7, 0.95, Nworld.y);
+    float planarMask = heightMask * faceMask;
+    if (planarMask <= 0.0) return targetSpec;
+
+    vec2 duv = Nworld.xz * uPlanarDistortion;   // 0 for a perfectly flat plane
+    vec2 uv  = vUv + duv;
+
+    // Explicit 9-tap tent (no mipmaps: float-texture mip chains are unreliable on some GPUs).
+    // Offset scales with roughness, so a smooth floor stays sharp; a rougher one softens and
+    // hides half-res / grazing pixelation.
+    vec2 o = (1.0 / vec2(textureSize(uPlanarMap, 0))) * (roughness * uPlanarBlur);
+    vec3 planarCol =
+          texture(uPlanarMap, uv).rgb                       * 0.25
+        + texture(uPlanarMap, uv + vec2( o.x, 0.0)).rgb     * 0.125
+        + texture(uPlanarMap, uv + vec2(-o.x, 0.0)).rgb     * 0.125
+        + texture(uPlanarMap, uv + vec2(0.0,  o.y)).rgb     * 0.125
+        + texture(uPlanarMap, uv + vec2(0.0, -o.y)).rgb     * 0.125
+        + texture(uPlanarMap, uv + vec2( o.x,  o.y)).rgb    * 0.0625
+        + texture(uPlanarMap, uv + vec2(-o.x, -o.y)).rgb    * 0.0625
+        + texture(uPlanarMap, uv + vec2( o.x, -o.y)).rgb    * 0.0625
+        + texture(uPlanarMap, uv + vec2(-o.x,  o.y)).rgb    * 0.0625;
+
+    vec3 planarSpec = planarCol * W * uPlanarIntensity;
+    return mix(targetSpec, planarSpec, planarMask);
+}
+
 void main()
 {
     vec4  ssr  = texture(uSsr, vUv);
@@ -68,60 +122,28 @@ void main()
     vec3 N   = normalize(texture(uNormal, vUv).xyz * 2.0 - 1.0);   // view space
     vec3 V   = normalize(-P);                                      // fragment -> camera (view space)
     float NoV = max(dot(N, V), 0.0);
-    
+
     vec3 F0   = mix(vec3(0.04), vec3(1.0), metallic);
     vec3 F    = FresnelSchlickRoughness(NoV, F0, roughness);
     vec2 brdf = texture(uBrdfLUT, vec2(NoV, roughness)).rg;
     vec3 W    = F * brdf.x + brdf.y;          // specular env-BRDF weight (split-sum)
 
-    vec3 Rview   = reflect(-V, N);
-    vec3 Rworld  = normalize(mat3(uInvView) * Rview);
+    vec3 Rworld   = normalize(mat3(uInvView) * reflect(-V, N));
     vec3 worldPos = (uInvView * vec4(P, 1.0)).xyz;
-    
+
     vec3 skyboxSpec = vec3(0.0);
     if (uHasIBL == 1)
-    {
-        vec3 pre  = textureLod(uPrefilterMap, Rworld, roughness * uMaxReflectionLod).rgb;
-        skyboxSpec = pre * W * uIblIntensity;
-    }
+        skyboxSpec = textureLod(uPrefilterMap, Rworld, roughness * uMaxReflectionLod).rgb * W * uIblIntensity;
 
-    vec3  fallbackSpec      = skyboxSpec;
-    float fallbackIntensity = uIblIntensity;
-    if (uHasProbe == 1)
-    {
-        vec3  outsideVec  = max(uProbeBoxMin - worldPos, worldPos - uProbeBoxMax);
-        float outside     = max(outsideVec.x, max(outsideVec.y, outsideVec.z));
-        float probeWeight = 1.0 - smoothstep(0.0, uProbeBoxFalloff, max(outside, 0.0));
+    float fallbackIntensity;
+    vec3  fallbackSpec = probeFallback(skyboxSpec, Rworld, worldPos, W, roughness, fallbackIntensity);
 
-        if (probeWeight > 0.0)
-        {
-            vec3 preP      = textureLod(uProbeMap, Rworld, roughness * uProbeMaxReflectionLod).rgb;
-            vec3 probeSpec = preP * W * uProbeIntensity;
-
-            fallbackSpec      = mix(skyboxSpec, probeSpec,       probeWeight);
-            fallbackIntensity = mix(uIblIntensity, uProbeIntensity, probeWeight);
-        }
-    }
-
-    vec3 ssrSpec = ssr.rgb * W * fallbackIntensity;
-
+    vec3 ssrSpec    = ssr.rgb * W * fallbackIntensity;
     vec3 targetSpec = mix(fallbackSpec, ssrSpec, conf);
+    targetSpec      = applyPlanar(targetSpec, worldPos, N, W, roughness);
 
-    if (uHasPlanar == 1)
-    {
-        vec3  Nworld     = normalize(mat3(uInvView) * N);
-        float heightMask = 1.0 - smoothstep(0.15, 0.35, abs(worldPos.y - uPlanarHeight));
-        float faceMask   = smoothstep(0.7, 0.95, Nworld.y);
-        float planarMask = heightMask * faceMask;
-
-        if (planarMask > 0.0)
-        {
-            vec2 duv        = Nworld.xz * uPlanarDistortion;   // 0 for a perfectly flat plane
-            vec3 planarSpec = textureLod(uPlanarMap, vUv + duv, roughness * uPlanarBlur).rgb * W * uPlanarIntensity;
-            targetSpec      = mix(targetSpec, planarSpec, planarMask);
-        }
-    }
-    
+    // Match the lit pass's AO attenuation so the delta reconstructs targetSpec*ssao rather than
+    // over-subtracting the full skyboxSpec in AO'd areas.
     float ssao  = uHasSSAO == 1 ? texture(uSsaoMap, vUv).r : 1.0;
     vec3  delta = (targetSpec - skyboxSpec) * ssao;
 
