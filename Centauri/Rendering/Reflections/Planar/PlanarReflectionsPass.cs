@@ -23,6 +23,8 @@ using Utils.Misc;
 // mirrored pass so back-face culling still keeps the correct faces.
 public sealed class PlanarReflectionPass : IDisposable
 {
+    private const float VisibilityMargin = 0.5f;
+
     private readonly GL _gl;
     private readonly PlanarReflectionConfig _config;
     private readonly MainRenderer _main;
@@ -73,12 +75,13 @@ public sealed class PlanarReflectionPass : IDisposable
         var camera = scene.Cameras.Active;
         var h = ResolvePlaneHeight(scene);
         _resolvedHeight = h;
-
+        
+        if (!PlaneInFrustum(camera, h)) return;
         
         var reflect = new Matrix4x4(
-            1f,    0f, 0f, 0f,
-            0f,   -1f, 0f, 0f,
-            0f,    0f, 1f, 0f,
+            1f,     0f, 0f, 0f,
+            0f,    -1f, 0f, 0f,
+            0f,     0f, 1f, 0f,
             0f, 2f * h, 0f, 1f);
 
         var reflView = reflect * camera.GetViewMatrix();
@@ -123,6 +126,22 @@ public sealed class PlanarReflectionPass : IDisposable
                 return entity.GetWorldBounds().Max.Y;
 
         return _config.PlaneHeight;   // named entity not found this frame
+    }
+    
+    private static bool PlaneInFrustum(Camera camera, float planeHeight)
+    {
+        Span<Vector3> corners = stackalloc Vector3[8];
+        camera.GetFrustumCorners(corners);
+
+        var minY = float.MaxValue;
+        var maxY = float.MinValue;
+        foreach (var c in corners)
+        {
+            if (c.Y < minY) minY = c.Y;
+            if (c.Y > maxY) maxY = c.Y;
+        }
+
+        return planeHeight >= minY - VisibilityMargin && planeHeight <= maxY + VisibilityMargin;
     }
     
     private void AllocateMsaa()

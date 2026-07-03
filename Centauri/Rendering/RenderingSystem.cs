@@ -30,8 +30,8 @@ internal sealed class RenderContext
     public bool SsrActive;
     public bool TaaActive;
 
-    public CullingSystem Culling;
-    public GPUProfiler Profiler;
+    public CullingSystem Culling = null!;
+    public GPUProfiler Profiler = null!;
 }
 
 public class RenderingSystem : IDisposable

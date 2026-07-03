@@ -1,8 +1,40 @@
 namespace Centauri.Rendering.Helper;
 
+using System.Runtime.CompilerServices;
+
 using Graphics.Resources.Materials;
 using Graphics.Geometry;
 using World;
+
+// Identity-based key over a material array/list: two entities batch together only if their
+// material slots are the *same* Material references, in the same order. Wraps whatever list
+// it's given without copying, so it's cheap to build transiently for a Dictionary lookup — but
+// the key actually stored in a Dictionary must wrap an immutable snapshot (Batch.Materials),
+// never an entity's live (mutable-in-place, via MakeMaterialUnique) materials list.
+internal readonly struct MaterialArrayKey : IEquatable<MaterialArrayKey>
+{
+    private readonly IReadOnlyList<Material?> _materials;
+
+    public MaterialArrayKey(IReadOnlyList<Material?> materials) => _materials = materials;
+
+    public bool Equals(MaterialArrayKey other)
+    {
+        if (_materials.Count != other._materials.Count) return false;
+        for (var i = 0; i < _materials.Count; i++)
+            if (!ReferenceEquals(_materials[i], other._materials[i])) return false;
+        return true;
+    }
+
+    public override bool Equals(object? obj) => obj is MaterialArrayKey other && Equals(other);
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        foreach (var m in _materials)
+            hash.Add(m is null ? 0 : RuntimeHelpers.GetHashCode(m));
+        return hash.ToHashCode();
+    }
+}
 
 public sealed class Batch
 {
@@ -31,27 +63,28 @@ public sealed class ShaderBatcher
             return _batches;
 
         _batches.Clear();
-        var byModel = new Dictionary<Model, List<Batch>>();
+        var byModel = new Dictionary<Model, Dictionary<MaterialArrayKey, Batch>>();
 
         foreach (var entity in scene.Entities)
         {
             if (entity.Model is not { } model) continue;   // light-only / mesh-less
             if (entity.Materials.Count == 0)    continue;
-            
-            if (!byModel.TryGetValue(model, out var perModel))
-                byModel[model] = perModel = new List<Batch>();
 
-            var batch = Find(perModel, entity);
-            if (batch is null)
+            if (!byModel.TryGetValue(model, out var perModel))
+                byModel[model] = perModel = new Dictionary<MaterialArrayKey, Batch>();
+
+            // Transient key over the entity's live list, just for this lookup.
+            if (!perModel.TryGetValue(new MaterialArrayKey(entity.Materials), out var batch))
             {
                 batch = new Batch(model, entity.Materials.ToArray());
-                perModel.Add(batch);
+                // Stored key wraps the batch's own immutable snapshot, not the entity's list.
+                perModel[new MaterialArrayKey(batch.Materials)] = batch;
                 _batches.Add(batch);
             }
 
             batch.Entities.Add(entity);
         }
-        
+
         RenderableEntities = 0;
         TwoSidedEntities   = 0;
         foreach (var batch in _batches)
@@ -64,23 +97,6 @@ public sealed class ShaderBatcher
 
         _revision = scene.Revision;
         return _batches;
-    }
-    
-    private static Batch? Find(List<Batch> perModel, Entity entity)
-    {
-        foreach (var batch in perModel)
-            if (MaterialsMatch(batch.Materials, entity.Materials))
-                return batch;
-        return null;
-    }
-
-    private static bool MaterialsMatch(Material?[] a, IReadOnlyList<Material?> b)
-    {
-        if (a.Length != b.Count) return false;
-        
-        for (var i = 0; i < a.Length; i++)
-            if (!ReferenceEquals(a[i], b[i])) return false;
-        return true;
     }
 
     private static ulong SortKey(Batch b) =>

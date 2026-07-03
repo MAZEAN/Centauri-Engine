@@ -29,10 +29,7 @@ public sealed class SsaoPass : IDisposable
     private readonly uint _noise;
     
     private readonly Vector3[] _kernel = new Vector3[MaxKernel];
-    // "uKernel[0]".."uKernel[63]" built once; SetUniform still hits GLShader's location
-    // cache by name, but this avoids re-interpolating 64 strings on every single frame.
-    private static readonly string[] KernelUniformNames =
-        Enumerable.Range(0, MaxKernel).Select(i => $"uKernel[{i}]").ToArray();
+    private readonly int[] _kernelLocations = new int[MaxKernel];
 
     private readonly RenderTarget _aoTarget;
     private readonly RenderTarget _blurTarget;
@@ -59,6 +56,9 @@ public sealed class SsaoPass : IDisposable
         _noise = CreateNoise();
         
         BuildKernel();
+        
+        for (var i = 0; i < MaxKernel; i++)
+            _kernelLocations[i] = _ssao.GetLocation($"uKernel[{i}]");
     }
 
     public void Resize(uint width, uint height)
@@ -86,7 +86,7 @@ public sealed class SsaoPass : IDisposable
         _ssao.SetUniform("uBias",   _config.Bias);
         _ssao.SetUniform("uPower",  _config.Power);
         for (var i = 0; i < MaxKernel; i++)
-            _ssao.SetUniform(KernelUniformNames[i], _kernel[i]);
+            _ssao.SetUniform(_kernelLocations[i], _kernel[i]);
 
         _ssao.SetUniform("uDepth",  0);
         _ssao.SetUniform("uNormal", 1);

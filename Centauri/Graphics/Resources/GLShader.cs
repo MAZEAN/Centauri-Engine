@@ -51,63 +51,55 @@ public class GLShader : GLResource
         return true;
     }
 
-    public void SetUniform(string name, int value)
+    public void SetUniform(string name, int value) => SetUniform(GetLocation(name), value);
+    public void SetUniform(string name, float value) => SetUniform(GetLocation(name), value);
+    public void SetUniform(string name, Vector2 value) => SetUniform(GetLocation(name), value);
+    public void SetUniform(string name, Vector3 value) => SetUniform(GetLocation(name), value);
+    public void SetUniform(string name, Vector4 value) => SetUniform(GetLocation(name), value);
+    public void SetUniform(string name, Matrix4x4 value) => SetUniform(GetLocation(name), value);
+    
+    public void SetUniform(int location, int value)
     {
-        var location = GetLocation(name);
         if (location == -1) return;
         if (!Changed(_intCache, location, value)) return;
 
         Gl.Uniform1(location, value);
     }
 
-    public void SetUniform(string name, float value)
+    public void SetUniform(int location, float value)
     {
-        var location = GetLocation(name);
         if (location == -1) return;
         if (!Changed(_floatCache, location, value)) return;
 
         Gl.Uniform1(location, value);
     }
 
-    public void SetUniform(string name, float x, float y)
+    public void SetUniform(int location, Vector2 value)
     {
-        var location = GetLocation(name);
-        if (location == -1) return;
-        if (!Changed(_vec2Cache, location, new Vector2(x, y))) return;
-
-        Gl.Uniform2(location, x, y);
-    }
-
-    public void SetUniform(string name, Vector2 value)
-    {
-        var location = GetLocation(name);
         if (location == -1) return;
         if (!Changed(_vec2Cache, location, value)) return;
 
         Gl.Uniform2(location, value.X, value.Y);
     }
 
-    public void SetUniform(string name, Vector3 value)
+    public void SetUniform(int location, Vector3 value)
     {
-        var location = GetLocation(name);
         if (location == -1) return;
         if (!Changed(_vec3Cache, location, value)) return;
 
         Gl.Uniform3(location, value.X, value.Y, value.Z);
     }
 
-    public void SetUniform(string name, Vector4 value)
+    public void SetUniform(int location, Vector4 value)
     {
-        var location = GetLocation(name);
         if (location == -1) return;
         if (!Changed(_vec4Cache, location, value)) return;
 
         Gl.Uniform4(location, value.X, value.Y, value.Z, value.W);
     }
 
-    public unsafe void SetUniform(string name, Matrix4x4 value)
+    public unsafe void SetUniform(int location, Matrix4x4 value)
     {
-        var location = GetLocation(name);
         if (location == -1) return;
         if (!Changed(_matCache, location, value)) return;
 
@@ -140,7 +132,7 @@ public class GLShader : GLResource
         Gl.UniformBlockBinding(Handle, index, bindingPoint);
     }
 
-    private int GetLocation(string name)
+    public int GetLocation(string name)
     {
         if (_locationCache.TryGetValue(name, out var cached))
             return cached;

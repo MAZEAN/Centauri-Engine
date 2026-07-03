@@ -13,6 +13,10 @@ public sealed class SpatialGrid
     private List<Entity>[] _cells = [];
     private bool[]         _visited = [];      // parallel to _cells: touched by the last marking Cull
     private readonly List<Entity> _oversized = [];
+    // Non-empty cell indices, rebuilt alongside _cells — cell contents only ever change during
+    // Rebuild(), so Cull() (called once for the main camera and once per shadow cascade between
+    // rebuilds) can walk just the occupied cells instead of the full Rows x Columns rectangle.
+    private readonly List<int> _occupiedIndices = [];
 
     private Vector3 _origin;                    // min corner (minX, minY, minZ)
     private float   _maxY;
@@ -69,6 +73,7 @@ public sealed class SpatialGrid
             Columns = Rows = 0;
             _cells   = [];
             _visited = [];
+            _occupiedIndices.Clear();
             _origin  = Vector3.Zero;
             _maxY    = 0f;
             return;
@@ -95,9 +100,11 @@ public sealed class SpatialGrid
                     _cells[r * Columns + c].Add(e);
         }
         
-        foreach (var cell in _cells)
-            if (cell.Count > 0) 
-                OccupiedCells++;
+        _occupiedIndices.Clear();
+        for (var i = 0; i < _cells.Length; i++)
+            if (_cells[i].Count > 0)
+                _occupiedIndices.Add(i);
+        OccupiedCells = _occupiedIndices.Count;
     }
 
     // Gather every entity whose bounds pass the frustum into `results` (deduped). Records the
@@ -114,25 +121,23 @@ public sealed class SpatialGrid
             if (frustum.IsVisibleAABB(e.GetWorldBounds()))
                 results.Add(e);
 
-        for (var r = 0; r < Rows; r++)
-            for (var c = 0; c < Columns; c++)
-            {
-                var idx  = r * Columns + c;
-                var cell = _cells[idx];
-                
-                if (cell.Count == 0) continue;
-                if (!frustum.IsVisibleAABB(CellBounds(c, r))) continue;
+        foreach (var idx in _occupiedIndices)
+        {
+            var c = idx % Columns;
+            var r = idx / Columns;
 
-                if (markVisited)
-                {
-                    _visited[idx] = true;
-                    VisitedCells++;
-                }
-                
-                foreach (var e in cell)
-                    if (frustum.IsVisibleAABB(e.GetWorldBounds()))
-                        results.Add(e);
+            if (!frustum.IsVisibleAABB(CellBounds(c, r))) continue;
+
+            if (markVisited)
+            {
+                _visited[idx] = true;
+                VisitedCells++;
             }
+
+            foreach (var e in _cells[idx])
+                if (frustum.IsVisibleAABB(e.GetWorldBounds()))
+                    results.Add(e);
+        }
     }
 
     // ── debug-overlay accessors ─────────────────────────────────────────────────
