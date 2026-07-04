@@ -94,58 +94,43 @@ public class Model : IDisposable
 
     private static unsafe MeshData ProcessMesh(AssimpMesh* mesh)
     {
-        var vertices = new List<Vertex>(capacity: (int)mesh->MNumVertices);
-        var indices  = new List<uint>();
+        var vertices = new float[mesh->MNumVertices * 11];
+        var v = 0;
 
         for (uint i = 0; i < mesh->MNumVertices; i++)
         {
-            vertices.Add(new Vertex
-            {
-                Position  = mesh->MVertices[i],
-                Normal    = mesh->MNormals    != null ? mesh->MNormals[i]    : Vector3.Zero,
-                Tangent   = mesh->MTangents   != null ? mesh->MTangents[i]   : Vector3.Zero,
-                Bitangent = mesh->MBitangents != null ? mesh->MBitangents[i] : Vector3.Zero,
-                TexCoords = mesh->MTextureCoords[0] != null
-                    ? new Vector2(mesh->MTextureCoords[0][i].X, mesh->MTextureCoords[0][i].Y)
-                    : Vector2.Zero
-            });
+            var position  = mesh->MVertices[i];
+            var normal    = mesh->MNormals    != null ? mesh->MNormals[i]    : Vector3.Zero;
+            var tangent   = mesh->MTangents   != null ? mesh->MTangents[i]   : Vector3.Zero;
+            var texCoords = mesh->MTextureCoords[0] != null
+                ? new Vector2(mesh->MTextureCoords[0][i].X, mesh->MTextureCoords[0][i].Y)
+                : Vector2.Zero;
+
+            vertices[v++] = position.X;
+            vertices[v++] = position.Y;
+            vertices[v++] = position.Z;
+            vertices[v++] = normal.X;
+            vertices[v++] = normal.Y;
+            vertices[v++] = normal.Z;
+            vertices[v++] = texCoords.X;
+            vertices[v++] = texCoords.Y;
+            vertices[v++] = tangent.X;
+            vertices[v++] = tangent.Y;
+            vertices[v++] = tangent.Z;
         }
+        
+        var indices = new uint[mesh->MNumFaces * 3];
+        var idx = 0;
 
         for (uint i = 0; i < mesh->MNumFaces; i++)
         {
             var face = mesh->MFaces[i];
             for (uint j = 0; j < face.MNumIndices; j++)
-                indices.Add(face.MIndices[j]);
+                indices[idx++] = face.MIndices[j];
         }
 
-        return new MeshData(BuildVertices(vertices), BuildIndices(indices));
+        return new MeshData(vertices, indices);
     }
-
-    private static float[] BuildVertices(List<Vertex> vertexCollection)
-    {
-        // 11 floats per vertex: pos(3) + normal(3) + uv(2) + tangent(3)
-        var vertices = new float[vertexCollection.Count * 11];
-        var i = 0;
-
-        foreach (var v in vertexCollection)
-        {
-            vertices[i++] = v.Position.X;
-            vertices[i++] = v.Position.Y;
-            vertices[i++] = v.Position.Z;
-            vertices[i++] = v.Normal.X;
-            vertices[i++] = v.Normal.Y;
-            vertices[i++] = v.Normal.Z;
-            vertices[i++] = v.TexCoords.X;
-            vertices[i++] = v.TexCoords.Y;
-            vertices[i++] = v.Tangent.X;
-            vertices[i++] = v.Tangent.Y;
-            vertices[i++] = v.Tangent.Z;
-        }
-
-        return vertices;
-    }
-
-    private static uint[] BuildIndices(List<uint> indices) => indices.ToArray();
 
     private static BoundingBox ComputeBounds(List<Mesh> meshes)
     {

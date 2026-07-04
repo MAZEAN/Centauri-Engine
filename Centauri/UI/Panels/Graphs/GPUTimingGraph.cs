@@ -23,7 +23,10 @@ internal sealed class GPUTimingGraph
     private const float SampleIntervalMs = 50f;    // one plotted point per 50 ms
     private const float WindowSeconds    = Capacity * SampleIntervalMs / 1000f;
     private const int   MaxZones         = 8;
-    private const int WarmupFrames = 10;
+    private const int   WarmupFrames     = 200;
+    private const int Divs = 5;
+
+    private static readonly string WindowLabel = $"-{WindowSeconds:0}s";
     
     private enum HeaderAlign { Left, Right }
 
@@ -44,8 +47,15 @@ internal sealed class GPUTimingGraph
     private readonly float[] _acc = new float[MaxZones];
     private float _accMs;
     private int   _accN;
-    
     private int _framesSeen;
+    
+    private float _yMax = 1f;
+    private readonly string[] _tickLabels = new string[Divs + 1];
+    private readonly string[] _msLabels  = CreateFilledArray(MaxZones, "0.000");
+    private readonly string[] _pctLabels = CreateFilledArray(MaxZones, "0.0%");
+    private string _totalLabel = "0.000";
+
+    public GPUTimingGraph() => RefreshLabels();
 
     public void Push(IReadOnlyList<GpuTiming> timings, float frameTimeMs)
     {
@@ -75,8 +85,44 @@ internal sealed class GPUTimingGraph
         _head = (_head + 1) % Capacity;
         if (_count < Capacity) 
             _count++;
+        
         _accMs = 0f;
         _accN  = 0;
+        
+        RefreshLabels();
+    }
+    
+    private void RefreshLabels()
+    {
+        var peak = 0.01f;
+        for (var i = 0; i < _count; i++)
+        {
+            var sum = 0f;
+            for (var z = 0; z < _zoneCount; z++)
+                sum += _samples[i, z];
+            peak = MathF.Max(peak, sum);
+        }
+        _yMax = NiceCeil(peak);
+
+        for (var d = 0; d <= Divs; d++)
+            _tickLabels[d] = $"{_yMax * d / (float)Divs:0.0}";
+
+        var last  = (_head - 1 + Capacity) % Capacity;
+        var total = 0f;
+        for (var z = 0; z < _zoneCount; z++)
+        {
+            var ms = _count > 0 ? _samples[last, z] : 0f;
+            total += ms;
+        }
+
+        for (var z = 0; z < _zoneCount; z++)
+        {
+            var ms = _count > 0 ? _samples[last, z] : 0f;
+            var percentage = total > 0.00001f ? ms / total * 100f : 0f;
+            _msLabels[z]  = $"{ms:0.000}";
+            _pctLabels[z] = $"{percentage:0.0}%";
+        }
+        _totalLabel = $"{total:0.000}";
     }
 
     private int Slot(string name)
@@ -114,25 +160,15 @@ internal sealed class GPUTimingGraph
         dl.AddRectFilled(p0, p1, bg);
         dl.AddRect(p0, p1, edge);
 
-        // ── Y scale from the largest stacked total ──────────────────────────────
-        var peak = 0.01f;
-        for (var i = 0; i < _count; i++)
+        var yMax = _yMax;
+        
+        for (var d = 0; d <= Divs; d++)
         {
-            var sum = 0f;
-            for (var z = 0; z < _zoneCount; z++) 
-                sum += _samples[i, z];
-            peak = MathF.Max(peak, sum);
-        }
-        var yMax = NiceCeil(peak);
-
-        const int divs = 5;
-        for (var d = 0; d <= divs; d++)
-        {
-            var t = d / (float)divs;
+            var t = d / (float)Divs;
             var y = p1.Y - t * h;
             dl.AddLine(new Vector2(p0.X, y), new Vector2(p1.X, y), grid);
 
-            var label = $"{yMax * t:0.0}";
+            var label = _tickLabels[d];
             var sz = ImGui.CalcTextSize(label);
             dl.AddText(new Vector2(p0.X - 6f - sz.X, y - sz.Y * 0.5f), tick, label);
         }
@@ -169,8 +205,8 @@ internal sealed class GPUTimingGraph
             }
         }
 
-        // ── X labels ────────────────────────────────────────────────────────────
-        dl.AddText(new Vector2(p0.X, p1.Y + 2f), tick, $"-{WindowSeconds:0}s");
+        
+        dl.AddText(new Vector2(p0.X, p1.Y + 2f), tick, WindowLabel);
         var nowSz = ImGui.CalcTextSize("now");
         dl.AddText(new Vector2(p1.X - nowSz.X, p1.Y + 2f), tick, "now");
         
@@ -179,15 +215,12 @@ internal sealed class GPUTimingGraph
 
     private void DrawLegend()
     {
-        var last  = (_head - 1 + Capacity) % Capacity;
-        var total = GetTotal();
-
         if (!BeginLegendTable()) return;
 
         for (var z = 0; z < _zoneCount; z++)
-            DrawLegendRow(z, last, total);
+            DrawLegendRow(z);
 
-        DrawTotalRow(total);
+        DrawTotalRow();
 
         ImGui.EndTable();
     }
@@ -237,29 +270,23 @@ internal sealed class GPUTimingGraph
         ImGui.TextUnformatted(text);
     }
     
-    private void DrawLegendRow(int zone, int last, float total)
+    private void DrawLegendRow(int zone)
     {
-        var ms = _count > 0 ? _samples[last, zone] : 0f;
-
-        var percentage = total > 0.00001f
-            ? ms / total * 100f
-            : 0f;
-
         ImGui.TableNextRow();
 
         DrawPassCell(zone);
-        DrawRightAlignedCell(1, $"{ms:0.000}");
-        DrawRightAlignedCell(2, $"{percentage:0.0}%");
+        DrawRightAlignedCell(1, _msLabels[zone]);
+        DrawRightAlignedCell(2, _pctLabels[zone]);
     }
     
-    private static void DrawTotalRow(float total)
+    private void DrawTotalRow()
     {
         ImGui.TableNextRow();
 
         ImGui.TableSetColumnIndex(0);
         ImGui.TextDisabled("Total");
 
-        DrawRightAlignedCell(1, $"{total:0.000}");
+        DrawRightAlignedCell(1, _totalLabel);
         DrawRightAlignedCell(2, "100.0%");
     }
     
@@ -299,19 +326,6 @@ internal sealed class GPUTimingGraph
         ImGui.TextUnformatted(text);
     }
 
-    private float GetTotal()
-    {
-        var last  = (_head - 1 + Capacity) % Capacity;
-        var total = 0f;
-
-        for (var z = 0; z < _zoneCount; z++)
-        {
-            var ms = _count > 0 ? _samples[last, z] : 0f;
-            total += ms;
-        }
-        return total;
-    }
-
     private static float Y(float baseY, float h, float value, float yMax) =>
         baseY - h * MathF.Min(value / yMax, 1f);
 
@@ -323,5 +337,12 @@ internal sealed class GPUTimingGraph
         var n    = v / mag;
         var nice = n <= 1f ? 1f : n <= 2f ? 2f : n <= 2.5f ? 2.5f : n <= 5f ? 5f : 10f;
         return nice * mag;
+    }
+    
+    private static string[] CreateFilledArray(int length, string value)
+    {
+        var array = new string[length];
+        Array.Fill(array, value);
+        return array;
     }
 }

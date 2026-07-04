@@ -61,8 +61,33 @@ public sealed class SSRPass : IDisposable
             [InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Linear);
         
         _vao = gl.GenVertexArray();
-    }
 
+        BindConstantTextureSlots();
+    }
+    
+    private void BindConstantTextureSlots()
+    {
+        _shader.Use();
+        _shader.SetUniform("uScene",    0);
+        _shader.SetUniform("uDepth",    1);
+        _shader.SetUniform("uNormal",   2);
+        _shader.SetUniform("uMaterial", 3);
+
+        _blur.Use();
+        _blur.SetUniform("uSsr",      0);
+        _blur.SetUniform("uMaterial", 1);
+
+        _resolve.Use();
+        _resolve.SetUniform("uSsr",          0);
+        _resolve.SetUniform("uDepth",        1);
+        _resolve.SetUniform("uNormal",       2);
+        _resolve.SetUniform("uMaterial",     3);
+        _resolve.SetUniform("uPrefilterMap", 4);
+        _resolve.SetUniform("uBrdfLUT",      5);
+        _resolve.SetUniform("uProbeMap",     6);
+        _resolve.SetUniform("uSsaoMap",      7);
+        _resolve.SetUniform("uPlanarMap",    8);
+    }
     public void Resize(uint width, uint height)
     {
         _target.Resize(width / _resDivisor, height / _resDivisor);
@@ -111,11 +136,6 @@ public sealed class SSRPass : IDisposable
         _shader.SetUniform("uHasPlanar",    planar.Has ? 1 : 0);
         _shader.SetUniform("uPlanarHeight", planar.Height);
 
-        _shader.SetUniform("uScene",    0);
-        _shader.SetUniform("uDepth",    1);
-        _shader.SetUniform("uNormal",   2);
-        _shader.SetUniform("uMaterial", 3);
-
         Bind(TextureUnit.Texture0, sceneTex);
         Bind(TextureUnit.Texture1, gBuffer.Depth);
         Bind(TextureUnit.Texture2, gBuffer.Normal);
@@ -128,8 +148,6 @@ public sealed class SSRPass : IDisposable
     {
         _blurTarget.Bind();
         _blur.Use();
-        _blur.SetUniform("uSsr",      0);
-        _blur.SetUniform("uMaterial", 1);
         _blur.SetUniform("uTexel", new Vector2(1f / _blurTarget.Width, 1f / _blurTarget.Height));
         _blur.SetUniform("uRoughnessCutoff", _config.RoughnessCutoff);
 
@@ -147,13 +165,6 @@ public sealed class SSRPass : IDisposable
         _resolveTarget.Clear(0f, 0f, 0f, 0f);
 
         _resolve.Use();
-        _resolve.SetUniform("uSsr",          0);
-        _resolve.SetUniform("uDepth",        1);
-        _resolve.SetUniform("uNormal",       2);
-        _resolve.SetUniform("uMaterial",     3);
-        _resolve.SetUniform("uPrefilterMap", 4);
-        _resolve.SetUniform("uBrdfLUT",      5);
-        _resolve.SetUniform("uProbeMap",     6);
 
         _resolve.SetUniform("uInvProjection",    invProj);
         _resolve.SetUniform("uInvView",          invView);
@@ -169,10 +180,8 @@ public sealed class SSRPass : IDisposable
         _resolve.SetUniform("uProbeBoxMax",           ibl.ProbeBoxMax);
         _resolve.SetUniform("uProbeBoxFalloff",       ibl.ProbeBoxFalloff);
 
-        _resolve.SetUniform("uSsaoMap",  7);
         _resolve.SetUniform("uHasSSAO",  ssaoActive ? 1 : 0);
 
-        _resolve.SetUniform("uPlanarMap",        8);
         _resolve.SetUniform("uHasPlanar",        planar.Has ? 1 : 0);
         _resolve.SetUniform("uPlanarHeight",     planar.Height);
         _resolve.SetUniform("uPlanarIntensity",  planar.Intensity);
