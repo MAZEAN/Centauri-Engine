@@ -11,6 +11,11 @@ uniform int   uHdr;         // 1 = linear HDR radiance, 0 = display-ready sRGB L
 uniform float uExposure;    // pre-tonemap multiplier (HDR only)
 uniform float uBlackLevel;  // crush radiance below this to black (HDR only)
 
+uniform vec3  uSunDir;          // world-space direction from the sky toward the sun
+uniform vec3  uSunColor;        // sun disc radiance
+uniform float uSunAngularSize;  // cosine of the disc's half-angle
+uniform float uSunGlowExponent; // higher = tighter halo around the disc
+
 void main()
 {
     vec3 d  = normalize(vDir);
@@ -23,6 +28,11 @@ void main()
         color = pow(color, vec3(2.2));  // LDR sRGB → linear so the post pass grades it too
 
     color = max(color - uBlackLevel, vec3(0.0));   // crush the sky's faint floor to black
+    
+    float cosAngle = dot(d, uSunDir);
+    float disc     = smoothstep(uSunAngularSize - 0.0006, uSunAngularSize, cosAngle);
+    float glow     = pow(max(cosAngle, 0.0), uSunGlowExponent);
+    color += uSunColor * (disc * 6.0 + glow * 0.4);
 
     FragColor = vec4(color, 1.0);       // linear HDR — global grade + tonemap happen in post
 }

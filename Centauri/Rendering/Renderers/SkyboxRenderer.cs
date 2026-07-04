@@ -10,6 +10,9 @@ using Utils.Misc;
 
 public class SkyboxRenderer : IDisposable
 {
+    private const float SunAngularSizeCos  = 0.99999f; 
+    private const float SunGlowExponent    = 500f;    // higher = tighter halo
+    
     private readonly GL       _gl;
     private readonly GLShader _shader;
     private readonly Mesh     _cube;
@@ -44,6 +47,8 @@ public class SkyboxRenderer : IDisposable
         _shader.SetUniform("uHdr",        sky.Texture.IsHdr ? 1 : 0);
         _shader.SetUniform("uExposure",   sky.Exposure);
         _shader.SetUniform("uBlackLevel", sky.BlackLevel);
+        
+        UploadSun(scene);
 
         _gl.ActiveTexture(TextureUnit.Texture0);
         _gl.BindTexture(TextureTarget.Texture2D, sky.Texture.Handle);
@@ -81,6 +86,24 @@ public class SkyboxRenderer : IDisposable
         ];
 
         return (vertices, indices);
+    }
+    
+    private void UploadSun(Scene scene)
+    {
+        if (scene.Lighting.DirectionalLights.Count == 0)
+        {
+            _shader.SetUniform("uSunColor", Vector3.Zero);
+            return;
+        }
+
+        var sun = scene.Lighting.DirectionalLights[0];
+        
+        var sunDir = -Vector3.Normalize(sun.Direction);
+
+        _shader.SetUniform("uSunDir",          sunDir);
+        _shader.SetUniform("uSunColor",        sun.Color * sun.Intensity);
+        _shader.SetUniform("uSunAngularSize",  SunAngularSizeCos);
+        _shader.SetUniform("uSunGlowExponent", SunGlowExponent);
     }
 
     private void SetSkyboxRenderState()
