@@ -12,7 +12,7 @@ uniform int   uHdr;         // 1 = linear HDR radiance, 0 = display-ready sRGB L
 uniform float uExposure;    // pre-tonemap multiplier (HDR only)
 uniform float uBlackLevel;  // crush radiance below this to black (HDR only)
 
-uniform int   uMode;        // 0 = sample panorama, 1 = procedural Preetham atmosphere
+uniform int   uMode;
 
 uniform vec3  uSunDir;          // world-space direction from the sky toward the sun
 uniform vec3  uSunColor;        // sun disc radiance
@@ -42,17 +42,13 @@ vec3 proceduralSky(vec3 dir, vec3 sunDir, float turbidity, float intensity)
 
 void main()
 {
-    vec3 d  = normalize(vDir);
-    vec2 uv = vec2(atan(d.z, d.x), asin(clamp(d.y, -1.0, 1.0))) * invAtan + 0.5;
-    vec3 color = texture(uPanorama, uv).rgb;
+    vec3 d = normalize(vDir);
+    vec3 color;
 
     if (uMode == 1)
     {
         color = proceduralSky(d, uSunDir, uTurbidity, uSkyIntensity);
-
-        // Fade to a dim night blue as the sun sinks (Preetham is undefined below the horizon).
-        // Tracks the same elevation DayNightCycle uses to fade the light, so sky + lighting
-        // dim together without a separate day/night branch on the CPU.
+        
         float day = smoothstep(-0.08, 0.12, uSunDir.y);
         color = mix(vec3(0.008, 0.012, 0.025), color, day);
     }

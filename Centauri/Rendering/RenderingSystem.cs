@@ -153,7 +153,7 @@ public class RenderingSystem : IDisposable
     private (IblResolveInputs, PlanarResolveInputs) GetInputs(Scene scene)
     {
         var activeSky   = scene.Skyboxes.Active;
-        var procedural  = _config.Sky.Procedural && _ibl.HasProceduralBake;
+        var procedural  = _config.Sky.Procedural && _ibl.HasProceduralBake && DayNightCycle.IsDay(scene);
         var probeCfg    = _config.ReflectionProbe;
         var probeActive = probeCfg.Enabled && _reflectionProbe.Baked;
         var boxCenter   = new System.Numerics.Vector3(probeCfg.BoxCenter[0], probeCfg.BoxCenter[1], probeCfg.BoxCenter[2]);
@@ -261,8 +261,8 @@ public class RenderingSystem : IDisposable
     
     private void UpdateProceduralIbl(Scene scene)
     {
-        if (!_config.Sky.Procedural) return;
-        if (scene.Lighting.DirectionalLights.Count == 0) return;
+        if (!_config.Sky.Procedural || scene.Lighting.DirectionalLights.Count == 0 || !DayNightCycle.IsDay(scene)) return;
+
 
         var sun    = scene.Lighting.DirectionalLights[0];
         var sunDir = -System.Numerics.Vector3.Normalize(sun.Direction);

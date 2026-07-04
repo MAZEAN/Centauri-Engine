@@ -35,6 +35,9 @@ public sealed class DayNightCycle : Component
     }
 
     public void Toggle() => Paused = !Paused;
+    
+    public static bool IsDay(Scene scene) =>
+        scene.FindComponent<DayNightCycle>() is not { } cycle || cycle.Daylight >= 0.5f;
 
     protected override void OnAttach() => Apply();   // place the sun immediately
 

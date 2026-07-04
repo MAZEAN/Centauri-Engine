@@ -4,6 +4,7 @@ using Silk.NET.OpenGL;
 using System.Numerics;
 
 using World;
+using World.Components;
 using Graphics.Geometry;
 using Graphics.Resources;
 using Utils.Misc;
@@ -38,8 +39,8 @@ public class SkyboxRenderer : IDisposable
     
     public void Render(Scene scene, Matrix4x4 view, Matrix4x4 projection)
     {
-        var procedural = _config.Sky.Procedural;
-        var sky        = scene.Skyboxes.Active;
+        var sky = scene.Skyboxes.Active;
+        var procedural = _config.Sky.Procedural && DayNightCycle.IsDay(scene);
 
         if (!procedural && sky is null) return;   // textured mode needs a loaded panorama
 

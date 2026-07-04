@@ -278,7 +278,7 @@ public class MainRenderer : IDisposable
 
     private void BindIbl(Scene scene)
     {
-        var procedural = _config.Sky.Procedural && _ibl.HasProceduralBake;
+        var procedural = _config.Sky.Procedural && _ibl.HasProceduralBake && DayNightCycle.IsDay(scene);
         var sky        = scene.Skyboxes.Active;
 
         _iblActive = procedural || sky is { IblBaked: true };
