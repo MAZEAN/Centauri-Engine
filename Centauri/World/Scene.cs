@@ -6,13 +6,17 @@ using Components;
 
 public class Scene
 {
-    private readonly List<Entity> _entities = new();
+    private readonly List<Entity> _entities = [];
     public IReadOnlyList<Entity> Entities => _entities;
     public int Revision { get; private set; }
 
     public LightingSystem Lighting  { get; } = new();
     public CameraRig      Cameras   { get; } = new();
     public SkyboxSet      Skyboxes  { get; } = new();
+    
+    private Type?      _lastFindType;
+    private Component? _lastFindResult;
+    private int         _lastFindRevision = -1;
 
     public Entity? Selected { get; private set; }
     public void Select(Entity? entity) => Selected = entity;
@@ -29,16 +33,10 @@ public class Scene
     public void RemoveEntity(Entity entity)
     {
         _entities.Remove(entity);
-        if (Selected == entity) Selected = null;   // keep selection valid
+        if (Selected == entity) 
+            Selected = null;   // keep selection valid
         Revision++;
     }
-    
-    // Caches the last {type, result} pair keyed by Revision, since global-toggle components
-    // (e.g. DayNightCycle) get looked up by FindComponent every frame from multiple call sites
-    // but the scene's entity/component list only actually changes when Revision changes.
-    private Type?      _lastFindType;
-    private Component? _lastFindResult;
-    private int         _lastFindRevision = -1;
 
     // first component of type T across the scene, or null — handy for global toggles
     public T? FindComponent<T>() where T : Component
@@ -48,11 +46,16 @@ public class Scene
 
         T? found = null;
         foreach (var e in _entities)
-            if (e.GetComponent<T>() is { } c) { found = c; break; }
+            if (e.GetComponent<T>() is { } c)
+            {
+                found = c; 
+                break;
+            }
 
         _lastFindType     = typeof(T);
         _lastFindResult   = found;
         _lastFindRevision = Revision;
+        
         return found;
     }
 
@@ -75,7 +78,8 @@ public class Scene
     public void Dispose()
     {
         Selected = null;
-        foreach (var entity in _entities) entity.Dispose();
+        foreach (var entity in _entities) 
+            entity.Dispose();
         _entities.Clear();
     }
 }

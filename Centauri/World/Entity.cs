@@ -66,7 +66,8 @@ public class Entity : IDisposable
     public T? GetComponent<T>() where T : Component
     {
         foreach (var c in _components)
-            if (c is T t) return t;
+            if (c is T t) 
+                return t;
         return null;
     }
     
@@ -105,6 +106,7 @@ public class Entity : IDisposable
         _materials[index]    = _materials[index]!.Clone();
         _ownsMaterial[index] = true;
         _anyTwoSided         = null;
+        
         return true;
     }
 

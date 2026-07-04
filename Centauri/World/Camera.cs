@@ -28,12 +28,11 @@ public class Camera
     {
         _config = config;
         Name = name;
-
         Position = position;
         WorldUp = worldUp;
-
         Yaw = yaw;
         Pitch = pitch;
+        
         Zoom = config.FOV;
 
         UpdateVectors();
@@ -84,6 +83,7 @@ public class Camera
     {
         if (newSize.Y <= 0)
             throw new ArgumentException("Height must be positive.");
+        
         AspectRatio = (float)newSize.X / newSize.Y;
         IsFrustumDirty = true;
     }
@@ -110,6 +110,7 @@ public class Camera
     public void UpdateFrustum()
     {
         if (!IsFrustumDirty) return;
+        
         Frustum.Update(GetViewMatrix() * GetProjectionMatrix());
         IsFrustumDirty = false;
     }
@@ -126,6 +127,7 @@ public class Camera
         var proj = GetProjectionMatrixRaw();
         proj.M31 += JitterNdc.X;   // shifts clip.x by jitter*w → constant NDC offset after divide
         proj.M32 += JitterNdc.Y;
+        
         return proj;
     }
     
@@ -135,13 +137,6 @@ public class Camera
             throw new InvalidOperationException("Aspect ratio has not been set.");
         
         return Matrix4x4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(Zoom), AspectRatio, _config.Near, _config.Far);
-    }
-    
-    public Vector3[] GetFrustumCorners()
-    {
-        var corners = new Vector3[8];
-        GetFrustumCorners(corners);
-        return corners;
     }
 
     public void GetFrustumCorners(Span<Vector3> dest)

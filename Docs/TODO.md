@@ -15,7 +15,7 @@
 * [x] Screen Space Ambient Occlusion (SSAO)
 * [x] Temporal Anti-Aliasing (TAA)
 * [x] Screen Space Reflections (SSR) (with ray tracing or PBR Accumulation)
-* [ ] Reflection Probes (maybe "Planar Reflections" for mirrors)
+* [x] Reflection Probes (maybe "Planar Reflections" for mirrors)
 * [ ] GTAO (Ground-Truth AO)
 * [ ] Contact-hardening / PCSS
 * [ ] Raytracing with BVH (only experimental, not real-time)
@@ -41,6 +41,7 @@
 * [ ] Skybox transitions & variantions
 * [ ] Keybindings
 * [ ] UI improvements (DPI-scaling etc.)
+* [ ] (Hosek-Wilkie sky algorithm)
 
 ---
 

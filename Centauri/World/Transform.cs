@@ -12,15 +12,13 @@ public class Transform
     private bool      _localDirty = true;
     private bool      _worldDirty = true;
 
-    private readonly List<Transform> _children = new();
+    private readonly List<Transform> _children = [];
     private Transform? _parent;
 
     public IReadOnlyList<Transform> Children => _children;
     public event Action? OnChanged;
-    
-    private Vector3 _eulerAngles; // last-set degrees (pitch, yaw, roll) — kept in sync by SetEulerAngles
 
-    public Vector3 EulerAngles => _eulerAngles;
+    public Vector3 EulerAngles { get; private set; }
 
     public Transform? Parent
     {
@@ -42,29 +40,37 @@ public class Transform
             MarkWorldDirty();
         }
     }
-
-    // ── Properties ────────────────────────────────────────────────────────────
-
+    
     public Vector3 Position
     {
         get => _position;
-        set { _position = value; MarkDirty(); }
+        set
+        {
+            _position = value;
+            MarkDirty();
+        }
     }
 
     public Vector3 Scale
     {
         get => _scale;
-        set { _scale = value; MarkDirty(); }
+        set
+        {
+            _scale = value;
+            MarkDirty();
+        }
     }
 
     public Quaternion Rotation
     {
         get => _rotation;
-        set { _rotation = Quaternion.Normalize(value); MarkDirty(); }
+        set
+        {
+            _rotation = Quaternion.Normalize(value); 
+            MarkDirty();
+        }
     }
-
-    // ── Dirty propagation ─────────────────────────────────────────────────────
-
+    
     private void MarkDirty()
     {
         _localDirty = true;
@@ -81,9 +87,7 @@ public class Transform
         foreach (var child in _children)
             child.MarkWorldDirty();
     }
-
-    // ── Matrices ──────────────────────────────────────────────────────────────
-
+    
     public Matrix4x4 LocalMatrix
     {
         get
@@ -115,9 +119,7 @@ public class Transform
             return _worldMatrix;
         }
     }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
+    
     public void Translate(Vector3 delta)       => Position += delta;
     public void RotateLocal(Quaternion delta)   => Rotation = delta * _rotation;
     public void RotateWorld(Quaternion delta)   => Rotation = _rotation * delta;
@@ -127,7 +129,7 @@ public class Transform
 
     public void SetEulerAngles(float pitchDeg, float yawDeg, float rollDeg)
     {
-        _eulerAngles = new Vector3(pitchDeg, yawDeg, rollDeg);
+        EulerAngles = new Vector3(pitchDeg, yawDeg, rollDeg);
         Rotation = Quaternion.CreateFromYawPitchRoll(
             float.DegreesToRadians(yawDeg),
             float.DegreesToRadians(pitchDeg),
@@ -141,7 +143,8 @@ public class Transform
         var current = node._parent;
         while (current != null)
         {
-            if (current == this) return true;
+            if (current == this) 
+                return true;
             current = current._parent;
         }
         return false;

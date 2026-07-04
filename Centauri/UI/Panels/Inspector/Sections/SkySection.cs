@@ -15,7 +15,7 @@ public sealed class SkySection : ISection
 
     public void Draw(Scene scene)
     {
-        using var s = Widgets.Section("Sky (Procedural)", startCollapsed: true);
+        using var s = Widgets.Section("Procedural Sky", startCollapsed: true);
         if (!s.Open) return;
 
         var conf = _config.Sky;
