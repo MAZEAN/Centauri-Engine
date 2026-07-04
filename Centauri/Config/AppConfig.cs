@@ -21,4 +21,5 @@ public class AppConfig
     [JsonPropertyName("taa")]     public TAAConfig    TAA { get; init; } = new();
     [JsonPropertyName("wind")]    public WindConfig   Wind { get; init; } = new();
     [JsonPropertyName("culling")] public CullingConfig Culling { get; init; } = new();
+    [JsonPropertyName("sky")]     public SkyConfig    Sky { get; init; } = new();
 }

@@ -80,7 +80,7 @@ public class RenderingSystem : IDisposable
         _mainRenderer   = new MainRenderer(gl, config, _ibl, _shadows, _instances);
         _gridRenderer   = new GridRenderer(gl);
         _debugRenderer  = new DebugRenderer(gl, config);
-        _skyboxRenderer = new SkyboxRenderer(gl);
+        _skyboxRenderer = new SkyboxRenderer(gl, config);
         _reflectionProbe = new ReflectionProbeBaker(gl, _config.ReflectionProbe, _ibl, _mainRenderer, _skyboxRenderer);
     }
     

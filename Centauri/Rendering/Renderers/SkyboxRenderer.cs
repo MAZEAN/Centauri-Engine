@@ -7,6 +7,7 @@ using World;
 using Graphics.Geometry;
 using Graphics.Resources;
 using Utils.Misc;
+using Config;
 
 public class SkyboxRenderer : IDisposable
 {
@@ -14,12 +15,16 @@ public class SkyboxRenderer : IDisposable
     private const float SunGlowExponent    = 500f;    // higher = tighter halo
     
     private readonly GL       _gl;
+    private readonly AppConfig _config;
+    
     private readonly GLShader _shader;
     private readonly Mesh     _cube;
 
-    public SkyboxRenderer(GL gl)
+    public SkyboxRenderer(GL gl, AppConfig config)
     {
         _gl = gl;
+        _config = config;
+        
         _shader = new GLShader(gl,
             PathResolver.Resolve("Shaders/Skybox/skybox.vert"),
             PathResolver.Resolve("Shaders/Skybox/skybox.frag"));
@@ -33,25 +38,37 @@ public class SkyboxRenderer : IDisposable
     
     public void Render(Scene scene, Matrix4x4 view, Matrix4x4 projection)
     {
-        if (scene.Skyboxes.Active is not { } sky) return;   // no skybox — nothing to draw
-        
-        view.Translation = Vector3.Zero;        // rotation only — sky doesn't translate
+        var procedural = _config.Sky.Procedural;
+        var sky        = scene.Skyboxes.Active;
+
+        if (!procedural && sky is null) return;   // textured mode needs a loaded panorama
+
+        view.Translation = Vector3.Zero;
 
         SetSkyboxRenderState();
 
         _shader.Use();
         _shader.SetUniform("uView",       view);
         _shader.SetUniform("uProjection", projection);
-        _shader.SetUniform("uPanorama",   0);
+        _shader.SetUniform("uMode",       procedural ? 1 : 0);
         
-        _shader.SetUniform("uHdr",        sky.Texture.IsHdr ? 1 : 0);
-        _shader.SetUniform("uExposure",   sky.Exposure);
-        _shader.SetUniform("uBlackLevel", sky.BlackLevel);
-        
-        UploadSun(scene);
+        if (procedural)
+        {
+            _shader.SetUniform("uTurbidity",    _config.Sky.Turbidity);
+            _shader.SetUniform("uSkyIntensity", _config.Sky.Intensity);
+        }
+        else if (sky is { } s)
+        {
+            _shader.SetUniform("uPanorama",   0);
+            _shader.SetUniform("uHdr",        s.Texture.IsHdr ? 1 : 0);
+            _shader.SetUniform("uExposure",   s.Exposure);
+            _shader.SetUniform("uBlackLevel", s.BlackLevel);
 
-        _gl.ActiveTexture(TextureUnit.Texture0);
-        _gl.BindTexture(TextureTarget.Texture2D, sky.Texture.Handle);
+            _gl.ActiveTexture(TextureUnit.Texture0);
+            _gl.BindTexture(TextureTarget.Texture2D, s.Texture.Handle);
+        }
+
+        UploadSun(scene);
 
         _cube.Bind();
         unsafe
