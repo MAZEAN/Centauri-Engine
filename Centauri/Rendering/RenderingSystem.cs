@@ -122,6 +122,8 @@ public class RenderingSystem : IDisposable
     {
         BeginFrame(scene);
         
+        UpdateProceduralIbl(scene);
+        
         RenderPrePostComponents(scene, deltaTime);
         
         if (!_probeBaked || _config.ReflectionProbe.RebakeRequested)
@@ -138,17 +140,30 @@ public class RenderingSystem : IDisposable
         _post.BeginScene();
         RenderCentralComponents(scene, deltaTime);
         
+        var (iblInputs, planarInputs) = GetInputs(scene);
+        
+        var gBuffer = new GBufferTextures(_prepass.DepthTexture, _prepass.NormalTexture, _prepass.MaterialTexture);
+        using (_context.Profiler.Measure("Post"))
+            _post.Composite(scene.Cameras.Active, in gBuffer, _context.SsrActive, _context.TaaActive, in iblInputs,
+                _ssao.AoTexture, _context.SsaoActive, in planarInputs);
+        
+        RenderAfterPostComponents(scene, deltaTime);
+    }
+
+    private (IblResolveInputs, PlanarResolveInputs) GetInputs(Scene scene)
+    {
         var activeSky   = scene.Skyboxes.Active;
+        var procedural  = _config.Sky.Procedural && _ibl.HasProceduralBake;
         var probeCfg    = _config.ReflectionProbe;
         var probeActive = probeCfg.Enabled && _reflectionProbe.Baked;
         var boxCenter   = new System.Numerics.Vector3(probeCfg.BoxCenter[0], probeCfg.BoxCenter[1], probeCfg.BoxCenter[2]);
         var boxHalf     = new System.Numerics.Vector3(probeCfg.BoxSize[0],   probeCfg.BoxSize[1],   probeCfg.BoxSize[2]);
         var iblInputs = new IblResolveInputs(
-            PrefilterMap:     activeSky?.PrefilteredMap ?? 0,
+            PrefilterMap:     procedural ? _ibl.ProceduralPrefiltered : (activeSky?.PrefilteredMap ?? 0),
             BrdfLut:          _ibl.BrdfLut,
             MaxReflectionLod: _ibl.MaxReflectionLod,
             Intensity:        _config.IBLConfig.IblIntensity,
-            HasIbl:           activeSky is { IblBaked: true },
+            HasIbl:           procedural || activeSky is { IblBaked: true },
             ProbePrefilterMap:     probeActive ? _reflectionProbe.PrefilteredMap : 0,
             ProbeMaxReflectionLod: _reflectionProbe.MaxReflectionLod,
             ProbeIntensity:        probeCfg.Intensity,
@@ -157,7 +172,7 @@ public class RenderingSystem : IDisposable
             ProbeBoxMin:           boxCenter - boxHalf,
             ProbeBoxMax:           boxCenter + boxHalf,
             ProbeBoxFalloff:       MathF.Max(probeCfg.BoxFalloff, 1e-3f)
-            );
+        );
         
         var planarCfg    = _config.PlanarReflection;
         var planarInputs = new PlanarResolveInputs(
@@ -168,13 +183,7 @@ public class RenderingSystem : IDisposable
             Distortion: _planar.Distortion,
             Blur:       _planar.Blur
         );
-        
-        var gBuffer = new GBufferTextures(_prepass.DepthTexture, _prepass.NormalTexture, _prepass.MaterialTexture);
-        using (_context.Profiler.Measure("Post"))
-            _post.Composite(scene.Cameras.Active, in gBuffer, _context.SsrActive, _context.TaaActive, in iblInputs,
-                _ssao.AoTexture, _context.SsaoActive, in planarInputs);
-        
-        RenderAfterPostComponents(scene, deltaTime);
+        return (iblInputs, planarInputs);
     }
 
     private void BeginFrame(Scene scene)
@@ -248,6 +257,17 @@ public class RenderingSystem : IDisposable
             _ssao.AoTexture, _post.VelocityTexture, _config.Camera.Near, _config.Camera.Far);
         
         _ui.Render(scene, in _context.Stats, _context.Profiler.Results);
+    }
+    
+    private void UpdateProceduralIbl(Scene scene)
+    {
+        if (!_config.Sky.Procedural) return;
+        if (scene.Lighting.DirectionalLights.Count == 0) return;
+
+        var sun    = scene.Lighting.DirectionalLights[0];
+        var sunDir = -System.Numerics.Vector3.Normalize(sun.Direction);
+
+        _ibl.UpdateProcedural(sunDir, _config.Sky.Turbidity, _config.Sky.Intensity);
     }
     
     private void UpdateDayNightSkybox(Scene scene)

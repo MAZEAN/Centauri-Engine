@@ -5,7 +5,7 @@ in  vec3 vDir;
 out vec4 FragColor;
 
 const vec2  invAtan = vec2(0.1591549, 0.3183099); // 1/(2π), 1/π
-const float PI      = 3.14159265;
+const vec3 RAYLEIGH_WEIGHT = vec3(0.35, 0.55, 1.0);
 
 uniform sampler2D uPanorama;
 uniform int   uHdr;         // 1 = linear HDR radiance, 0 = display-ready sRGB LDR
@@ -23,56 +23,21 @@ uniform float uSunGlowExponent; // higher = tighter halo around the disc
 uniform float uTurbidity;   // atmospheric haziness (1 clear .. 6+ hazy)
 uniform float uSkyIntensity; // scales relative sky radiance into the exposure/tonemap range
 
-// ── Preetham et al. "A Practical Analytic Model for Daylight" ────────────────────
-// The Perez luminance/chromaticity distribution: a 5-coefficient angular falloff whose
-// coefficients are linear in turbidity. We use the RELATIVE form (Yz = 1) rather than the
-// model's absolute cd/m² zenith luminance — absolute values are in the thousands and would
-// blow straight past this engine's exposure/tonemap pipeline; uSkyIntensity places the
-// normalized result back into range instead.
-float perez(float cosTheta, float gamma, float A, float B, float C, float D, float E)
+vec3 proceduralSky(vec3 dir, vec3 sunDir, float turbidity, float intensity)
 {
-    float cg = cos(gamma);
-    return (1.0 + A * exp(B / max(cosTheta, 0.01)))
-    * (1.0 + C * exp(D * gamma) + E * cg * cg);
-}
+    float sunUp   = clamp(sunDir.y, 0.0, 1.0);
+    float cosView = max(dir.y, 0.02);              // avoid dividing by ~0 at the horizon
+    float opticalDepth = 1.0 / cosView;             // thicker atmosphere path near the horizon
 
-vec3 preethamSky(vec3 dir, vec3 sunDir, float turbidity)
-{
-    float T = turbidity;
+    vec3 extinction = exp(-RAYLEIGH_WEIGHT * turbidity * 0.15 * opticalDepth);
+    vec3 rayleigh   = vec3(1.0) - extinction;
 
-    // Perez coefficients (linear in turbidity), for luminance Y and chromaticity x, y.
-    float AY =  0.1787 * T - 1.4630, BY = -0.3554 * T + 0.4275, CY = -0.0227 * T + 5.3251,
-          DY =  0.1206 * T - 2.5771, EY = -0.0670 * T + 0.3703;
-    float Ax = -0.0193 * T - 0.2592, Bx = -0.0665 * T + 0.0008, Cx = -0.0004 * T + 0.2125,
-          Dx = -0.0641 * T - 0.8989, Ex = -0.0033 * T + 0.0452;
-    float Ay = -0.0167 * T - 0.2608, By = -0.0950 * T + 0.0092, Cy = -0.0079 * T + 0.2102,
-          Dy = -0.0441 * T - 1.6537, Ey = -0.0109 * T + 0.0529;
+    float cosTheta = dot(dir, sunDir);
+    float mie = pow(clamp(cosTheta, 0.0, 1.0), 8.0);
 
-    float thetaS  = acos(clamp(sunDir.y, 0.0, 1.0));   // sun angle from zenith
-    float cosTheta = max(dir.y, 0.0);                  // view angle from zenith (cos)
-    float gamma    = acos(clamp(dot(dir, sunDir), -1.0, 1.0));  // view-to-sun angle
+    vec3 color = rayleigh * RAYLEIGH_WEIGHT * 2.0 + mie * vec3(1.0, 0.85, 0.65) * 0.5;
 
-    // Zenith chromaticity as a polynomial in (thetaS, turbidity).
-    float t2 = thetaS * thetaS, t3 = t2 * thetaS, T2 = T * T;
-    float xz = ( 0.00166 * t3 - 0.00375 * t2 + 0.00209 * thetaS)            * T2
-    + (-0.02903 * t3 + 0.06377 * t2 - 0.03202 * thetaS + 0.00394) * T
-    + ( 0.11693 * t3 - 0.21196 * t2 + 0.06052 * thetaS + 0.25886);
-    float yz = ( 0.00275 * t3 - 0.00610 * t2 + 0.00317 * thetaS)            * T2
-    + (-0.04214 * t3 + 0.08970 * t2 - 0.04153 * thetaS + 0.00516) * T
-    + ( 0.15346 * t3 - 0.26756 * t2 + 0.06670 * thetaS + 0.26688);
-
-    // Relative luminance + chromaticity, each normalized against the zenith-toward-sun value.
-    float Y = perez(cosTheta, gamma, AY, BY, CY, DY, EY) / perez(1.0, thetaS, AY, BY, CY, DY, EY);
-    float x = xz * perez(cosTheta, gamma, Ax, Bx, Cx, Dx, Ex) / perez(1.0, thetaS, Ax, Bx, Cx, Dx, Ex);
-    float y = yz * perez(cosTheta, gamma, Ay, By, Cy, Dy, Ey) / perez(1.0, thetaS, Ay, By, Cy, Dy, Ey);
-
-    // xyY → XYZ → linear sRGB.
-    vec3 XYZ = vec3(x / y * Y, Y, (1.0 - x - y) / y * Y);
-    vec3 rgb = mat3( 3.2406, -0.9689,  0.0557,
-            -1.5372,  1.8758, -0.2040,
-            -0.4986,  0.0415,  1.0570) * XYZ;
-
-    return max(rgb, vec3(0.0));
+    return color * intensity * (0.2 + 0.8 * sunUp);
 }
 
 void main()
@@ -83,7 +48,7 @@ void main()
 
     if (uMode == 1)
     {
-        color = preethamSky(d, uSunDir, uTurbidity) * uSkyIntensity;
+        color = proceduralSky(d, uSunDir, uTurbidity, uSkyIntensity);
 
         // Fade to a dim night blue as the sun sinks (Preetham is undefined below the horizon).
         // Tracks the same elevation DayNightCycle uses to fade the light, so sky + lighting

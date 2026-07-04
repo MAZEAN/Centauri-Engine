@@ -278,14 +278,17 @@ public class MainRenderer : IDisposable
 
     private void BindIbl(Scene scene)
     {
-        _iblActive = scene.Skyboxes.Active is { IblBaked: true };
+        var procedural = _config.Sky.Procedural && _ibl.HasProceduralBake;
+        var sky        = scene.Skyboxes.Active;
+
+        _iblActive = procedural || sky is { IblBaked: true };
+        
         if (!_iblActive) return;
 
-        var sky = scene.Skyboxes.Active!;
         _gl.ActiveTexture(TextureUnit.Texture5);
-        _gl.BindTexture(TextureTarget.TextureCubeMap, sky.IrradianceMap);
+        _gl.BindTexture(TextureTarget.TextureCubeMap, procedural ? _ibl.ProceduralIrradiance : sky!.IrradianceMap);
         _gl.ActiveTexture(TextureUnit.Texture6);
-        _gl.BindTexture(TextureTarget.TextureCubeMap, sky.PrefilteredMap);
+        _gl.BindTexture(TextureTarget.TextureCubeMap, procedural ? _ibl.ProceduralPrefiltered : sky!.PrefilteredMap);
         _gl.ActiveTexture(TextureUnit.Texture7);
         _gl.BindTexture(TextureTarget.Texture2D, _ibl.BrdfLut);
     }

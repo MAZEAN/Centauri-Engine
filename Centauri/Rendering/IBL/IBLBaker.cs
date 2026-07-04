@@ -11,18 +11,29 @@ using Config;
 // global BRDF LUT. Standard split-sum / LearnOpenGL flow.
 public sealed class IBLBaker : IDisposable
 {
+    private const float RebakeCosThreshold = 0.999f;  // ~2.5° of sun movement before re-baking
+    private const float RebakeValueEpsilon = 0.01f;
+    
     private readonly GL _gl;
     private readonly IBLConfig _config;
     
     private readonly uint _fbo, _rbo, _cubeVao, _cubeVbo, _quadVao;
-    private readonly GLShader _toCube, _irradiance, _prefilter, _brdf;
+    private readonly GLShader _toCube, _irradiance, _prefilter, _brdf, _proceduralEnv;
     private readonly Matrix4x4 _proj;
     private readonly Matrix4x4[] _views;
     
     private readonly List<uint> _baked = [];
+    
+    private Vector3 _proceduralSunDir = Vector3.UnitY;
+    private float   _proceduralTurbidity = float.NaN;
+    private float   _proceduralIntensity  = float.NaN;
 
     public uint BrdfLut { get; }
     public int MaxReflectionLod => _config.PrefilterMips - 1;
+    
+    public uint ProceduralIrradiance  { get; private set; }
+    public uint ProceduralPrefiltered { get; private set; }
+    public bool HasProceduralBake => ProceduralPrefiltered != 0;
 
     public IBLBaker(GL gl, IBLConfig config)
     {
@@ -39,6 +50,7 @@ public sealed class IBLBaker : IDisposable
         _toCube     = Load("equirect_to_cubemap");
         _irradiance = Load("irradiance");
         _prefilter  = Load("prefilter");
+        _proceduralEnv = Load("procedural_env");
         _brdf = new GLShader(gl,
             PathResolver.Resolve("Shaders/Post/post.vert"),
             PathResolver.Resolve("Shaders/IBL/brdf.frag"));
@@ -86,7 +98,63 @@ public sealed class IBLBaker : IDisposable
         }
     }
     
-    public uint ConvolveIrradiance(uint env)
+    public void UpdateProcedural(Vector3 sunDir, float turbidity, float intensity)
+    {
+        sunDir = Vector3.Normalize(sunDir);
+
+        var needsBake = !HasProceduralBake
+                        || Vector3.Dot(sunDir, _proceduralSunDir) < RebakeCosThreshold
+                        || MathF.Abs(turbidity - _proceduralTurbidity) > RebakeValueEpsilon
+                        || MathF.Abs(intensity - _proceduralIntensity) > RebakeValueEpsilon;
+
+        if (!needsBake) return;
+
+        _gl.Disable(EnableCap.CullFace);
+        try
+        {
+            var env = CreateCubemap(_config.EnvSize, mips: true);
+            _proceduralEnv.Use();
+            _proceduralEnv.SetUniform("uProjection",   _proj);
+            _proceduralEnv.SetUniform("uSunDir",       sunDir);
+            _proceduralEnv.SetUniform("uTurbidity",    turbidity);
+            _proceduralEnv.SetUniform("uSkyIntensity", intensity);
+
+            RenderToCube(env, _config.EnvSize, 0, _proceduralEnv);
+            _gl.BindTexture(TextureTarget.TextureCubeMap, env);
+            _gl.GenerateMipmap(TextureTarget.TextureCubeMap);
+
+            var irr = ConvolveIrradiance(env);
+            var pre = PrefilterEnvironment(env, _config.EnvSize);
+
+            _gl.DeleteTexture(env);
+            _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+
+            DisposeProcedural();   // only now — once the new pair exists — free the old one
+            ProceduralIrradiance  = irr;
+            ProceduralPrefiltered = pre;
+        }
+        finally
+        {
+            _gl.Enable(EnableCap.CullFace);
+        }
+
+        _proceduralSunDir     = sunDir;
+        _proceduralTurbidity  = turbidity;
+        _proceduralIntensity  = intensity;
+    }
+
+    private void DisposeProcedural()
+    {
+        if (ProceduralIrradiance  != 0) 
+            _gl.DeleteTexture(ProceduralIrradiance);
+        if (ProceduralPrefiltered != 0)
+            _gl.DeleteTexture(ProceduralPrefiltered);
+        
+        ProceduralIrradiance  = 0;
+        ProceduralPrefiltered = 0;
+    }
+    
+    private uint ConvolveIrradiance(uint env)
     {
         var irr = CreateCubemap(_config.IrradianceSize, mips: false);
         _irradiance.Use();
@@ -258,9 +326,13 @@ public sealed class IBLBaker : IDisposable
         _irradiance.Dispose(); 
         _prefilter.Dispose(); 
         _brdf.Dispose();
+        _proceduralEnv.Dispose();
         
         foreach (var t in _baked) 
             _gl.DeleteTexture(t);
+        
         _baked.Clear();
+        DisposeProcedural();
+
     }
 }
