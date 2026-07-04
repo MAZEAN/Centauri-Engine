@@ -52,13 +52,11 @@ public sealed class GPUProfiler : IDisposable
             if (!_issued[_frame, z]) continue;
 
             _gl.GetQueryObject(_queries[_frame, z], QueryObjectParameterName.ResultAvailable, out uint ready);
-            if (ready != 0)
-            {
-                _gl.GetQueryObject(_queries[_frame, z], QueryObjectParameterName.Result, out uint ns);
-                _ms[z] = ns / 1_000_000.0;
-            }
+            if (ready == 0) continue;
 
-            _issued[_frame, z] = false;   // consumed; re-armed below if measured this frame
+            _gl.GetQueryObject(_queries[_frame, z], QueryObjectParameterName.Result, out uint ns);
+            _ms[z] = ns / 1_000_000.0;
+            _issued[_frame, z] = false; 
         }
 
         for (var z = 0; z < _zoneCount; z++)
@@ -72,6 +70,9 @@ public sealed class GPUProfiler : IDisposable
         if (!_enabled || _open) return;   // ignore overlap — TIME_ELAPSED is singular
 
         var slot = Slot(name);
+        
+        if (_issued[_frame, slot]) return;
+        
         _open = true;
         _issued[_frame, slot] = true;
         _gl.BeginQuery(QueryTarget.TimeElapsed, _queries[_frame, slot]);
