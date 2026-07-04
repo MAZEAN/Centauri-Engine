@@ -13,6 +13,13 @@ public sealed class IBLBaker : IDisposable
 {
     private const float RebakeCosThreshold = 0.999f;  // ~2.5° of sun movement before re-baking
     private const float RebakeValueEpsilon = 0.01f;
+    private const float MinRebakeInterval  = 1.0f;    // seconds — hard floor regardless of sun speed
+    public const float FullIrradianceSampleDelta = 0.025f;
+    public const int   FullPrefilterSampleCount  = 1024;
+    private const float ProceduralIrradianceSampleDelta = 0.1f;
+    private const int   ProceduralPrefilterSampleCount  = 64;
+
+    private float _lastProceduralBakeTime = float.NegativeInfinity;
     
     private readonly GL _gl;
     private readonly IBLConfig _config;
@@ -81,8 +88,8 @@ public sealed class IBLBaker : IDisposable
             _gl.BindTexture(TextureTarget.TextureCubeMap, env);
             _gl.GenerateMipmap(TextureTarget.TextureCubeMap);
     
-            var irr = ConvolveIrradiance(env);
-            var pre = PrefilterEnvironment(env, _config.EnvSize);
+            var irr = ConvolveIrradiance(env, FullIrradianceSampleDelta);
+            var pre = PrefilterEnvironment(env, _config.EnvSize, FullPrefilterSampleCount);
     
             _gl.DeleteTexture(env);
             _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
@@ -107,7 +114,7 @@ public sealed class IBLBaker : IDisposable
                         || MathF.Abs(turbidity - _proceduralTurbidity) > RebakeValueEpsilon
                         || MathF.Abs(intensity - _proceduralIntensity) > RebakeValueEpsilon;
 
-        if (!needsBake) return;
+        if (!needsBake || Time.Now - _lastProceduralBakeTime < MinRebakeInterval) return;
 
         _gl.Disable(EnableCap.CullFace);
         try
@@ -123,8 +130,8 @@ public sealed class IBLBaker : IDisposable
             _gl.BindTexture(TextureTarget.TextureCubeMap, env);
             _gl.GenerateMipmap(TextureTarget.TextureCubeMap);
 
-            var irr = ConvolveIrradiance(env);
-            var pre = PrefilterEnvironment(env, _config.EnvSize);
+            var irr = ConvolveIrradiance(env, ProceduralIrradianceSampleDelta);
+            var pre = PrefilterEnvironment(env, _config.EnvSize, ProceduralPrefilterSampleCount);
 
             _gl.DeleteTexture(env);
             _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
@@ -141,6 +148,7 @@ public sealed class IBLBaker : IDisposable
         _proceduralSunDir     = sunDir;
         _proceduralTurbidity  = turbidity;
         _proceduralIntensity  = intensity;
+        _lastProceduralBakeTime = Time.Now;
     }
 
     private void DisposeProcedural()
@@ -154,13 +162,14 @@ public sealed class IBLBaker : IDisposable
         ProceduralPrefiltered = 0;
     }
     
-    private uint ConvolveIrradiance(uint env)
+    private uint ConvolveIrradiance(uint env, float sampleDelta)
     {
         var irr = CreateCubemap(_config.IrradianceSize, mips: false);
         _irradiance.Use();
         _irradiance.SetUniform("uProjection", _proj);
         _irradiance.SetUniform("uEnv", 0);
         _irradiance.SetUniform("uMaxRadiance", _config.MaxRadiance);
+        _irradiance.SetUniform("uSampleDelta", sampleDelta);
 
         _gl.ActiveTexture(TextureUnit.Texture0);
         _gl.BindTexture(TextureTarget.TextureCubeMap, env);
@@ -169,7 +178,7 @@ public sealed class IBLBaker : IDisposable
         return irr;
     }
     
-    public uint PrefilterEnvironment(uint env, uint envSize)
+    public uint PrefilterEnvironment(uint env, uint envSize, int sampleCount)
     {
         var pre = CreateCubemap(_config.PrefilterSize, mips: true);
         _prefilter.Use();
@@ -177,6 +186,7 @@ public sealed class IBLBaker : IDisposable
         _prefilter.SetUniform("uEnv", 0);
         _prefilter.SetUniform("uResolution", envSize);
         _prefilter.SetUniform("uMaxRadiance", _config.MaxRadiance);
+        _prefilter.SetUniform("uSampleCount", sampleCount);
 
         _gl.ActiveTexture(TextureUnit.Texture0);
         _gl.BindTexture(TextureTarget.TextureCubeMap, env);

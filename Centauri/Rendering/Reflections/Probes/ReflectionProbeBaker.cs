@@ -110,7 +110,7 @@ public sealed class ReflectionProbeBaker : IDisposable
         if (PrefilteredMap != 0)
             _gl.DeleteTexture(PrefilteredMap);
 
-        PrefilteredMap = _ibl.PrefilterEnvironment(env, _config.Resolution);
+        PrefilteredMap = _ibl.PrefilterEnvironment(env, _config.Resolution, IBLBaker.FullPrefilterSampleCount);
 
         _gl.DeleteTexture(env);
     }

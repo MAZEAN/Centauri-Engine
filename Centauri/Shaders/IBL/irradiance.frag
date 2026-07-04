@@ -7,6 +7,7 @@ const float PI = 3.14159265359;
 
 uniform samplerCube uEnv;
 uniform float uMaxRadiance;
+uniform float uSampleDelta;
 
 void main() {
     vec3 N = normalize(vLocalPos);
@@ -17,20 +18,19 @@ void main() {
     
     vec3 irradiance = vec3(0.0);
     float samples = 0.0;
-    
-    for (float phi = 0.0; phi < 2.0 * PI; phi += 0.025)
-    
-    for (float theta = 0.0; theta < 0.5 * PI; theta += 0.025) {
-        vec3 t = vec3(sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta));
-        vec3 s = t.x * right + t.y * up + t.z * N;
 
-        vec3 c = texture(uEnv, s).rgb;
-        float peak = max(max(c.r, c.g), c.b);
-        
-        c *= uMaxRadiance / (uMaxRadiance + peak);   // smooth rolloff — caps brights, no hard edge
-        irradiance += c * cos(theta) * sin(theta);
-        
-        samples++;
-    }
+    for (float phi = 0.0; phi < 2.0 * PI; phi += uSampleDelta)
+        for (float theta = 0.0; theta < 0.5 * PI; theta += uSampleDelta) {
+            vec3 t = vec3(sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta));
+            vec3 s = t.x * right + t.y * up + t.z * N;
+    
+            vec3 c = texture(uEnv, s).rgb;
+            float peak = max(max(c.r, c.g), c.b);
+            
+            c *= uMaxRadiance / (uMaxRadiance + peak);   // smooth rolloff — caps brights, no hard edge
+            irradiance += c * cos(theta) * sin(theta);
+            
+            samples++;
+        }
     FragColor = vec4(PI * irradiance / samples, 1.0);
 }

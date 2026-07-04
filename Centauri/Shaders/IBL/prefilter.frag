@@ -9,6 +9,7 @@ uniform samplerCube uEnv;
 uniform float uRoughness;
 uniform float uResolution;     // env face size, for mip selection
 uniform float uMaxRadiance;
+uniform int   uSampleCount;
 
 float RadicalInverse_VdC(uint bits) {
     bits = (bits<<16u) | (bits>>16u);
@@ -51,9 +52,8 @@ void main() {
     vec3 N = normalize(vLocalPos); 
     vec3 V = N;
     
-    const uint S = 1024u; 
-    
-    vec3 acc = vec3(0.0); 
+    vec3 acc = vec3(0.0);
+    uint S = uint(uSampleCount);
     float w = 0.0;
     
     for (uint i = 0u; i < S; i++) {
