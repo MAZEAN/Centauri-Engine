@@ -9,23 +9,18 @@ using System.Numerics;
 public sealed class DayNightCycle : Component
 {
     private readonly float   _speed;        // time-of-day fraction advanced per second
+    private float _time;                    // [0,1): 0 midnight, .25 sunrise, .5 noon, .75 sunset
     private readonly float   _dayIntensity; // peak sun intensity at noon
     private readonly Vector3 _dayColor;     // sun color near noon
     private readonly Vector3 _duskColor;    // sun color near the horizon
-
-    private float _time;  // [0,1): 0 midnight, .25 sunrise, .5 noon, .75 sunset
+    
     public bool Paused { get; private set; } = true;
     
     // 0 = full night, 1 = full day — drives ambient/IBL dimming and skybox selection
     public float Daylight { get; private set; }
 
-    public DayNightCycle(
-        float    speed        = 0.02f,
-        float    startTime    = 0.3f,
-        float    dayIntensity = 4f,
-        Vector3? dayColor     = null,
-        Vector3? duskColor    = null
-    )
+    public DayNightCycle(float speed = 0.02f, float startTime = 0.3f, 
+        float dayIntensity = 4f, Vector3? dayColor = null, Vector3? duskColor  = null)
     {
         _speed        = speed;
         _time         = Wrap01(startTime);
@@ -36,10 +31,12 @@ public sealed class DayNightCycle : Component
 
     public void Toggle() => Paused = !Paused;
     
-    public static bool IsDay(Scene scene) =>
-        scene.FindComponent<DayNightCycle>() is not { } cycle || cycle.Daylight >= 0.5f;
+    public static float DaylightOf(Scene scene) =>
+        scene.FindComponent<DayNightCycle>() is { } cycle ? cycle.Daylight : 1f;
 
-    protected override void OnAttach() => Apply();   // place the sun immediately
+    public static bool IsDay(Scene scene) => DaylightOf(scene) >= 0.5f;
+
+    protected override void OnAttach() => Apply();
 
     public override void Update(float dt)
     {

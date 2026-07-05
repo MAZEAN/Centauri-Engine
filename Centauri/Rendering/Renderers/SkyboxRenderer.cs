@@ -39,26 +39,31 @@ public class SkyboxRenderer : IDisposable
     
     public void Render(Scene scene, Matrix4x4 view, Matrix4x4 projection)
     {
-        var sky = scene.Skyboxes.Active;
-        var procedural = _config.Sky.Procedural && DayNightCycle.IsDay(scene);
+        var proceduralEnabled = _config.Sky.Procedural;
+        var blend = proceduralEnabled ? DayNightCycle.DaylightOf(scene) : 0f;
 
-        if (!procedural && sky is null) return;   // textured mode needs a loaded panorama
+        var sky = proceduralEnabled
+            ? (scene.Skyboxes.TryGet("Night", out var night) ? night : scene.Skyboxes.Active)
+            : scene.Skyboxes.Active;
+
+        if (sky is null)
+        {
+            if (blend <= 0f) return;   // textured mode needs a loaded panorama
+            blend = 1f;                // procedural with nothing to fade to — stay fully procedural
+        }
 
         view.Translation = Vector3.Zero;
 
         SetSkyboxRenderState();
 
         _shader.Use();
-        _shader.SetUniform("uView",       view);
-        _shader.SetUniform("uProjection", projection);
-        _shader.SetUniform("uMode",       procedural ? 1 : 0);
+        _shader.SetUniform("uView",            view);
+        _shader.SetUniform("uProjection",      projection);
+        _shader.SetUniform("uProceduralBlend", blend);
+        _shader.SetUniform("uTurbidity",       _config.Sky.Turbidity);
+        _shader.SetUniform("uSkyIntensity",    _config.Sky.Intensity);
         
-        if (procedural)
-        {
-            _shader.SetUniform("uTurbidity",    _config.Sky.Turbidity);
-            _shader.SetUniform("uSkyIntensity", _config.Sky.Intensity);
-        }
-        else if (sky is { } s)
+        if (sky is { } s)
         {
             _shader.SetUniform("uPanorama",   0);
             _shader.SetUniform("uHdr",        s.Texture.IsHdr ? 1 : 0);

@@ -46,11 +46,14 @@ public class SkyboxSet
     
     public bool TrySetActive(string name)
     {
-        if (!_byName.TryGetValue(name, out var sky)) return false;
+        if (!_byName.TryGetValue(name, out var sky)) 
+            return false;
         
         Active = sky;
         return true;
     }
+    
+    public bool TryGet(string name, out Skybox? sky) => _byName.TryGetValue(name, out sky);
 
     public void Cycle()
     {
