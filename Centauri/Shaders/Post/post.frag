@@ -19,6 +19,12 @@ uniform float     uBloomIntensity; // additive strength
 uniform sampler2D uSsr;            // screen-space reflections (pre-weighted, additive)
 uniform int       uHasSsr;
 
+uniform sampler2D uAutoLuminance;       // 1x1 adapted average log-luminance (AutoExposurePass)
+uniform int       uAutoExposureEnabled;
+uniform float     uAutoKeyValue;        // "middle grey" target the adapted luminance is aimed at
+uniform float     uAutoMinExposure;
+uniform float     uAutoMaxExposure;
+
 vec3 ACESFilm(vec3 x)
 {
     const float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;
@@ -39,7 +45,14 @@ void main()
     color = clamp(color, 0.0, maxVal);              // kill +Inf before tonemap
 
     // ── linear-space grading ──
-    color *= uExposure;
+    color *= uExposure;   // manual EV-compensation dial — stays in effect either way
+
+    if (uAutoExposureEnabled == 1)
+    {
+        float avgLuma       = exp(texture(uAutoLuminance, vec2(0.5)).r);   // log-luminance -> linear
+        float autoExposure  = uAutoKeyValue / max(avgLuma, 1e-4);
+        color *= clamp(autoExposure, uAutoMinExposure, uAutoMaxExposure);
+    }
     color = max(color - uBlackLevel, 0.0);
 
     // ── tonemap ──

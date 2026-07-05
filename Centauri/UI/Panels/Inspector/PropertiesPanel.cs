@@ -45,6 +45,7 @@ public class PropertiesPanel
                 new SSAOSection(config),
                 new TAASection(config),
                 new BloomSection(config),
+                new AutoExposureSection(config.AutoExposure),
                 new ColorGradingSection(config.ColorGrading)
             ]),
             new SectionGroup("Scene", ColorPalette.Amber, [

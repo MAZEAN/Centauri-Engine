@@ -145,7 +145,7 @@ public class RenderingSystem : IDisposable
         var gBuffer = new GBufferTextures(_prepass.DepthTexture, _prepass.NormalTexture, _prepass.MaterialTexture);
         using (_context.Profiler.Measure("Post"))
             _post.Composite(scene.Cameras.Active, in gBuffer, _context.SsrActive, _context.TaaActive, in iblInputs,
-                _ssao.AoTexture, _context.SsaoActive, in planarInputs);
+                _ssao.AoTexture, _context.SsaoActive, in planarInputs, deltaTime);
         
         RenderAfterPostComponents(scene, deltaTime);
     }

@@ -54,6 +54,7 @@ public sealed class PostProcessor : IDisposable
     
     private readonly GLShader _tonemap;
     private readonly BloomPass _bloom;
+    private readonly AutoExposurePass _autoExposure;
     private readonly uint _emptyVao;   // core profile needs a bound VAO for attribute-less draws
 
     public PostProcessor(GL gl, HDRFramebuffer hdr, AppConfig config, uint width, uint height)
@@ -68,6 +69,7 @@ public sealed class PostProcessor : IDisposable
             PathResolver.Resolve("Shaders/Post/post.vert"),
             PathResolver.Resolve("Shaders/Post/post.frag"));
         _bloom = new BloomPass(gl, _config.Bloom, width, height);
+        _autoExposure = new AutoExposurePass(gl, _config.AutoExposure, width, height);
         _ssr = new SSRPass(gl, _config.SSR, width, height);
         _taa = new TAAPass(gl, _config.TAA, width, height);
         _emptyVao = gl.GenVertexArray();
@@ -79,6 +81,7 @@ public sealed class PostProcessor : IDisposable
         _height = height;
         _hdr.Resize(width, height);
         _bloom.Resize(width, height);
+        _autoExposure.Resize(width, height);
         _ssr.Resize(width, height);
         _taa.Resize(width, height);
     }
@@ -90,7 +93,7 @@ public sealed class PostProcessor : IDisposable
 
     public void Composite(Camera camera, in GBufferTextures gBuffer,
         bool ssrAvailable, bool taaAvailable, in IblResolveInputs ibl, uint ssaoTex, bool ssaoActive,
-        in PlanarResolveInputs planar)
+        in PlanarResolveInputs planar, float deltaTime)
     {
         _hdr.Resolve();
 
@@ -107,6 +110,10 @@ public sealed class PostProcessor : IDisposable
             _taa.Render(sceneColor, ssrActive ? _ssr.ReflectionTexture : 0, ssrActive, gBuffer.Depth, camera);
             sceneColor = _taa.OutputTexture;
         }
+        
+        var autoExposureActive = _config.AutoExposure.Enabled;
+        if (autoExposureActive)
+            _autoExposure.Render(sceneColor, deltaTime);
         
         var bloomActive = _config.Bloom.Enabled;
         if (bloomActive)
@@ -142,6 +149,15 @@ public sealed class PostProcessor : IDisposable
         _tonemap.SetUniform("uSsr",    2);
         _tonemap.SetUniform("uHasSsr", ssrInTonemap ? 1 : 0);
         
+        _gl.ActiveTexture(TextureUnit.Texture3);
+        _gl.BindTexture(TextureTarget.Texture2D, autoExposureActive ? _autoExposure.AdaptedLuminanceTexture : 0);
+
+        _tonemap.SetUniform("uAutoLuminance",       3);
+        _tonemap.SetUniform("uAutoExposureEnabled", autoExposureActive ? 1 : 0);
+        _tonemap.SetUniform("uAutoKeyValue",        _config.AutoExposure.KeyValue);
+        _tonemap.SetUniform("uAutoMinExposure",     _config.AutoExposure.MinExposure);
+        _tonemap.SetUniform("uAutoMaxExposure",     _config.AutoExposure.MaxExposure);
+        
         _gl.BindVertexArray(_emptyVao);
         _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
         _gl.BindVertexArray(0);
@@ -164,6 +180,7 @@ public sealed class PostProcessor : IDisposable
         _hdr.Dispose();
         _tonemap.Dispose();
         _bloom.Dispose();
+        _autoExposure.Dispose();
         _ssr.Dispose();
         _taa.Dispose();
         
