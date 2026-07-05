@@ -21,8 +21,15 @@ public sealed class ShadowArray : IDisposable
         gl.TexImage3D(TextureTarget.Texture2DArray, 0, InternalFormat.DepthComponent24,
             size, size, (uint)layers, 0, PixelFormat.DepthComponent, PixelType.Float, null);
 
-        gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMinFilter, (int)GLEnum.Nearest);
-        gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMagFilter, (int)GLEnum.Nearest);
+        // Linear, even though the shader now does its own manual depth comparison instead of
+        // relying on a sampler2DArrayShadow's hardware compare: foliage casters are alpha-tested
+        // cutouts (see depth.frag), so the stored depth flips hard between "leaf" and "gap" at
+        // every leaf edge. Nearest-sampling that raw, unblended per-texel would turn the intended
+        // soft, dappled leaf-shadow look into coarse screen-door noise. Linear blends across those
+        // edges before the compare, trading a little precision at hard silhouettes for smooth
+        // penumbrae — the Poisson-disk multi-tap blur still supplies the bulk of the softness.
+        gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMinFilter, (int)GLEnum.Linear);
+        gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
         gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureWrapS, (int)GLEnum.ClampToBorder);
         gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureWrapT, (int)GLEnum.ClampToBorder);
         

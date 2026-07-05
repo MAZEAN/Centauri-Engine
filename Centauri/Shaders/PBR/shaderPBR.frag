@@ -170,14 +170,14 @@ float SampleCascade(int c, vec3 N, vec3 L)
     {
         float selfBias   = nOffset / max(uDepthRangeWorld[c], 1e-4);
         float avgBlocker = FindBlockerDepth(c, proj.xy, current, uBlockerRadius, selfBias);
-        if (avgBlocker < 0.0)
-            return 0.0;   // nothing occludes within the search window — fully lit, skip the PCF pass
-
-        // orthographic (directional/parallel) light: penumbra grows linearly with occluder
-        // distance, no perspective divide needed — unlike point/spot-light PCSS.
-        float worldPenumbra  = (current - avgBlocker) * uDepthRangeWorld[c] * uLightSize;
-        float penumbraTexels = worldPenumbra / uTexelWorld[c];
-        radius = clamp(penumbraTexels, radius, uMaxPenumbra);
+        if (avgBlocker >= 0.0)
+        {
+            // orthographic (directional/parallel) light: penumbra grows linearly with
+            // occluder distance, no perspective divide needed — unlike point/spot-light PCSS.
+            float worldPenumbra  = (current - avgBlocker) * uDepthRangeWorld[c] * uLightSize;
+            float penumbraTexels = worldPenumbra / uTexelWorld[c];
+            radius = clamp(penumbraTexels, radius, uMaxPenumbra);
+        }
     }
 
     vec2 texel = 1.0 / vec2(textureSize(uShadowMap, 0).xy);
