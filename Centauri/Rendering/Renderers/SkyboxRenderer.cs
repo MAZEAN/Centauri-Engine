@@ -59,6 +59,10 @@ public class SkyboxRenderer : IDisposable
         _shader.SetUniform("uProceduralBlend", blend);
         _shader.SetUniform("uTurbidity",       _config.Sky.Turbidity);
         _shader.SetUniform("uSkyIntensity",    _config.Sky.Intensity);
+        _shader.SetUniform("uCloudCoverage", _config.Sky.Clouds ? _config.Sky.CloudCoverage : 0f);
+        _shader.SetUniform("uCloudScale",    _config.Sky.CloudScale);
+        _shader.SetUniform("uCloudSpeed",    _config.Sky.CloudSpeed);
+        _shader.SetUniform("uTime",          Time.Now);
         
         if (sky is { } s)
         {

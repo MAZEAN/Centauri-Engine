@@ -267,7 +267,9 @@ public class RenderingSystem : IDisposable
         var sun    = scene.Lighting.DirectionalLights[0];
         var sunDir = -System.Numerics.Vector3.Normalize(sun.Direction);
 
-        _ibl.UpdateProcedural(sunDir, _config.Sky.Turbidity, _config.Sky.Intensity);
+        var cloudCoverage = _config.Sky.Clouds ? _config.Sky.CloudCoverage : 0f;
+        _ibl.UpdateProcedural(sunDir, _config.Sky.Turbidity, _config.Sky.Intensity,
+            cloudCoverage, _config.Sky.CloudScale, _config.Sky.CloudSpeed);
     }
     
     private void UpdateDayNightSkybox(Scene scene)

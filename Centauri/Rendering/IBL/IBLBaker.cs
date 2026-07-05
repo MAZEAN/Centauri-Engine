@@ -34,6 +34,8 @@ public sealed class IBLBaker : IDisposable
     private Vector3 _proceduralSunDir = Vector3.UnitY;
     private float   _proceduralTurbidity = float.NaN;
     private float   _proceduralIntensity  = float.NaN;
+    private float   _proceduralCloudCoverage = float.NaN;
+    private float   _proceduralCloudScale    = float.NaN;
 
     public uint BrdfLut { get; }
     public int MaxReflectionLod => _config.PrefilterMips - 1;
@@ -105,14 +107,18 @@ public sealed class IBLBaker : IDisposable
         }
     }
     
-    public void UpdateProcedural(Vector3 sunDir, float turbidity, float intensity)
+    public void UpdateProcedural(Vector3 sunDir, float turbidity, float intensity,
+        float cloudCoverage, float cloudScale, float cloudSpeed)
     {
         sunDir = Vector3.Normalize(sunDir);
 
         var needsBake = !HasProceduralBake
                         || Vector3.Dot(sunDir, _proceduralSunDir) < RebakeCosThreshold
                         || MathF.Abs(turbidity - _proceduralTurbidity) > RebakeValueEpsilon
-                        || MathF.Abs(intensity - _proceduralIntensity) > RebakeValueEpsilon;
+                        || MathF.Abs(intensity - _proceduralIntensity) > RebakeValueEpsilon
+                        || MathF.Abs(intensity - _proceduralIntensity) > RebakeValueEpsilon
+                        || MathF.Abs(cloudCoverage - _proceduralCloudCoverage) > RebakeValueEpsilon
+                        || MathF.Abs(cloudScale - _proceduralCloudScale) > RebakeValueEpsilon;
 
         if (!needsBake || Time.Now - _lastProceduralBakeTime < MinRebakeInterval) return;
 
@@ -121,10 +127,14 @@ public sealed class IBLBaker : IDisposable
         {
             var env = CreateCubemap(_config.EnvSize, mips: true);
             _proceduralEnv.Use();
-            _proceduralEnv.SetUniform("uProjection",   _proj);
-            _proceduralEnv.SetUniform("uSunDir",       sunDir);
-            _proceduralEnv.SetUniform("uTurbidity",    turbidity);
-            _proceduralEnv.SetUniform("uSkyIntensity", intensity);
+            _proceduralEnv.SetUniform("uProjection",    _proj);
+            _proceduralEnv.SetUniform("uSunDir",        sunDir);
+            _proceduralEnv.SetUniform("uTurbidity",     turbidity);
+            _proceduralEnv.SetUniform("uSkyIntensity",  intensity);
+            _proceduralEnv.SetUniform("uCloudCoverage", cloudCoverage);
+            _proceduralEnv.SetUniform("uCloudScale",    cloudScale);
+            _proceduralEnv.SetUniform("uCloudSpeed",    cloudSpeed);
+            _proceduralEnv.SetUniform("uTime",          Time.Now);
 
             RenderToCube(env, _config.EnvSize, 0, _proceduralEnv);
             _gl.BindTexture(TextureTarget.TextureCubeMap, env);
@@ -145,10 +155,12 @@ public sealed class IBLBaker : IDisposable
             _gl.Enable(EnableCap.CullFace);
         }
 
-        _proceduralSunDir     = sunDir;
-        _proceduralTurbidity  = turbidity;
-        _proceduralIntensity  = intensity;
-        _lastProceduralBakeTime = Time.Now;
+        _proceduralSunDir        = sunDir;
+        _proceduralTurbidity     = turbidity;
+        _proceduralIntensity     = intensity;
+        _proceduralCloudCoverage = cloudCoverage;
+        _proceduralCloudScale    = cloudScale;
+        _lastProceduralBakeTime  = Time.Now;
     }
 
     private void DisposeProcedural()

@@ -14,19 +14,29 @@ public sealed class SkyConfig : IJsonOnDeserialized
     [JsonPropertyName("intensity")]  public float Intensity  { get; set; } = 1.0f;  // scales sky radiance into the exposure/tonemap range
     [JsonPropertyName("sunAngularSizeDeg")] public float SunAngularSizeDeg { get; set; } = 0.3f;   // ~0.25° is the real sun's half-angle
     [JsonPropertyName("sunGlowExponent")]   public float SunGlowExponent   { get; set; } = 750f;   // higher = tighter
+    [JsonPropertyName("clouds")]        public bool  Clouds        { get; set; } = false;
+    [JsonPropertyName("cloudCoverage")] public float CloudCoverage { get; set; } = 0.45f;  // 0 clear .. 1 overcast
+    [JsonPropertyName("cloudScale")]    public float CloudScale    { get; set; } = 2.0f;   // noise frequency — higher = smaller, more numerous clouds
+    [JsonPropertyName("cloudSpeed")]    public float CloudSpeed    { get; set; } = 0.02f;   // scroll speed
 
     [JsonIgnore] public float AuthoredTurbidity { get; private set; }
     [JsonIgnore] public float AuthoredIntensity { get; private set; }
     [JsonIgnore] public float AuthoredSunAngularSizeDeg { get; private set; }
     [JsonIgnore] public float AuthoredSunGlowExponent   { get; private set; }
+    [JsonIgnore] public float AuthoredCloudCoverage { get; private set; }
+    [JsonIgnore] public float AuthoredCloudScale     { get; private set; }
+    [JsonIgnore] public float AuthoredCloudSpeed     { get; private set; }
 
     public SkyConfig() => OnDeserialized();
 
     public void OnDeserialized()
     {
-        AuthoredTurbidity = Turbidity;
-        AuthoredIntensity = Intensity;
+        AuthoredTurbidity         = Turbidity;
+        AuthoredIntensity         = Intensity;
         AuthoredSunAngularSizeDeg = SunAngularSizeDeg;
         AuthoredSunGlowExponent   = SunGlowExponent;
+        AuthoredCloudCoverage     = CloudCoverage;
+        AuthoredCloudScale        = CloudScale;
+        AuthoredCloudSpeed        = CloudSpeed;
     }
 }
