@@ -110,7 +110,7 @@
     "refineSteps": 6,
     "roughnessCutoff": 0.6,
     "halfResolution": false,
-    "silhouetteThreshold": 0.1
+    "silhouetteThreshold": 0.6
   },
   "taa": {
     "enabled": false,
