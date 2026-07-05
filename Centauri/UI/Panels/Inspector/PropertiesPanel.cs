@@ -31,6 +31,7 @@ public class PropertiesPanel
             new SectionGroup("Environment", ColorPalette.Green, [
                 new SkyboxSection(),
                 new SkySection(config),
+                new DayNightSection(),
                 new ShadowSection(config),
                 new WindSection(config)
             ]),

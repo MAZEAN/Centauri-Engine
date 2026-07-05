@@ -36,8 +36,14 @@ vec3 proceduralSky(vec3 dir, vec3 sunDir, float turbidity, float intensity)
     float mie = pow(clamp(cosTheta, 0.0, 1.0), 8.0);
 
     vec3 color = rayleigh * RAYLEIGH_WEIGHT * 2.0 + mie * vec3(1.0, 0.85, 0.65) * 0.5;
+    color *= (0.2 + 0.8 * sunUp);
 
-    return color * intensity * (0.2 + 0.8 * sunUp);
+    float sunLow  = 1.0 - smoothstep(0.0, 0.35, sunUp);
+    float grazing = 1.0 - clamp(dir.y, 0.0, 1.0);
+    float sunSide = 0.4 + 0.6 * clamp(cosTheta, 0.0, 1.0);
+    color += vec3(1.0, 0.45, 0.2) * (sunLow * grazing * sunSide) * 0.6;
+
+    return color * intensity;
 }
 
 void main()

@@ -3,23 +3,17 @@
 in  vec3 vLocalPos;
 out vec4 FragColor;
 
+const vec3 RAYLEIGH_WEIGHT = vec3(0.35, 0.55, 1.0);
+
 uniform vec3  uSunDir;
 uniform float uTurbidity;
 uniform float uSkyIntensity;
 
-// Same bounded Rayleigh/Mie approximation as Shaders/Skybox/skybox.frag's proceduralSky —
-// this project has no shared-include mechanism between shader files, so keep any tuning
-// changes mirrored between the two by hand. Deliberately excludes the sun disc itself: baking
-// a tiny, extremely bright feature into a low-res irradiance/prefilter cubemap would either
-// alias badly or blow out the convolution — direct sun lighting already comes from the
-// DirectionalLight, this only needs the ambient sky around it.
-const vec3 RAYLEIGH_WEIGHT = vec3(0.35, 0.55, 1.0);
-
 vec3 proceduralSky(vec3 dir, vec3 sunDir, float turbidity, float intensity)
 {
     float sunUp   = clamp(sunDir.y, 0.0, 1.0);
-    float cosView = max(dir.y, 0.02);
-    float opticalDepth = 1.0 / cosView;
+    float cosView = max(dir.y, 0.02);              // avoid dividing by ~0 at the horizon
+    float opticalDepth = 1.0 / cosView;             // thicker atmosphere path near the horizon
 
     vec3 extinction = exp(-RAYLEIGH_WEIGHT * turbidity * 0.15 * opticalDepth);
     vec3 rayleigh   = vec3(1.0) - extinction;
@@ -28,8 +22,14 @@ vec3 proceduralSky(vec3 dir, vec3 sunDir, float turbidity, float intensity)
     float mie = pow(clamp(cosTheta, 0.0, 1.0), 8.0);
 
     vec3 color = rayleigh * RAYLEIGH_WEIGHT * 2.0 + mie * vec3(1.0, 0.85, 0.65) * 0.5;
+    color *= (0.2 + 0.8 * sunUp);
 
-    return color * intensity * (0.2 + 0.8 * sunUp);
+    float sunLow  = 1.0 - smoothstep(0.0, 0.35, sunUp);
+    float grazing = 1.0 - clamp(dir.y, 0.0, 1.0);
+    float sunSide = 0.4 + 0.6 * clamp(cosTheta, 0.0, 1.0);
+    color += vec3(1.0, 0.45, 0.2) * (sunLow * grazing * sunSide) * 0.6;
+
+    return color * intensity;
 }
 
 void main()

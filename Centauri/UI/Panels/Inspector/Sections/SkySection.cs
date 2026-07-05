@@ -26,5 +26,9 @@ public sealed class SkySection : ISection
             0.02f, 1f, 10f, "%.2f", conf.AuthoredTurbidity);
         Widgets.DragRow("Intensity", conf.Intensity, v => conf.Intensity = v,
             0.02f, 0f, 8f, "%.2f", conf.AuthoredIntensity);
+        Widgets.DragRow("Sun Size (deg)", conf.SunAngularSizeDeg, v => conf.SunAngularSizeDeg = v,
+            0.01f, 0.05f, 5f, "%.2f", conf.AuthoredSunAngularSizeDeg);
+        Widgets.DragRow("Sun Glow", conf.SunGlowExponent, v => conf.SunGlowExponent = v,
+            5f, 50f, 2000f, "%.0f", conf.AuthoredSunGlowExponent);
     }
 }

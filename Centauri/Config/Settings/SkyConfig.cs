@@ -12,9 +12,13 @@ public sealed class SkyConfig : IJsonOnDeserialized
     [JsonPropertyName("procedural")] public bool  Procedural { get; set; } = false;
     [JsonPropertyName("turbidity")]  public float Turbidity  { get; set; } = 2.5f;  // 1=clear alpine, 2-4=clear day, 6+=hazy
     [JsonPropertyName("intensity")]  public float Intensity  { get; set; } = 1.0f;  // scales sky radiance into the exposure/tonemap range
+    [JsonPropertyName("sunAngularSizeDeg")] public float SunAngularSizeDeg { get; set; } = 0.3f;   // ~0.25° is the real sun's half-angle
+    [JsonPropertyName("sunGlowExponent")]   public float SunGlowExponent   { get; set; } = 750f;   // higher = tighter
 
     [JsonIgnore] public float AuthoredTurbidity { get; private set; }
     [JsonIgnore] public float AuthoredIntensity { get; private set; }
+    [JsonIgnore] public float AuthoredSunAngularSizeDeg { get; private set; }
+    [JsonIgnore] public float AuthoredSunGlowExponent   { get; private set; }
 
     public SkyConfig() => OnDeserialized();
 
@@ -22,5 +26,7 @@ public sealed class SkyConfig : IJsonOnDeserialized
     {
         AuthoredTurbidity = Turbidity;
         AuthoredIntensity = Intensity;
+        AuthoredSunAngularSizeDeg = SunAngularSizeDeg;
+        AuthoredSunGlowExponent   = SunGlowExponent;
     }
 }

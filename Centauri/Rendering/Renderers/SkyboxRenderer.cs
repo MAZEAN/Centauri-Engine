@@ -12,9 +12,6 @@ using Config;
 
 public class SkyboxRenderer : IDisposable
 {
-    private const float SunAngularSizeCos  = 0.99999f; 
-    private const float SunGlowExponent    = 500f;    // higher = tighter halo
-    
     private readonly GL       _gl;
     private readonly AppConfig _config;
     
@@ -122,11 +119,12 @@ public class SkyboxRenderer : IDisposable
         var sun = scene.Lighting.DirectionalLights[0];
         
         var sunDir = -Vector3.Normalize(sun.Direction);
+        var angularSizeCos = MathF.Cos(_config.Sky.SunAngularSizeDeg * (MathF.PI / 180f));
 
         _shader.SetUniform("uSunDir",          sunDir);
         _shader.SetUniform("uSunColor",        sun.Color * sun.Intensity);
-        _shader.SetUniform("uSunAngularSize",  SunAngularSizeCos);
-        _shader.SetUniform("uSunGlowExponent", SunGlowExponent);
+        _shader.SetUniform("uSunAngularSize",  angularSizeCos);
+        _shader.SetUniform("uSunGlowExponent", _config.Sky.SunGlowExponent);
     }
 
     private void SetSkyboxRenderState()

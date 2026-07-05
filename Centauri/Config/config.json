@@ -122,6 +122,8 @@
   "sky": {
     "procedural": false,
     "turbidity": 2.5,
-    "intensity": 1.0
+    "intensity": 1.0,
+    "sunAngularSizeDeg": 0.3,
+    "sunGlowExponent": 750
   }
 }
