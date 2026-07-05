@@ -269,7 +269,7 @@ public class RenderingSystem : IDisposable
 
         var cloudCoverage = _config.Sky.Clouds ? _config.Sky.CloudCoverage : 0f;
         _ibl.UpdateProcedural(sunDir, _config.Sky.Turbidity, _config.Sky.Intensity,
-            cloudCoverage, _config.Sky.CloudScale, _config.Sky.CloudSpeed);
+            cloudCoverage, _config.Sky.CloudScale, _config.Sky.CloudSpeed, _config.Sky.CloudShading);
     }
     
     private void UpdateDayNightSkybox(Scene scene)

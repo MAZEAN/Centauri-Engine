@@ -39,5 +39,7 @@ public sealed class SkySection : ISection
             0.02f, 0.2f, 10f, "%.2f", conf.AuthoredCloudScale);
         Widgets.DragRow("Cloud Speed", conf.CloudSpeed, v => conf.CloudSpeed = v,
             0.002f, 0f, 0.5f, "%.3f", conf.AuthoredCloudSpeed);
+        Widgets.DragRow("Cloud Shading", conf.CloudShading, v => conf.CloudShading = v,
+            0.02f, 0f, 3f, "%.2f", conf.AuthoredCloudShading);
     }
 }

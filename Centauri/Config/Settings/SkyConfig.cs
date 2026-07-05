@@ -18,6 +18,8 @@ public sealed class SkyConfig : IJsonOnDeserialized
     [JsonPropertyName("cloudCoverage")] public float CloudCoverage { get; set; } = 0.45f;  // 0 clear .. 1 overcast
     [JsonPropertyName("cloudScale")]    public float CloudScale    { get; set; } = 2.0f;   // noise frequency — higher = smaller, more numerous clouds
     [JsonPropertyName("cloudSpeed")]    public float CloudSpeed    { get; set; } = 0.02f;   // scroll speed
+    [JsonPropertyName("cloudShading")]  public float CloudShading  { get; set; } = 1.0f;
+    [JsonIgnore] public float AuthoredCloudShading   { get; private set; }
 
     [JsonIgnore] public float AuthoredTurbidity { get; private set; }
     [JsonIgnore] public float AuthoredIntensity { get; private set; }
@@ -38,5 +40,6 @@ public sealed class SkyConfig : IJsonOnDeserialized
         AuthoredCloudCoverage     = CloudCoverage;
         AuthoredCloudScale        = CloudScale;
         AuthoredCloudSpeed        = CloudSpeed;
+        AuthoredCloudShading      = CloudShading;
     }
 }

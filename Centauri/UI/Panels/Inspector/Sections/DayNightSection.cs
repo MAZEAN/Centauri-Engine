@@ -37,6 +37,6 @@ public sealed class DayNightSection : ISection
             v => cycle.SetTimeOfDay(v / 24f), 0f, 24f, cycle.AuthoredTimeOfDay * 24f);
 
         Widgets.DragRow("Speed", cycle.SpeedMultiplier, v => cycle.SpeedMultiplier = MathF.Max(0f, v),
-            0.05f, 0f, 100f, "%.2fx", cycle.AuthoredSpeed);
+            0.05f, 0f, 100f, "%.2fx", 1f);
     }
 }

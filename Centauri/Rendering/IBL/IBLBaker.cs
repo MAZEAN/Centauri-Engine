@@ -32,10 +32,11 @@ public sealed class IBLBaker : IDisposable
     private readonly List<uint> _baked = [];
     
     private Vector3 _proceduralSunDir = Vector3.UnitY;
-    private float   _proceduralTurbidity = float.NaN;
-    private float   _proceduralIntensity  = float.NaN;
-    private float   _proceduralCloudCoverage = float.NaN;
-    private float   _proceduralCloudScale    = float.NaN;
+    private float _proceduralTurbidity = float.NaN;
+    private float _proceduralIntensity = float.NaN;
+    private float _proceduralCloudCoverage = float.NaN;
+    private float _proceduralCloudScale = float.NaN;
+    private float _proceduralCloudShading = float.NaN;
 
     public uint BrdfLut { get; }
     public int MaxReflectionLod => _config.PrefilterMips - 1;
@@ -108,7 +109,7 @@ public sealed class IBLBaker : IDisposable
     }
     
     public void UpdateProcedural(Vector3 sunDir, float turbidity, float intensity,
-        float cloudCoverage, float cloudScale, float cloudSpeed)
+        float cloudCoverage, float cloudScale, float cloudSpeed, float cloudShading)
     {
         sunDir = Vector3.Normalize(sunDir);
 
@@ -118,7 +119,8 @@ public sealed class IBLBaker : IDisposable
                         || MathF.Abs(intensity - _proceduralIntensity) > RebakeValueEpsilon
                         || MathF.Abs(intensity - _proceduralIntensity) > RebakeValueEpsilon
                         || MathF.Abs(cloudCoverage - _proceduralCloudCoverage) > RebakeValueEpsilon
-                        || MathF.Abs(cloudScale - _proceduralCloudScale) > RebakeValueEpsilon;
+                        || MathF.Abs(cloudScale - _proceduralCloudScale) > RebakeValueEpsilon
+                        || MathF.Abs(cloudShading - _proceduralCloudShading) > RebakeValueEpsilon;
 
         if (!needsBake || Time.Now - _lastProceduralBakeTime < MinRebakeInterval) return;
 
@@ -134,6 +136,7 @@ public sealed class IBLBaker : IDisposable
             _proceduralEnv.SetUniform("uCloudCoverage", cloudCoverage);
             _proceduralEnv.SetUniform("uCloudScale",    cloudScale);
             _proceduralEnv.SetUniform("uCloudSpeed",    cloudSpeed);
+            _proceduralEnv.SetUniform("uCloudShading",  cloudShading);
             _proceduralEnv.SetUniform("uTime",          Time.Now);
 
             RenderToCube(env, _config.EnvSize, 0, _proceduralEnv);
@@ -160,6 +163,7 @@ public sealed class IBLBaker : IDisposable
         _proceduralIntensity     = intensity;
         _proceduralCloudCoverage = cloudCoverage;
         _proceduralCloudScale    = cloudScale;
+        _proceduralCloudShading  = cloudShading;
         _lastProceduralBakeTime  = Time.Now;
     }
 

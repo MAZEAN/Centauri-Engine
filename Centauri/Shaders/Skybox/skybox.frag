@@ -26,12 +26,14 @@ uniform float uSkyIntensity; // scales relative sky radiance into the exposure/t
 uniform float uCloudCoverage;  // 0 = none (skipped entirely), 1 = fully overcast
 uniform float uCloudScale;     // noise frequency — higher = smaller, more numerous clouds
 uniform float uCloudSpeed;     // scroll speed
+uniform float uCloudShading;   // shading contrast: 0 = flat cutout, 1 = full effect, >1 = harder
 uniform float uTime;           // seconds, for scrolling
 
 float hash3(vec3 p)
 {
     p = fract(p * vec3(443.897, 441.423, 437.195));
     p += dot(p, p.yzx + 19.19);
+    
     return fract((p.x + p.y) * p.z);
 }
 
@@ -61,7 +63,6 @@ float valueNoise3(vec3 p)
     return mix(nxy0, nxy1, u.z);
 }
 
-// 5 octaves, amplitudes halving — bounded to [0, ~0.97] regardless of input.
 float fbm(vec3 p)
 {
     float sum = 0.0;
@@ -75,9 +76,22 @@ float fbm(vec3 p)
     return sum;
 }
 
-vec3 applyClouds(vec3 skyColor, vec3 dir, vec3 sunDir, float coverage, float scale, float speed, float time)
+float fbmLite(vec3 p)
 {
-    if (coverage <= 0.0) 
+    float sum = 0.0;
+    float amp = 0.5;
+    for (int i = 0; i < 2; i++)
+    {
+        sum += amp * valueNoise3(p);
+        p   *= 2.0;
+        amp *= 0.5;
+    }
+    return sum;
+}
+
+vec3 applyClouds(vec3 skyColor, vec3 dir, vec3 sunDir, float coverage, float scale, float speed, float shading, float time)
+{
+    if (coverage <= 0.0)
         return skyColor;   // clouds off — skip the noise entirely
 
     vec3 wind   = vec3(0.7, 0.3, 0.5) * time * speed;
@@ -92,19 +106,23 @@ vec3 applyClouds(vec3 skyColor, vec3 dir, vec3 sunDir, float coverage, float sca
     float density   = smoothstep(threshold, threshold + 0.05, eroded);
     density *= smoothstep(-0.05, 0.1, dir.y);   // no clouds at/below the horizon
 
-    if (density <= 0.001) return skyColor;   // clear here — skip the shading work below
+    if (density <= 0.001) 
+        return skyColor;   // clear here — skip the shading work below
     
-    float e  = 0.08;
-    float nx = valueNoise3(p + vec3(e, 0.0, 0.0)) - valueNoise3(p - vec3(e, 0.0, 0.0));
-    float ny = valueNoise3(p + vec3(0.0, e, 0.0)) - valueNoise3(p - vec3(0.0, e, 0.0));
-    float nz = valueNoise3(p + vec3(0.0, 0.0, e)) - valueNoise3(p - vec3(0.0, 0.0, e));
-    vec3  cloudNormal = normalize(vec3(-nx, -ny, -nz) + vec3(0.0, 0.6, 0.0));
+    float thickness = clamp((eroded - threshold) / 0.5, 0.0, 1.0);
     
     float detail = fbm(p * 3.0 + vec3(5.2, 1.3, 7.8));
-
-    float wrap  = clamp(dot(cloudNormal, sunDir) * 0.5 + 0.5, 0.0, 1.0);
-    float shade = clamp(mix(0.45, 1.0, wrap) * mix(0.85, 1.0, detail), 0.0, 1.0);
-    vec3  base  = mix(vec3(0.5, 0.53, 0.6), vec3(0.95, 0.95, 0.98), shade);
+    
+    float e  = 0.2;
+    float nx = fbmLite(p + vec3(e, 0.0, 0.0)) - fbmLite(p - vec3(e, 0.0, 0.0));
+    float ny = fbmLite(p + vec3(0.0, e, 0.0)) - fbmLite(p - vec3(0.0, e, 0.0));
+    float nz = fbmLite(p + vec3(0.0, 0.0, e)) - fbmLite(p - vec3(0.0, 0.0, e));
+    vec3  cloudNormal = normalize(vec3(-nx, -ny, -nz) * 4.0 + vec3(0.0, 0.3, 0.0));
+    float wrap = clamp(dot(cloudNormal, sunDir) * 0.5 + 0.5, 0.0, 1.0);
+    
+    float rawShade = mix(0.35, 1.0, thickness) * mix(0.8, 1.0, detail) * mix(0.75, 1.0, wrap);
+    float shd      = clamp(mix(1.0, rawShade, shading), 0.0, 1.0);
+    vec3  base     = mix(vec3(0.35, 0.38, 0.45), vec3(0.95, 0.95, 0.98), shd);
 
     float sunFacing = pow(clamp(dot(dir, sunDir), 0.0, 1.0), 2.0);
     float sunLow    = 1.0 - smoothstep(0.0, 0.35, clamp(sunDir.y, 0.0, 1.0));
@@ -125,10 +143,10 @@ vec3 proceduralSky(vec3 dir, vec3 sunDir, float turbidity, float intensity)
 
     float cosTheta = dot(dir, sunDir);
     float mie = pow(clamp(cosTheta, 0.0, 1.0), 8.0);
-
-    vec3 color = rayleigh * RAYLEIGH_WEIGHT * 2.0 + mie * vec3(1.0, 0.85, 0.65) * 0.5;
+    
+    vec3 color = rayleigh * RAYLEIGH_WEIGHT + mie * vec3(1.0, 0.85, 0.65) * 0.3;
     color *= (0.2 + 0.8 * sunUp);
-
+    
     float sunLow  = 1.0 - smoothstep(0.0, 0.35, sunUp);
     float grazing = 1.0 - clamp(dir.y, 0.0, 1.0);
     float sunSide = 0.4 + 0.6 * clamp(cosTheta, 0.0, 1.0);
@@ -145,19 +163,19 @@ void main()
     float day = smoothstep(-0.08, 0.12, uSunDir.y);
     procedural = mix(vec3(0.008, 0.012, 0.025), procedural, day);
 
-    procedural = applyClouds(procedural, d, uSunDir, uCloudCoverage, uCloudScale, uCloudSpeed, uTime);
+    procedural = applyClouds(procedural, d, uSunDir, uCloudCoverage, uCloudScale, uCloudSpeed, uCloudShading, uTime);
 
     vec2 uv = vec2(atan(d.z, d.x), asin(clamp(d.y, -1.0, 1.0))) * invAtan + 0.5;
     vec3 textured = texture(uPanorama, uv).rgb;
-    
+
     if (uHdr == 1)
-        textured *= uExposure;
+    textured *= uExposure;
     else
-        textured = pow(textured, vec3(2.2));
+    textured = pow(textured, vec3(2.2));
     textured = max(textured - uBlackLevel, vec3(0.0));
 
     vec3 color = mix(textured, procedural, uProceduralBlend);
-    
+
     float cosAngle = dot(d, uSunDir);
     float disc     = smoothstep(uSunAngularSize - 0.0006, uSunAngularSize, cosAngle);
     float glow     = pow(max(cosAngle, 0.0), uSunGlowExponent);
