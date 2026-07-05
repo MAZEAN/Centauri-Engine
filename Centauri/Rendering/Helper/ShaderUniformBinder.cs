@@ -72,6 +72,11 @@ public sealed class ShaderUniformBinder
         shader.SetUniform("uShadowBias", _config.Shadows.DepthBias);
         shader.SetUniform("uNormalBias", _config.Shadows.NormalBias);
         shader.SetUniform("uPcfRadius",  _config.Shadows.PcfRadius);
+        
+        shader.SetUniform("uPcss",         _config.Shadows.ContactHardening ? 1 : 0);
+        shader.SetUniform("uLightSize",    _config.Shadows.LightSize);
+        shader.SetUniform("uBlockerRadius", _config.Shadows.BlockerSearchRadius);
+        shader.SetUniform("uMaxPenumbra",  _config.Shadows.MaxPenumbraRadius);
     }
 
     public static void UploadMaterial(GLShader shader, Material mat)

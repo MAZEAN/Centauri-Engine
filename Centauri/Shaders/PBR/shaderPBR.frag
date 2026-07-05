@@ -16,6 +16,7 @@ const int   MAX_SPOT_LIGHTS  = 16;
 const int   MAX_CASCADES = 4;
 const float CASCADE_BLEND = 0.1;   // fraction of a cascade's depth range used as the cross-fade band
 const float SHADOW_FADE   = 0.1;   // fraction of the shadow distance over which shadows fade out
+const int BLOCKER_TAPS = 8;   // subset of POISSON_DISK — cheaper than the full PCF tap count
 
 const int  POISSON_COUNT = 16;
 const vec2 POISSON_DISK[16] = vec2[](
@@ -85,11 +86,12 @@ uniform int       uHasSSAO;
 uniform int uFoliage;   // 1 = two-sided foliage: add leaf transmission, skip screen-space AO
 
 // Shadows
-uniform sampler2DArrayShadow uShadowMap;         // unit 8 (now an array)
+uniform sampler2DArray uShadowMap;   // unit 8 (now an array) — sampled manually (no HW compare) below
 layout(std140) uniform Shadows {
     mat4 uLightMatrices[MAX_CASCADES];
     vec4 uCascadeSplits;
     vec4 uTexelWorld;
+    vec4 uDepthRangeWorld;
 };
 
 uniform int   uCascadeCount;
@@ -98,6 +100,13 @@ uniform float uShadowBias;
 uniform float uNormalBias;
 uniform int   uPcfRadius;
 
+// PCSS — contact hardening
+uniform int   uPcss;
+uniform float uLightSize;      // tan(sun half-angle): world penumbra growth per unit occluder distance
+uniform float uBlockerRadius;  // blocker-search disk radius, in texels
+uniform float uMaxPenumbra;    // clamp on the resulting PCF radius, in texels
+
+// Debugging
 uniform int uShowCascades;
 
 int SelectCascade(float viewDepth) 
@@ -107,6 +116,39 @@ int SelectCascade(float viewDepth)
             return i;
     
     return uCascadeCount - 1;
+}
+
+mat2 InterleavedGradientRotation()
+{
+    float ign = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+    float ang = ign * 6.28318530;
+    float sa  = sin(ang), ca = cos(ang);
+    
+    return mat2(ca, -sa, sa, ca);
+}
+
+// Average depth of samples closer to the light than `current`, searched over a
+// `radiusTexels` disk. Returns -1 when nothing in the window occludes the point, so the
+// caller can skip the PCF pass entirely (fully lit).
+float FindBlockerDepth(int c, vec2 uv, float current, float radiusTexels)
+{
+    vec2 texel = 1.0 / vec2(textureSize(uShadowMap, 0).xy);
+    mat2 rot   = InterleavedGradientRotation();
+
+    float sum   = 0.0;
+    int   count = 0;
+    for (int i = 0; i < BLOCKER_TAPS; ++i)
+    {
+        vec2  offset = (rot * POISSON_DISK[i]) * radiusTexels * texel;
+        float z      = texture(uShadowMap, vec3(uv + offset, float(c))).r;
+        if (z < current)
+        {
+            sum += z;
+            count++;
+        }
+    }
+
+    return count > 0 ? sum / float(count) : -1.0;
 }
 
 float SampleCascade(int c, vec3 N, vec3 L) 
@@ -120,22 +162,31 @@ float SampleCascade(int c, vec3 N, vec3 L)
 
     float bias    = max(uShadowBias * (1.0 - dot(N, L)), uShadowBias * 0.1);
     float current = proj.z - bias;
-    
-    vec2 texel = 1.0 / vec2(textureSize(uShadowMap, 0).xy);
-
-    float ign = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
-    float ang = ign * 6.28318530;
-    float sa  = sin(ang), ca = cos(ang);
-    mat2  rot = mat2(ca, -sa, sa, ca);
 
     float radius = float(uPcfRadius);
+
+    if (uPcss == 1)
+    {
+        float avgBlocker = FindBlockerDepth(c, proj.xy, current, uBlockerRadius);
+        if (avgBlocker < 0.0)
+        return 0.0;   // nothing occludes within the search window — fully lit, skip the PCF pass
+
+        // orthographic (directional/parallel) light: penumbra grows linearly with occluder
+        // distance, no perspective divide needed — unlike point/spot-light PCSS.
+        float worldPenumbra  = (current - avgBlocker) * uDepthRangeWorld[c] * uLightSize;
+        float penumbraTexels = worldPenumbra / uTexelWorld[c];
+        radius = clamp(penumbraTexels, radius, uMaxPenumbra);
+    }
+
+    vec2 texel = 1.0 / vec2(textureSize(uShadowMap, 0).xy);
+    mat2  rot  = InterleavedGradientRotation();
 
     float lit = 0.0;
     for (int i = 0; i < POISSON_COUNT; ++i)
     {
-        // vec4(uv.xy, layer, compareDepth) — GPU compares + 2x2 blends in one tap
-        vec2 offset = (rot * POISSON_DISK[i]) * radius * texel;
-        lit += texture(uShadowMap, vec4(proj.xy + offset, float(c), current));
+        vec2  offset = (rot * POISSON_DISK[i]) * radius * texel;
+        float z      = texture(uShadowMap, vec3(proj.xy + offset, float(c))).r;
+        lit += z < current ? 0.0 : 1.0;
     }
 
     return 1.0 - lit / float(POISSON_COUNT);

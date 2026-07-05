@@ -29,10 +29,9 @@ public sealed class ShadowSection : ISection
             0.0001f, 0f, 0.02f, "%.4f", _config.AuthoredDepthBias);
         Widgets.DragRow("Normal Bias", _config.NormalBias, v => _config.NormalBias = v,
             0.1f,    0f, 10.0f, "%.3f", _config.AuthoredNormalBias);
-
         Widgets.DragRow("PCF Radius", _config.PcfRadius, v => _config.PcfRadius = (int)MathF.Round(v),
             1f, 0f, 4f, "%.0f", _config.AuthoredPcfRadius);
-
+        
         var sizeIndex = Array.IndexOf(Sizes, _config.Size);
         if (Widgets.ComboRow("Map Size", ref sizeIndex, SizeLabels))
             _config.Size = sizeIndex >= 0 ? Sizes[sizeIndex] : _config.AuthoredSize;
@@ -42,6 +41,17 @@ public sealed class ShadowSection : ISection
             1f, 1f, _config.MaxCascades, "%.0f", _config.AuthoredCascadeCount);
         Widgets.DragRow("Split Blend", _config.SplitLambda, v => _config.SplitLambda = v,
             0.01f, 0f, 1f, "%.2f", _config.AuthoredSplitLambda);
+        
+        Widgets.CheckRow("Contact Hardening", _config.ContactHardening, v => _config.ContactHardening = v);
+        if (_config.ContactHardening)
+        {
+            Widgets.DragRow("Light Size", _config.LightSize, v => _config.LightSize = v,
+                0.001f, 0f, 0.1f, "%.3f", _config.AuthoredLightSize);
+            Widgets.DragRow("Blocker Search", _config.BlockerSearchRadius, v => _config.BlockerSearchRadius = v,
+                0.5f, 1f, 16f, "%.1f", _config.AuthoredBlockerSearchRadius);
+            Widgets.DragRow("Max Penumbra", _config.MaxPenumbraRadius, v => _config.MaxPenumbraRadius = v,
+                1f, 1f, 48f, "%.0f", _config.AuthoredMaxPenumbraRadius);
+        }
 
         Widgets.CheckRow("Tint Cascades", _config.DebugCascades, v => _config.DebugCascades = v);
     }

@@ -72,7 +72,11 @@
     "normalBias": 2.5,
     "pcfRadius": 2,
     "cascadeCount": 4,
-    "splitLambda": 0.85
+    "splitLambda": 0.85,
+    "contactHardening": true,
+    "lightSize": 0.02,
+    "blockerSearchRadius": 5.0,
+    "maxPenumbraRadius": 24.0
   },
   "grading": {
     "exposure": 1.0,

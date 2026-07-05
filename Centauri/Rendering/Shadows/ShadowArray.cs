@@ -21,15 +21,10 @@ public sealed class ShadowArray : IDisposable
         gl.TexImage3D(TextureTarget.Texture2DArray, 0, InternalFormat.DepthComponent24,
             size, size, (uint)layers, 0, PixelFormat.DepthComponent, PixelType.Float, null);
 
-        gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMinFilter, (int)GLEnum.Linear);
-        gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
+        gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMinFilter, (int)GLEnum.Nearest);
+        gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMagFilter, (int)GLEnum.Nearest);
         gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureWrapS, (int)GLEnum.ClampToBorder);
         gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureWrapT, (int)GLEnum.ClampToBorder);
-        
-        // hardware depth comparison — turns this into a sampler2DArrayShadow source.
-        // LEQUAL matches the old "lit when current <= closest" test; Linear above → free 2x2 PCF.
-        gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureCompareMode, (int)GLEnum.CompareRefToTexture);
-        gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureCompareFunc, (int)GLEnum.Lequal);
         
         Span<float> border = [1f, 1f, 1f, 1f];
         fixed (float* b = border)

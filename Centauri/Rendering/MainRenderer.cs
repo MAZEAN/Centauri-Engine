@@ -317,7 +317,7 @@ public class MainRenderer : IDisposable
         float size   = _config.Shadows.Size;
         for (var i = 0; i < cascades.Length; i++)
             _shadowBuffer.SetCascade(i, cascades[i].Matrix, cascades[i].SplitDepth,
-                cascades[i].Radius * 2f / size);
+                cascades[i].Radius * 2f / size, cascades[i].DepthRange);
 
         _shadowBuffer.Upload();
     }

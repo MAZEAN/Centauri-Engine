@@ -6,10 +6,16 @@ using Config;
 using World;
 using Utils.Geometry;
 
-// Pure cascade-fitting math for CSM — no GL. Splits the camera frustum (PSSM),
-// fits a stable, texel-snapped ortho box per slice (bounding-sphere method), and
-// extends the depth range toward the closest caster. Lives apart from ShadowMapper
-// so the bias/cascade tuning is testable without a GL context.
+public struct Cascade
+{
+    public Matrix4x4 Matrix;      // lightView * lightProj  (GLSL: uLightMatrix * pos)
+    public float     SplitDepth;  // view-space far depth — used for cascade selection
+    public Vector3   Center;      // world-space slice center  (depth-pass culling, Step 2)
+    public float     Radius;      // bounding-sphere radius    (depth-pass culling, Step 2)
+    public float     DepthRange;  // world-space extent of the light-space Z range (farZ - nearZ) —
+    // lets PCSS convert a depth-space blocker distance to world units
+}
+
 public sealed class CascadeBuilder
 {
     private const float UpThreshold = 0.99f;   // switch up-vector when the sun is ~vertical
@@ -141,6 +147,7 @@ public sealed class CascadeBuilder
             SplitDepth = splitDepth,
             Center     = center,
             Radius     = radius,
+            DepthRange = farZ - nearZ,
         };
     }
 

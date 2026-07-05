@@ -19,10 +19,11 @@ public sealed class ShadowBuffer : IDisposable
     public const uint BindingPoint = 1;   // Lights occupies 0
 
     private const int MaxCascades    = 4;
-    private const int MatricesFloats = MaxCascades * 16;   // 64
+    private const int MatricesFloats = MaxCascades * 16;    // 64
     private const int SplitsBase     = MatricesFloats;      // 64
     private const int TexelBase      = SplitsBase + 4;      // 68
-    private const int TotalFloats    = TexelBase + 4;       // 72
+    private const int DepthRangeBase = TexelBase + 4;       // 72
+    private const int TotalFloats    = DepthRangeBase + 4;  // 76
     private const int TotalBytes     = TotalFloats * sizeof(float);
 
     private readonly UniformBufferObject _ubo;
@@ -32,11 +33,12 @@ public sealed class ShadowBuffer : IDisposable
 
     // Pack one cascade's matrix plus its split depth and world texel size. The vec4 packing
     // of splits/texel assumes at most MaxCascades (4) cascades — one component each.
-    public void SetCascade(int index, Matrix4x4 matrix, float splitDepth, float texelWorld)
+    public void SetCascade(int index, Matrix4x4 matrix, float splitDepth, float texelWorld, float depthRangeWorld)
     {
         MemoryMarshal.Cast<float, Matrix4x4>(_data.AsSpan(index * 16, 16))[0] = matrix;
-        _data[SplitsBase + index] = splitDepth;
-        _data[TexelBase  + index] = texelWorld;
+        _data[SplitsBase     + index] = splitDepth;
+        _data[TexelBase      + index] = texelWorld;
+        _data[DepthRangeBase + index] = depthRangeWorld;
     }
 
     public void Upload() => _ubo.Upload(_data);
