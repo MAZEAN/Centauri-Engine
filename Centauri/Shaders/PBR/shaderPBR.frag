@@ -130,18 +130,19 @@ mat2 InterleavedGradientRotation()
 // Average depth of samples closer to the light than `current`, searched over a
 // `radiusTexels` disk. Returns -1 when nothing in the window occludes the point, so the
 // caller can skip the PCF pass entirely (fully lit).
-float FindBlockerDepth(int c, vec2 uv, float current, float radiusTexels)
+float FindBlockerDepth(int c, vec2 uv, float current, float radiusTexels, float selfBias)
 {
     vec2 texel = 1.0 / vec2(textureSize(uShadowMap, 0).xy);
     mat2 rot   = InterleavedGradientRotation();
 
+    float threshold = current - selfBias;
     float sum   = 0.0;
     int   count = 0;
     for (int i = 0; i < BLOCKER_TAPS; ++i)
     {
         vec2  offset = (rot * POISSON_DISK[i]) * radiusTexels * texel;
         float z      = texture(uShadowMap, vec3(uv + offset, float(c))).r;
-        if (z < current)
+        if (z < threshold)
         {
             sum += z;
             count++;
@@ -167,9 +168,10 @@ float SampleCascade(int c, vec3 N, vec3 L)
 
     if (uPcss == 1)
     {
-        float avgBlocker = FindBlockerDepth(c, proj.xy, current, uBlockerRadius);
+        float selfBias   = nOffset / max(uDepthRangeWorld[c], 1e-4);
+        float avgBlocker = FindBlockerDepth(c, proj.xy, current, uBlockerRadius, selfBias);
         if (avgBlocker < 0.0)
-        return 0.0;   // nothing occludes within the search window — fully lit, skip the PCF pass
+            return 0.0;   // nothing occludes within the search window — fully lit, skip the PCF pass
 
         // orthographic (directional/parallel) light: penumbra grows linearly with occluder
         // distance, no perspective divide needed — unlike point/spot-light PCSS.
