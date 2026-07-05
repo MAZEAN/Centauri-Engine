@@ -63,6 +63,7 @@ public sealed class ShaderUniformBinder
     private void UploadShadow(GLShader shader)
     {
         shader.SetUniform("uShadowMap", 8);
+        shader.SetUniform("uShadowMapRaw", 10);
         shader.SetUniform("uHasShadow", _shadows.Active ? 1 : 0);
         shader.SetUniform("uShowCascades", _config.Shadows.DebugCascades ? 1 : 0);
         

@@ -15,8 +15,8 @@ const int   MAX_POINT_LIGHTS = 16;
 const int   MAX_SPOT_LIGHTS  = 16;
 const int   MAX_CASCADES = 4;
 const float CASCADE_BLEND = 0.1;   // fraction of a cascade's depth range used as the cross-fade band
-const float SHADOW_FADE   = 0.1;   // fraction of the shadow distance over which shadows fade out
-const int BLOCKER_TAPS = 8;   // subset of POISSON_DISK — cheaper than the full PCF tap count
+const float SHADOW_FADE = 0.1;   // fraction of the shadow distance over which shadows fade out
+const int   BLOCKER_TAPS = 8;   // subset of POISSON_DISK — cheaper than the full PCF tap count
 
 const int  POISSON_COUNT = 16;
 const vec2 POISSON_DISK[16] = vec2[](
@@ -82,11 +82,12 @@ uniform float uIblIntensity;
 
 // SSAO
 uniform sampler2D uSsaoMap;   // unit 9
-uniform int       uHasSSAO;
+uniform int uHasSSAO;
 uniform int uFoliage;   // 1 = two-sided foliage: add leaf transmission, skip screen-space AO
 
 // Shadows
-uniform sampler2DArray uShadowMap;   // unit 8 (now an array) — sampled manually (no HW compare) below
+uniform sampler2DArrayShadow uShadowMap;    // unit 8 — hardware compare, free 2x2 PCF blend per tap
+uniform sampler2DArray       uShadowMapRaw; // unit 10 — same depth, uncompared: PCSS blocker search only
 layout(std140) uniform Shadows {
     mat4 uLightMatrices[MAX_CASCADES];
     vec4 uCascadeSplits;
@@ -105,6 +106,14 @@ uniform int   uPcss;
 uniform float uLightSize;      // tan(sun half-angle): world penumbra growth per unit occluder distance
 uniform float uBlockerRadius;  // blocker-search disk radius, in texels
 uniform float uMaxPenumbra;    // clamp on the resulting PCF radius, in texels
+
+// Lighting
+layout(std140) uniform Lights {
+    DirLight   uDir;
+    PointLight uPoints[MAX_POINT_LIGHTS];
+    SpotLight  uSpots[MAX_SPOT_LIGHTS];
+    ivec4      uCounts; // x = pointCount, y = spotCount, z = hasDir
+};
 
 // Debugging
 uniform int uShowCascades;
@@ -132,7 +141,7 @@ mat2 InterleavedGradientRotation()
 // caller can skip the PCF pass entirely (fully lit).
 float FindBlockerDepth(int c, vec2 uv, float current, float radiusTexels, float selfBias)
 {
-    vec2 texel = 1.0 / vec2(textureSize(uShadowMap, 0).xy);
+    vec2 texel = 1.0 / vec2(textureSize(uShadowMapRaw, 0).xy);
     mat2 rot   = InterleavedGradientRotation();
 
     float threshold = current - selfBias;
@@ -141,7 +150,7 @@ float FindBlockerDepth(int c, vec2 uv, float current, float radiusTexels, float 
     for (int i = 0; i < BLOCKER_TAPS; ++i)
     {
         vec2  offset = (rot * POISSON_DISK[i]) * radiusTexels * texel;
-        float z      = texture(uShadowMap, vec3(uv + offset, float(c))).r;
+        float z      = texture(uShadowMapRaw, vec3(uv + offset, float(c))).r;
         if (z < threshold)
         {
             sum += z;
@@ -186,9 +195,9 @@ float SampleCascade(int c, vec3 N, vec3 L)
     float lit = 0.0;
     for (int i = 0; i < POISSON_COUNT; ++i)
     {
-        vec2  offset = (rot * POISSON_DISK[i]) * radius * texel;
-        float z      = texture(uShadowMap, vec3(proj.xy + offset, float(c))).r;
-        lit += z < current ? 0.0 : 1.0;
+        // vec4(uv.xy, layer, compareDepth) — GPU compares + 2x2 blends in one tap
+        vec2 offset = (rot * POISSON_DISK[i]) * radius * texel;
+        lit += texture(uShadowMap, vec4(proj.xy + offset, float(c), current));
     }
 
     return 1.0 - lit / float(POISSON_COUNT);
@@ -219,15 +228,6 @@ float ShadowFactor(vec3 N, vec3 L)
 
     return shadow * fade;
 }
-
-// ─── lighting ──────────────────────────────────────────────────────────────────
-// shared lights UBO (binding 0) — uploaded once per frame for all lit shaders
-layout(std140) uniform Lights {
-    DirLight   uDir;
-    PointLight uPoints[MAX_POINT_LIGHTS];
-    SpotLight  uSpots[MAX_SPOT_LIGHTS];
-    ivec4      uCounts; // x = pointCount, y = spotCount, z = hasDir
-};
 
 // ─── PBR functions ────────────────────────────────────────────────────────────
 

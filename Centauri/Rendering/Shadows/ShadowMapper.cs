@@ -39,7 +39,8 @@ public sealed class ShadowMapper : IDisposable
     private readonly ShadowCache _cache = new();
 
     public bool Active { get; private set; }
-    public uint DepthTexture => _maps.DepthTexture;
+    public uint DepthTexture    => _maps.DepthTexture;
+    public uint RawDepthTexture => _maps.RawDepthTexture;
 
     public Cascade[] Cascades { get; private set; } = [];
 
@@ -118,6 +119,8 @@ public sealed class ShadowMapper : IDisposable
         }
 
         ResetRenderState();
+        
+        _maps.SyncRawDepth();
         Active = true;
 
         _cache.Record(key);   // these maps are valid until one of the key's inputs changes

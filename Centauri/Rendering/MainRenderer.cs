@@ -305,8 +305,11 @@ public class MainRenderer : IDisposable
     private void BindShadows()
     {
         if (!_shadows.Active) return;
+        
         _gl.ActiveTexture(TextureUnit.Texture8);
         _gl.BindTexture(TextureTarget.Texture2DArray, _shadows.DepthTexture);
+        _gl.ActiveTexture(TextureUnit.Texture10);
+        _gl.BindTexture(TextureTarget.Texture2DArray, _shadows.RawDepthTexture);
     }
     
     private void UploadShadowData()
