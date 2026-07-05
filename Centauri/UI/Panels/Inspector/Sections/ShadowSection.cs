@@ -43,16 +43,13 @@ public sealed class ShadowSection : ISection
             0.01f, 0f, 1f, "%.2f", _config.AuthoredSplitLambda);
         
         Widgets.CheckRow("Contact Hardening", _config.ContactHardening, v => _config.ContactHardening = v);
-        if (_config.ContactHardening)
-        {
-            Widgets.DragRow("Light Size", _config.LightSize, v => _config.LightSize = v,
-                0.001f, 0f, 0.1f, "%.3f", _config.AuthoredLightSize);
-            Widgets.DragRow("Blocker Search", _config.BlockerSearchRadius, v => _config.BlockerSearchRadius = v,
-                0.5f, 1f, 16f, "%.1f", _config.AuthoredBlockerSearchRadius);
-            Widgets.DragRow("Max Penumbra", _config.MaxPenumbraRadius, v => _config.MaxPenumbraRadius = v,
-                1f, 1f, 48f, "%.0f", _config.AuthoredMaxPenumbraRadius);
-        }
-
+        Widgets.DragRow("Light Size", _config.LightSize, v => _config.LightSize = v,
+            0.001f, 0f, 0.1f, "%.3f", _config.AuthoredLightSize);
+        Widgets.DragRow("Blocker Search", _config.BlockerSearchRadius, v => _config.BlockerSearchRadius = v,
+            0.5f, 1f, 16f, "%.1f", _config.AuthoredBlockerSearchRadius);
+        Widgets.DragRow("Max Penumbra", _config.MaxPenumbraRadius, v => _config.MaxPenumbraRadius = v,
+            1f, 1f, 48f, "%.0f", _config.AuthoredMaxPenumbraRadius);
+        
         Widgets.CheckRow("Tint Cascades", _config.DebugCascades, v => _config.DebugCascades = v);
     }
 }
