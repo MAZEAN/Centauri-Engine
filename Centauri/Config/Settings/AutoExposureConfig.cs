@@ -8,7 +8,7 @@ using System.Text.Json.Serialization;
 // default: existing scenes keep their fixed manual exposure exactly as before until enabled.
 public sealed class AutoExposureConfig : IJsonOnDeserialized
 {
-    [JsonPropertyName("enabled")]     public bool  Enabled     { get; set; } = false;
+    [JsonPropertyName("enabled")]     public bool  Enabled     { get; set; } = true;
     [JsonPropertyName("keyValue")]    public float KeyValue    { get; set; } = 0.18f;  // "middle grey" target
     [JsonPropertyName("adaptSpeed")]  public float AdaptSpeed  { get; set; } = 1.5f;   // higher = adapts faster
     [JsonPropertyName("minExposure")] public float MinExposure { get; set; } = 0.1f;

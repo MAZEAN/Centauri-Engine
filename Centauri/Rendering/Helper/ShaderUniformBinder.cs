@@ -51,7 +51,7 @@ public sealed class ShaderUniformBinder
         shader.SetUniform("uBrdfLUT",       7);
         shader.SetUniform("uHasIBL", iblActive ? 1 : 0);
         shader.SetUniform("uMaxReflectionLod", (float)_ibl.MaxReflectionLod);
-        shader.SetUniform("uIblIntensity", _config.IBLConfig.IblIntensity * iblIntensityScale);
+        shader.SetUniform("uIblIntensity", _config.IBL.IblIntensity * iblIntensityScale);
     }
     
     private static void UploadSsao(GLShader shader, bool ssaoActive)

@@ -94,6 +94,13 @@
     "intensity": 0.05,
     "radius": 1.0
   },
+  "autoExposure": {
+    "enabled": true,
+    "keyValue": 0.18,
+    "adaptSpeed": 1.5,
+    "minExposure": 0.1,
+    "maxExposure": 8.0
+  },
   "ssr": {
     "enabled": true,
     "intensity": 1.0,

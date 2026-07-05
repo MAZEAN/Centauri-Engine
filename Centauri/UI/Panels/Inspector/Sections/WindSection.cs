@@ -9,24 +9,22 @@ using Common;
 // fall back on its static-cascade cache.
 public sealed class WindSection : ISection
 {
-    private readonly AppConfig _config;
+    private readonly WindConfig _config;
 
-    public WindSection(AppConfig config) => _config = config;
+    public WindSection(WindConfig config) => _config = config;
 
     public void Draw(Scene scene)
     {
         using var s = Widgets.Section("Wind", startCollapsed: true);
         if (!s.Open) return;
+        
+        Widgets.CheckRow("Enabled", _config.Enabled, v => _config.Enabled = v);
 
-        var conf = _config.Wind;
-
-        Widgets.CheckRow("Enabled", conf.Enabled, v => conf.Enabled = v);
-
-        Widgets.DragRow("Strength", conf.Strength, v => conf.Strength = MathF.Max(0f, v),
-            0.005f, 0f, 1f, "%.3f", conf.AuthoredStrength);
-        Widgets.DragRow("Speed", conf.Speed, v => conf.Speed = MathF.Max(0f, v),
-            0.05f, 0f, 10f, "%.2f", conf.AuthoredSpeed);
-        Widgets.SliderRow("Direction", conf.Direction, v => conf.Direction = v,
-            0f, 360f, conf.AuthoredDirection);
+        Widgets.DragRow("Strength", _config.Strength, v => _config.Strength = MathF.Max(0f, v),
+            0.005f, 0f, 1f, "%.3f", _config.AuthoredStrength);
+        Widgets.DragRow("Speed", _config.Speed, v => _config.Speed = MathF.Max(0f, v),
+            0.05f, 0f, 10f, "%.2f", _config.AuthoredSpeed);
+        Widgets.SliderRow("Direction", _config.Direction, v => _config.Direction = v,
+            0f, 360f, _config.AuthoredDirection);
     }
 }

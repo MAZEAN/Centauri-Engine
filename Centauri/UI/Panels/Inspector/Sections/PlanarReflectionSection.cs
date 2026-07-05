@@ -8,34 +8,32 @@ using Common;
 
 public sealed class PlanarReflectionSection : ISection
 {
-    private readonly AppConfig _config;
+    private readonly PlanarReflectionConfig _config;
 
-    public PlanarReflectionSection(AppConfig config) => _config = config;
+    public PlanarReflectionSection(PlanarReflectionConfig config) => _config = config;
 
     public void Draw(Scene scene)
     {
         using var s = Widgets.Section("Planar Reflection", startCollapsed: true);
         if (!s.Open) return;
+        
+        Widgets.CheckRow("Enabled", _config.Enabled, v => _config.Enabled = v);
 
-        var conf = _config.PlanarReflection;
-
-        Widgets.CheckRow("Enabled", conf.Enabled, v => conf.Enabled = v);
-
-        var bound = !string.IsNullOrEmpty(conf.ReflectorEntity);
+        var bound = !string.IsNullOrEmpty(_config.ReflectorEntity);
         if (bound)
-            ImGui.TextDisabled($"Plane bound to \"{conf.ReflectorEntity}\" (tracks its top).");
+            ImGui.TextDisabled($"Plane bound to \"{_config.ReflectorEntity}\" (tracks its top).");
         
         Widgets.DragRow(bound ? "Plane Height (fallback)" : "Plane Height",
-            conf.PlaneHeight, v => conf.PlaneHeight = v,
+            _config.PlaneHeight, v => _config.PlaneHeight = v,
             0.05f, -100f, 100f, "%.2f", -1.5f);
 
-        Widgets.DragRow("Intensity", conf.Intensity, v => conf.Intensity = v,
+        Widgets.DragRow("Intensity", _config.Intensity, v => _config.Intensity = v,
             0.01f, 0f, 4f, "%.2f", 1f);
         
-        Widgets.DragRow("Blur", conf.Blur, v => conf.Blur = v,
+        Widgets.DragRow("Blur", _config.Blur, v => _config.Blur = v,
             0.05f, 0f, 8f, "%.2f", 3f);
         
-        Widgets.DragRow("Distortion", conf.Distortion, v => conf.Distortion = v,
+        Widgets.DragRow("Distortion", _config.Distortion, v => _config.Distortion = v,
             0.001f, 0f, 0.2f, "%.3f", 0f);
 
         ImGui.TextDisabled("Half-res is a startup/resize setting (config).");

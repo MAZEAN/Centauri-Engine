@@ -74,7 +74,7 @@ public class RenderingSystem : IDisposable
         _context.Culling   = new CullingSystem(_config.Culling.CellSize, _config.Culling.OversizeFactor);
         
         _shadows = new ShadowMapper(gl, _config, _instances);
-        _ibl = new IBLBaker(gl, _config.IBLConfig);
+        _ibl = new IBLBaker(gl, _config.IBL);
         _context.Profiler = new GPUProfiler(gl);
         
         _mainRenderer   = new MainRenderer(gl, config, _ibl, _shadows, _instances);
@@ -139,15 +139,32 @@ public class RenderingSystem : IDisposable
         
         _post.BeginScene();
         RenderCentralComponents(scene, deltaTime);
+
+        var compositeRequest = CreateCompositeRequest(scene, deltaTime);
+        using (_context.Profiler.Measure("Post"))
+            _post.Composite(in compositeRequest);
         
+        RenderAfterPostComponents(scene, deltaTime);
+    }
+
+    private CompositeRequest CreateCompositeRequest(Scene scene, float deltaTime)
+    {
         var (iblInputs, planarInputs) = GetInputs(scene);
         
         var gBuffer = new GBufferTextures(_prepass.DepthTexture, _prepass.NormalTexture, _prepass.MaterialTexture);
-        using (_context.Profiler.Measure("Post"))
-            _post.Composite(scene.Cameras.Active, in gBuffer, _context.SsrActive, _context.TaaActive, in iblInputs,
-                _ssao.AoTexture, _context.SsaoActive, in planarInputs, deltaTime);
+        var compositeRequest = new CompositeRequest(
+            Camera:       scene.Cameras.Active,
+            GBuffer:      gBuffer,
+            SsrAvailable: _context.SsrActive,
+            TaaAvailable: _context.TaaActive,
+            Ibl:          iblInputs,
+            SsaoTexture:  _ssao.AoTexture,
+            SsaoActive:   _context.SsaoActive,
+            Planar:       planarInputs,
+            DeltaTime:    deltaTime
+        );
         
-        RenderAfterPostComponents(scene, deltaTime);
+        return compositeRequest;
     }
 
     private (IblResolveInputs, PlanarResolveInputs) GetInputs(Scene scene)
@@ -162,7 +179,7 @@ public class RenderingSystem : IDisposable
             PrefilterMap:     procedural ? _ibl.ProceduralPrefiltered : (activeSky?.PrefilteredMap ?? 0),
             BrdfLut:          _ibl.BrdfLut,
             MaxReflectionLod: _ibl.MaxReflectionLod,
-            Intensity:        _config.IBLConfig.IblIntensity,
+            Intensity:        _config.IBL.IblIntensity,
             HasIbl:           procedural || activeSky is { IblBaked: true },
             ProbePrefilterMap:     probeActive ? _reflectionProbe.PrefilteredMap : 0,
             ProbeMaxReflectionLod: _reflectionProbe.MaxReflectionLod,

@@ -6,25 +6,23 @@ using Common;
 
 public sealed class ViewportSection : ISection
 {
-    private readonly AppConfig _config;
+    private readonly DebugConfig _config;
 
-    public ViewportSection(AppConfig config) => _config = config;
+    public ViewportSection(DebugConfig config) => _config = config;
 
     public void Draw(Scene scene)
     {
         using var s = Widgets.Section("Viewport", startCollapsed: true);
         if (!s.Open) return;
 
-        var d = _config.Debug;   // reference type — setters mutate the shared instance
-
-        Widgets.CheckRow("Grid",            d.ShowGrid,          v => d.ShowGrid          = v);
-        Widgets.CheckRow("Skybox",          d.ShowSkybox,        v => d.ShowSkybox        = v);
-        Widgets.CheckRow("Stats Overlay",   d.ShowStatsOverlay,  v => d.ShowStatsOverlay  = v);
-        Widgets.CheckRow("Frustum Culling", d.EnableCulling,     v => d.EnableCulling     = v);
-        Widgets.CheckRow("Anisotropic",     d.AnisotropicFilter, v => d.AnisotropicFilter = v);
-        Widgets.CheckRow("Bounding Boxes",  d.ShowBoundingBoxes, v => d.ShowBoundingBoxes = v);
-        Widgets.CheckRow("Spatial Grid",    d.ShowCullingGrid,   v => d.ShowCullingGrid   = v);
-        Widgets.CheckRow("Cameras",         d.ShowCameras,       v => d.ShowCameras       = v);
-        Widgets.CheckRow("Frustums",        d.ShowFrustums,      v => d.ShowFrustums      = v);
+        Widgets.CheckRow("Grid",            _config.ShowGrid,          v => _config.ShowGrid          = v);
+        Widgets.CheckRow("Skybox",          _config.ShowSkybox,        v => _config.ShowSkybox        = v);
+        Widgets.CheckRow("Stats Overlay",   _config.ShowStatsOverlay,  v => _config.ShowStatsOverlay  = v);
+        Widgets.CheckRow("Frustum Culling", _config.EnableCulling,     v => _config.EnableCulling     = v);
+        Widgets.CheckRow("Anisotropic",     _config.AnisotropicFilter, v => _config.AnisotropicFilter = v);
+        Widgets.CheckRow("Bounding Boxes",  _config.ShowBoundingBoxes, v => _config.ShowBoundingBoxes = v);
+        Widgets.CheckRow("Spatial Grid",    _config.ShowCullingGrid,   v => _config.ShowCullingGrid   = v);
+        Widgets.CheckRow("Cameras",         _config.ShowCameras,       v => _config.ShowCameras       = v);
+        Widgets.CheckRow("Frustums",        _config.ShowFrustums,      v => _config.ShowFrustums      = v);
     }
 }

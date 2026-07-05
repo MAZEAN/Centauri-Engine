@@ -30,27 +30,27 @@ public class PropertiesPanel
         [
             new SectionGroup("Environment", ColorPalette.Green, [
                 new SkyboxSection(),
-                new SkySection(config),
+                new SkySection(config.Sky),
                 new DayNightSection(),
-                new ShadowSection(config),
-                new WindSection(config)
+                new ShadowSection(config.Shadows),
+                new WindSection(config.Wind)
             ]),
             new SectionGroup("Reflections", ColorPalette.Blue, [
-                new IBLSection(config),
-                new ReflectionProbeSection(config),
-                new PlanarReflectionSection(config),
-                new SSRSection(config)
+                new IBLSection(config.IBL),
+                new ReflectionProbeSection(config.ReflectionProbe),
+                new PlanarReflectionSection(config.PlanarReflection),
+                new SSRSection(config.SSR)
             ]),
             new SectionGroup("Post FX", ColorPalette.Purple, [
-                new SSAOSection(config),
-                new TAASection(config),
-                new BloomSection(config),
+                new SSAOSection(config.SSAO),
+                new TAASection(config.TAA),
+                new BloomSection(config.Bloom),
                 new AutoExposureSection(config.AutoExposure),
                 new ColorGradingSection(config.ColorGrading)
             ]),
             new SectionGroup("Scene", ColorPalette.Amber, [
                 new CullingSection(config),
-                new ViewportSection(config)
+                new ViewportSection(config.Debug)
             ])
         ];
     }

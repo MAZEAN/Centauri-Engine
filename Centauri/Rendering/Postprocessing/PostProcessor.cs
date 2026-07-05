@@ -10,7 +10,6 @@ using World;
 using Reflections.SSR;
 using TAA;
 
-// The three prepass outputs every post-process pass reads from (depth + view-space normal + roughness/metallic).
 public readonly record struct GBufferTextures (
     uint Depth,
     uint Normal,
@@ -27,8 +26,8 @@ public readonly record struct IblResolveInputs (
     float ProbeMaxReflectionLod,
     float ProbeIntensity,
     bool  HasProbe,
-    Vector3 ProbePosition,   // capture point (cubemap sampling center)
-    Vector3 ProbeBoxMin,     // parallax box, world space
+    Vector3 ProbePosition, 
+    Vector3 ProbeBoxMin,
     Vector3 ProbeBoxMax,
     float ProbeBoxFalloff
 );
@@ -40,6 +39,18 @@ public readonly record struct PlanarResolveInputs (
     float Intensity,
     float Distortion,
     float Blur
+);
+
+public readonly record struct CompositeRequest(
+    Camera Camera,
+    GBufferTextures GBuffer,
+    bool SsrAvailable,
+    bool TaaAvailable,
+    IblResolveInputs Ibl,
+    uint SsaoTexture,
+    bool SsaoActive,
+    PlanarResolveInputs Planar,
+    float DeltaTime
 );
 
 public sealed class PostProcessor : IDisposable
@@ -91,34 +102,50 @@ public sealed class PostProcessor : IDisposable
     public Vector2 NextTaaJitter() => _taa.NextJitter(_width, _height);
     public uint VelocityTexture => _taa.VelocityTexture;   // TAA motion vectors, for the debug view
 
-    public void Composite(Camera camera, in GBufferTextures gBuffer,
-        bool ssrAvailable, bool taaAvailable, in IblResolveInputs ibl, uint ssaoTex, bool ssaoActive,
-        in PlanarResolveInputs planar, float deltaTime)
+    public void Composite(in CompositeRequest request)
     {
         _hdr.Resolve();
 
         var sceneColor = _hdr.ResolvedTexture;
 
-        var ssrActive = ssrAvailable && _config.SSR.Enabled;
-        if (ssrActive)
-            _ssr.Render(sceneColor, in gBuffer, camera, in ibl, ssaoTex, ssaoActive, in planar);
-
-        var taaActive = taaAvailable && _config.TAA.Enabled;
+        var ssrActive = RenderSsr(request, sceneColor);
+        var taaActive = RenderTaa(request, ssrActive, ref sceneColor);
         var ssrInTonemap = ssrActive && !taaActive;
-        if (taaActive)
-        {
-            _taa.Render(sceneColor, ssrActive ? _ssr.ReflectionTexture : 0, ssrActive, gBuffer.Depth, camera);
-            sceneColor = _taa.OutputTexture;
-        }
         
-        var autoExposureActive = _config.AutoExposure.Enabled;
-        if (autoExposureActive)
-            _autoExposure.Render(sceneColor, deltaTime);
+        if (_config.AutoExposure.Enabled)
+            _autoExposure.Render(sceneColor, request.DeltaTime);
         
-        var bloomActive = _config.Bloom.Enabled;
-        if (bloomActive)
+        if (_config.Bloom.Enabled)
             _bloom.Render(sceneColor);
-        
+
+        DrawTonemap(sceneColor, ssrInTonemap);
+    }
+
+    // Returns whether SSR actually ran (request.SsrAvailable && config still enabled).
+    private bool RenderSsr(in CompositeRequest request, uint sceneColor)
+    {
+        var ssrActive = request.SsrAvailable && _config.SSR.Enabled;
+        if (ssrActive)
+            _ssr.Render(sceneColor, request.GBuffer, request.Camera, request.Ibl,
+                request.SsaoTexture, request.SsaoActive, request.Planar);
+
+        return ssrActive;
+    }
+
+    // Returns whether TAA actually ran; redirects sceneColor to TAA's output when it did.
+    private bool RenderTaa(in CompositeRequest request, bool ssrActive, ref uint sceneColor)
+    {
+        var taaActive = request.TaaAvailable && _config.TAA.Enabled;
+        if (!taaActive) return false;
+
+        _taa.Render(sceneColor, ssrActive ? _ssr.ReflectionTexture : 0, ssrActive,
+            request.GBuffer.Depth, request.Camera);
+        sceneColor = _taa.OutputTexture;
+        return true;
+    }
+
+    private void DrawTonemap(uint sceneColor, bool ssrInTonemap)
+    {    
         // back to the screen for the tonemap (bloom left its own mip FBOs bound)
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         _gl.Viewport(0, 0, _width, _height);
@@ -126,43 +153,66 @@ public sealed class PostProcessor : IDisposable
         SetRenderState();
 
         _tonemap.Use();
-        _gl.ActiveTexture(TextureUnit.Texture0);
-        _gl.BindTexture(TextureTarget.Texture2D, sceneColor);
         
-        _tonemap.SetUniform("uHdr",        0);
-        _tonemap.SetUniform("uExposure",   _config.ColorGrading.Exposure);
-        _tonemap.SetUniform("uBlackLevel", _config.ColorGrading.BlackLevel);
-        _tonemap.SetUniform("uContrast",   _config.ColorGrading.Contrast);
-        _tonemap.SetUniform("uSaturation", _config.ColorGrading.Saturation);
-        
-        // Bloom
-        _gl.ActiveTexture(TextureUnit.Texture1);
-        _gl.BindTexture(TextureTarget.Texture2D, bloomActive ? _bloom.BloomTexture : 0);
-        
-        _tonemap.SetUniform("uBloom",          1);
-        _tonemap.SetUniform("uHasBloom",       bloomActive ? 1 : 0);
-        _tonemap.SetUniform("uBloomIntensity", _config.Bloom.Intensity);
-        
-        _gl.ActiveTexture(TextureUnit.Texture2);
-        _gl.BindTexture(TextureTarget.Texture2D, ssrInTonemap ? _ssr.ReflectionTexture : 0);
-        
-        _tonemap.SetUniform("uSsr",    2);
-        _tonemap.SetUniform("uHasSsr", ssrInTonemap ? 1 : 0);
-        
-        _gl.ActiveTexture(TextureUnit.Texture3);
-        _gl.BindTexture(TextureTarget.Texture2D, autoExposureActive ? _autoExposure.AdaptedLuminanceTexture : 0);
+        BindScene(sceneColor);
+        BindBloom();
+        BindSsr(ssrInTonemap);
+        BindAutoExposure();
 
-        _tonemap.SetUniform("uAutoLuminance",       3);
-        _tonemap.SetUniform("uAutoExposureEnabled", autoExposureActive ? 1 : 0);
-        _tonemap.SetUniform("uAutoKeyValue",        _config.AutoExposure.KeyValue);
-        _tonemap.SetUniform("uAutoMinExposure",     _config.AutoExposure.MinExposure);
-        _tonemap.SetUniform("uAutoMaxExposure",     _config.AutoExposure.MaxExposure);
-        
         _gl.BindVertexArray(_emptyVao);
         _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
         _gl.BindVertexArray(0);
 
         ResetRenderState();
+    }
+    
+    private void BindScene(uint sceneColor)
+    {
+        _gl.ActiveTexture(TextureUnit.Texture0);
+        _gl.BindTexture(TextureTarget.Texture2D, sceneColor);
+        
+
+        _tonemap.SetUniform("uHdr",        0);
+        _tonemap.SetUniform("uExposure",   _config.ColorGrading.Exposure);
+        _tonemap.SetUniform("uBlackLevel", _config.ColorGrading.BlackLevel);
+        _tonemap.SetUniform("uContrast",   _config.ColorGrading.Contrast);
+        _tonemap.SetUniform("uSaturation", _config.ColorGrading.Saturation);
+    }
+    
+    private void BindBloom()
+    {
+        var active = _config.Bloom.Enabled;
+
+        _gl.ActiveTexture(TextureUnit.Texture1);
+        _gl.BindTexture(TextureTarget.Texture2D, active ? _bloom.BloomTexture : 0);
+
+        _tonemap.SetUniform("uBloom",          1);
+        _tonemap.SetUniform("uHasBloom",       active ? 1 : 0);
+        _tonemap.SetUniform("uBloomIntensity", _config.Bloom.Intensity);
+        
+    }
+    
+    private void BindSsr(bool active)
+    {
+        _gl.ActiveTexture(TextureUnit.Texture2);
+        _gl.BindTexture(TextureTarget.Texture2D, active ? _ssr.ReflectionTexture : 0);
+
+        _tonemap.SetUniform("uSsr",    2);
+        _tonemap.SetUniform("uHasSsr", active ? 1 : 0);
+    }
+
+    private void BindAutoExposure()
+    {
+        var active = _config.AutoExposure.Enabled;
+
+        _gl.ActiveTexture(TextureUnit.Texture3);
+        _gl.BindTexture(TextureTarget.Texture2D, active ? _autoExposure.AdaptedLuminanceTexture : 0);
+
+        _tonemap.SetUniform("uAutoLuminance",       3);
+        _tonemap.SetUniform("uAutoExposureEnabled", active ? 1 : 0);
+        _tonemap.SetUniform("uAutoKeyValue",        _config.AutoExposure.KeyValue);
+        _tonemap.SetUniform("uAutoMinExposure",     _config.AutoExposure.MinExposure);
+        _tonemap.SetUniform("uAutoMaxExposure",     _config.AutoExposure.MaxExposure);
     }
 
     private void SetRenderState()

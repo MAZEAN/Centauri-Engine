@@ -6,28 +6,26 @@ using Common;
 
 public sealed class SSAOSection : ISection
 {
-    private readonly AppConfig _config;
+    private readonly SSAOConfig _config;
 
-    public SSAOSection(AppConfig config) => _config = config;
+    public SSAOSection(SSAOConfig config) => _config = config;
 
     public void Draw(Scene scene)
     {
         using var s = Widgets.Section("SSAO", startCollapsed: true);
         if (!s.Open) return;
+        
+        Widgets.CheckRow("Enabled", _config.Enabled, v => _config.Enabled = v);
 
-        var conf = _config.SSAO;
+        Widgets.DragRow("Radius", _config.Radius, v => _config.Radius = v,
+            0.01f, 0.05f, 5f, "%.2f", _config.AuthoredRadius);
+        Widgets.DragRow("Bias",   _config.Bias,   v => _config.Bias   = v,
+            0.001f, 0f, 0.2f, "%.3f", _config.AuthoredBias);
+        Widgets.DragRow("Power",  _config.Power,  v => _config.Power  = v,
+            0.05f, 0.1f, 8f, "%.2f", _config.AuthoredPower);
 
-        Widgets.CheckRow("Enabled", conf.Enabled, v => conf.Enabled = v);
-
-        Widgets.DragRow("Radius", conf.Radius, v => conf.Radius = v,
-            0.01f, 0.05f, 5f, "%.2f", conf.AuthoredRadius);
-        Widgets.DragRow("Bias",   conf.Bias,   v => conf.Bias   = v,
-            0.001f, 0f, 0.2f, "%.3f", conf.AuthoredBias);
-        Widgets.DragRow("Power",  conf.Power,  v => conf.Power  = v,
-            0.05f, 0.1f, 8f, "%.2f", conf.AuthoredPower);
-
-        Widgets.DragRow("Samples", conf.SampleCount,
-            v => conf.SampleCount = Math.Clamp((int)MathF.Round(v), 1, 64),
-            1f, 1f, 64f, "%.0f", conf.AuthoredSampleCount);
+        Widgets.DragRow("Samples", _config.SampleCount,
+            v => _config.SampleCount = Math.Clamp((int)MathF.Round(v), 1, 64),
+            1f, 1f, 64f, "%.0f", _config.AuthoredSampleCount);
     }
 }

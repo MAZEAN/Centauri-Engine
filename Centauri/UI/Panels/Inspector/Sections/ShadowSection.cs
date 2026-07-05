@@ -8,43 +8,41 @@ using Common;
 
 public sealed class ShadowSection : ISection
 {
-    private readonly AppConfig _config;
+    private readonly ShadowConfig _config;
     
     private static readonly uint[] Sizes = [512, 1024, 2048, 4096, 8192];
     private static readonly string[] SizeLabels =
         Array.ConvertAll(Sizes, x => x.ToString(CultureInfo.InvariantCulture));
 
-    public ShadowSection(AppConfig config) => _config = config;
+    public ShadowSection(ShadowConfig config) => _config = config;
 
     public void Draw(Scene scene)
     {
         using var s = Widgets.Section("Shadows", startCollapsed: true);
         if (!s.Open) return;
+        
+        Widgets.CheckRow("Enabled", _config.Enabled, v => _config.Enabled = v);
 
-        var conf = _config.Shadows;
+        Widgets.DragRow("Distance",    _config.Distance,   v => _config.Distance   = v,
+            0.5f,    1f, 500f,  "%.1f", _config.AuthoredDistance);
+        Widgets.DragRow("Depth Bias",  _config.DepthBias,  v => _config.DepthBias  = v,
+            0.0001f, 0f, 0.02f, "%.4f", _config.AuthoredDepthBias);
+        Widgets.DragRow("Normal Bias", _config.NormalBias, v => _config.NormalBias = v,
+            0.1f,    0f, 10.0f, "%.3f", _config.AuthoredNormalBias);
 
-        Widgets.CheckRow("Enabled", conf.Enabled, v => conf.Enabled = v);
+        Widgets.DragRow("PCF Radius", _config.PcfRadius, v => _config.PcfRadius = (int)MathF.Round(v),
+            1f, 0f, 4f, "%.0f", _config.AuthoredPcfRadius);
 
-        Widgets.DragRow("Distance",    conf.Distance,   v => conf.Distance   = v,
-            0.5f,    1f, 500f,  "%.1f", conf.AuthoredDistance);
-        Widgets.DragRow("Depth Bias",  conf.DepthBias,  v => conf.DepthBias  = v,
-            0.0001f, 0f, 0.02f, "%.4f", conf.AuthoredDepthBias);
-        Widgets.DragRow("Normal Bias", conf.NormalBias, v => conf.NormalBias = v,
-            0.1f,    0f, 10.0f, "%.3f", conf.AuthoredNormalBias);
-
-        Widgets.DragRow("PCF Radius", conf.PcfRadius, v => conf.PcfRadius = (int)MathF.Round(v),
-            1f, 0f, 4f, "%.0f", conf.AuthoredPcfRadius);
-
-        var sizeIndex = Array.IndexOf(Sizes, conf.Size);
+        var sizeIndex = Array.IndexOf(Sizes, _config.Size);
         if (Widgets.ComboRow("Map Size", ref sizeIndex, SizeLabels))
-            conf.Size = sizeIndex >= 0 ? Sizes[sizeIndex] : conf.AuthoredSize;
+            _config.Size = sizeIndex >= 0 ? Sizes[sizeIndex] : _config.AuthoredSize;
 
-        Widgets.DragRow("Cascades", conf.CascadeCount,
-            v => conf.CascadeCount = Math.Clamp((int)MathF.Round(v), 1, conf.MaxCascades),
-            1f, 1f, conf.MaxCascades, "%.0f", conf.AuthoredCascadeCount);
-        Widgets.DragRow("Split Blend", conf.SplitLambda, v => conf.SplitLambda = v,
-            0.01f, 0f, 1f, "%.2f", conf.AuthoredSplitLambda);
+        Widgets.DragRow("Cascades", _config.CascadeCount,
+            v => _config.CascadeCount = Math.Clamp((int)MathF.Round(v), 1, _config.MaxCascades),
+            1f, 1f, _config.MaxCascades, "%.0f", _config.AuthoredCascadeCount);
+        Widgets.DragRow("Split Blend", _config.SplitLambda, v => _config.SplitLambda = v,
+            0.01f, 0f, 1f, "%.2f", _config.AuthoredSplitLambda);
 
-        Widgets.CheckRow("Tint Cascades", conf.DebugCascades, v => conf.DebugCascades = v);
+        Widgets.CheckRow("Tint Cascades", _config.DebugCascades, v => _config.DebugCascades = v);
     }
 }
