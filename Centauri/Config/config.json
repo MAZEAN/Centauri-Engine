@@ -120,10 +120,15 @@
     "oversizeFactor": 8.0
   },
   "sky": {
-    "procedural": false,
+    "procedural": true,
     "turbidity": 2.5,
     "intensity": 1.0,
     "sunAngularSizeDeg": 0.3,
-    "sunGlowExponent": 750
+    "sunGlowExponent": 750,
+    "clouds": true,
+    "cloudCoverage": 0.4,
+    "cloudScale": 2.0,
+    "cloudSpeed": 0.02,
+    "cloudShading": 1.5
   }
 }

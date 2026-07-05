@@ -20,10 +20,10 @@
 * [ ] Contact-hardening / PCSS
 * [ ] Raytracing with BVH (only experimental, not real-time)
 * [ ] Physics engine integration (BEPUphysics2)
-* [ ] Foundations for game dev
+* [ ] Basis for game
 * [ ] Terrain
 * [ ] Water simulation (Sea of Thieves algorithm)
-* [ ] Foliage rendering
+* [ ] Complex foliage rendering
 
 ## Enhancements
 
@@ -33,15 +33,20 @@
 * [x] Instancing
 * [x] Async asset loading
 * [x] Sub-mesh materials
+* [x] Procedural sky
+* [x] Improved sky transitions
 * [ ] (auto) LOD system (Impostor)
 * [ ] auto-exposure 
 * [ ] volumetric fog
 * [ ] Better wind (hierarchy) & leaves (orientation)
-* [ ] Remove sun from skybox
-* [ ] Skybox transitions & variantions
+* [ ] Extend shadows to spot- and point lights
+* [ ] Sky variantions
 * [ ] Keybindings
 * [ ] UI improvements (DPI-scaling etc.)
-* [ ] (Hosek-Wilkie sky algorithm)
+
+## Optional
+* [ ] Hosek-Wilkie sky algorithm
+* [ ] Full raymarched volumetric clouds
 
 ---
 
@@ -51,7 +56,7 @@
 
 ## Notes
 
-* The current design switches rather than combines.
+* Reflections: The current design switches rather than combines.
 A more advanced setup uses planar as the floor's base and lets SSR add perspective-accurate contact reflections
 on top (mix(planar, ssr, ssrConfidence)) — better for objects standing in water.
 Worth doing when you add real water, alongside the distortion wave normals.
