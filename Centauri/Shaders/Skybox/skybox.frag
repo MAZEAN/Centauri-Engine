@@ -80,16 +80,31 @@ vec3 applyClouds(vec3 skyColor, vec3 dir, vec3 sunDir, float coverage, float sca
     if (coverage <= 0.0) 
         return skyColor;   // clouds off — skip the noise entirely
 
-    vec3  p = dir * scale + vec3(0.7, 0.3, 0.5) * time * speed;
-    float n = fbm(p);
+    vec3 wind   = vec3(0.7, 0.3, 0.5) * time * speed;
+    vec3 p      = dir * scale + wind;
+    float shape = fbm(p);
+
+    float erosion = fbm(p * 4.0 + vec3(11.1, 3.3, 9.9));
+    float eroded  = shape - erosion * 0.18;
 
     // Higher coverage lowers the threshold, so more of the noise field counts as "cloud".
     float threshold = mix(0.75, 0.05, clamp(coverage, 0.0, 1.0));
-    float density   = smoothstep(threshold, threshold + 0.06, n);
+    float density   = smoothstep(threshold, threshold + 0.05, eroded);
     density *= smoothstep(-0.05, 0.1, dir.y);   // no clouds at/below the horizon
 
-    float shade = smoothstep(threshold, threshold + 0.4, n);
-    vec3  base  = mix(vec3(0.55, 0.58, 0.65), vec3(0.92, 0.93, 0.97), shade);
+    if (density <= 0.001) return skyColor;   // clear here — skip the shading work below
+    
+    float e  = 0.08;
+    float nx = valueNoise3(p + vec3(e, 0.0, 0.0)) - valueNoise3(p - vec3(e, 0.0, 0.0));
+    float ny = valueNoise3(p + vec3(0.0, e, 0.0)) - valueNoise3(p - vec3(0.0, e, 0.0));
+    float nz = valueNoise3(p + vec3(0.0, 0.0, e)) - valueNoise3(p - vec3(0.0, 0.0, e));
+    vec3  cloudNormal = normalize(vec3(-nx, -ny, -nz) + vec3(0.0, 0.6, 0.0));
+    
+    float detail = fbm(p * 3.0 + vec3(5.2, 1.3, 7.8));
+
+    float wrap  = clamp(dot(cloudNormal, sunDir) * 0.5 + 0.5, 0.0, 1.0);
+    float shade = clamp(mix(0.45, 1.0, wrap) * mix(0.85, 1.0, detail), 0.0, 1.0);
+    vec3  base  = mix(vec3(0.5, 0.53, 0.6), vec3(0.95, 0.95, 0.98), shade);
 
     float sunFacing = pow(clamp(dot(dir, sunDir), 0.0, 1.0), 2.0);
     float sunLow    = 1.0 - smoothstep(0.0, 0.35, clamp(sunDir.y, 0.0, 1.0));
