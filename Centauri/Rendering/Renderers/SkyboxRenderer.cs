@@ -17,6 +17,11 @@ public class SkyboxRenderer : IDisposable
     
     private readonly GLShader _shader;
     private readonly Mesh     _cube;
+    
+    private uint   _cloudTexture;
+    private Vector2 _cloudInvViewport;
+
+    public Mesh Cube => _cube;   // shared with CloudPass so both sample identical directions
 
     public SkyboxRenderer(GL gl, AppConfig config)
     {
@@ -24,17 +29,26 @@ public class SkyboxRenderer : IDisposable
         _config = config;
         
         _shader = new GLShader(gl,
-            PathResolver.Resolve("Shaders/Skybox/skybox.vert"),
-            PathResolver.Resolve("Shaders/Skybox/skybox.frag"));
+            PathResolver.Resolve("Shaders/Sky/skybox.vert"),
+            PathResolver.Resolve("Shaders/Sky/skybox.frag"));
 
         var (vertices, indices) = BuildCube();
         _cube = new Mesh(gl, vertices, indices);
     }
+    
+    public void SetCloudMap(uint texture, Vector2 invViewport)
+    {
+        _cloudTexture     = texture;
+        _cloudInvViewport = invViewport;
+    }
 
     public void Render(Scene scene)
-        => Render(scene, scene.Cameras.Active.GetViewMatrix(), scene.Cameras.Active.GetProjectionMatrix());
+        => Render(scene, scene.Cameras.Active.GetViewMatrix(), scene.Cameras.Active.GetProjectionMatrix(), withClouds: true);
     
     public void Render(Scene scene, Matrix4x4 view, Matrix4x4 projection)
+        => Render(scene, view, projection, withClouds: false);
+
+    private void Render(Scene scene, Matrix4x4 view, Matrix4x4 projection, bool withClouds)
     {
         var proceduralEnabled = _config.Sky.Procedural;
         var blend = proceduralEnabled ? DayNightCycle.DaylightOf(scene) : 0f;
@@ -59,11 +73,16 @@ public class SkyboxRenderer : IDisposable
         _shader.SetUniform("uProceduralBlend", blend);
         _shader.SetUniform("uTurbidity",       _config.Sky.Turbidity);
         _shader.SetUniform("uSkyIntensity",    _config.Sky.Intensity);
-        _shader.SetUniform("uCloudCoverage", _config.Sky.Clouds ? _config.Sky.CloudCoverage : 0f);
-        _shader.SetUniform("uCloudScale",    _config.Sky.CloudScale);
-        _shader.SetUniform("uCloudSpeed",    _config.Sky.CloudSpeed);
-        _shader.SetUniform("uCloudShading",  _config.Sky.CloudShading);
-        _shader.SetUniform("uTime",          Time.Now);
+        
+        var hasCloudMap = withClouds && _cloudTexture != 0;
+        _shader.SetUniform("uHasCloudMap", hasCloudMap ? 1 : 0);
+        if (hasCloudMap)
+        {
+            _shader.SetUniform("uCloudMap",     1);
+            _shader.SetUniform("uInvViewport",  _cloudInvViewport);
+            _gl.ActiveTexture(TextureUnit.Texture1);
+            _gl.BindTexture(TextureTarget.Texture2D, _cloudTexture);
+        }
         
         if (sky is { } s)
         {

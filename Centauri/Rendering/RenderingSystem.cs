@@ -3,6 +3,7 @@ namespace Centauri.Rendering;
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
 using Silk.NET.Input;
+using System.Numerics;
 
 using Config;
 using Renderers;
@@ -53,8 +54,11 @@ public class RenderingSystem : IDisposable
     private GeometryPrepass _prepass = null!;
     private SsaoPass _ssao = null!;
     private PlanarReflectionPass _planar = null!;
+    private CloudPass _clouds = null!;
     private BufferDebugView _bufferDebug = null!;
     
+    private Vector2 _cloudInvViewport;
+
     private readonly RenderContext _context = new();
     
     private bool _probeBaked;
@@ -97,6 +101,8 @@ public class RenderingSystem : IDisposable
         _ssao    = new SsaoPass(_gl, _config.SSAO, (uint)framebufferSize.X, (uint)framebufferSize.Y);
         _planar  = new PlanarReflectionPass(_gl, _config.PlanarReflection, _mainRenderer, _skyboxRenderer,
             (uint)framebufferSize.X, (uint)framebufferSize.Y, (uint)_config.Window.Samples);
+        _clouds  = new CloudPass(_gl, _config.Sky, _skyboxRenderer.Cube, (uint)framebufferSize.X, (uint)framebufferSize.Y);
+        _cloudInvViewport = new Vector2(1f / framebufferSize.X, 1f / framebufferSize.Y);
         _bufferDebug = new BufferDebugView(_gl);
     }
     
@@ -120,12 +126,17 @@ public class RenderingSystem : IDisposable
 
     public void Render(Scene scene, float deltaTime)
     {
-        Profiling.Tracy.Enabled = _config.Debug.TracyEnabled;
-        using var frameZone = Profiling.Tracy.Scope("Frame");
+        Tracy.Enabled = _config.Debug.TracyEnabled;
+        using var frameZone = Tracy.Scope("Frame");
         
         BeginFrame(scene);
         
         UpdateProceduralIbl(scene);
+        
+        var camera = scene.Cameras.Active;
+        using (_context.Profiler.Measure("Clouds"))
+            _clouds.Render(scene, camera.GetViewMatrix(), camera.GetProjectionMatrix());
+        _skyboxRenderer.SetCloudMap(_clouds.Active ? _clouds.CloudTexture : 0, _cloudInvViewport);
         
         RenderPrePostComponents(scene, deltaTime);
         
@@ -149,7 +160,7 @@ public class RenderingSystem : IDisposable
         
         RenderAfterPostComponents(scene, deltaTime);
         
-        Profiling.Tracy.FrameMark();
+        Tracy.FrameMark();
     }
 
     private CompositeRequest CreateCompositeRequest(Scene scene, float deltaTime)
@@ -319,6 +330,8 @@ public class RenderingSystem : IDisposable
         _post.Resize(width, height);
         _prepass.Resize(width, height);
         _ssao.Resize(width, height);
+        _clouds.Resize(width, height);
+        _cloudInvViewport = new Vector2(1f / width, 1f / height);
     }
 
     public void Dispose()
@@ -332,6 +345,7 @@ public class RenderingSystem : IDisposable
         _post.Dispose();
         _prepass.Dispose();
         _ssao.Dispose();
+        _clouds.Dispose();
         _bufferDebug.Dispose();
         _ibl.Dispose();
         _reflectionProbe.Dispose();
