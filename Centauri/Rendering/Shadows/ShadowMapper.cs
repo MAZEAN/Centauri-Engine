@@ -84,8 +84,7 @@ public sealed class ShadowMapper : IDisposable
         var key = new ShadowCacheKey(dir, camera.GetViewMatrix() * camera.GetProjectionMatrix(),
             scene.Revision, s.CascadeCount, s.Distance, s.SplitLambda);
 
-        if (_cache.CanReuse(key, _sceneHasWind && _config.Wind.Animating))
-        {
+        if (_cache.CanReuse(key, _sceneHasWind && _config.Wind.Animating, _config.Shadows.WindThrottleFrames))        {
             Active = true;   // last frame's depth maps + Cascades are still valid
             return;
         }

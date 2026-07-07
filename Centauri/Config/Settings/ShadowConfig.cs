@@ -19,6 +19,7 @@ public class ShadowConfig : IJsonOnDeserialized
     [JsonPropertyName("lightSize")]           public float LightSize           { get; set; } = 0.02f;  // tan(sun half-angle) — world penumbra growth per unit occluder distance
     [JsonPropertyName("blockerSearchRadius")] public float BlockerSearchRadius { get; set; } = 5f;      // texels
     [JsonPropertyName("maxPenumbraRadius")]   public float MaxPenumbraRadius   { get; set; } = 24f;     // texels — caps softness/cost
+    [JsonPropertyName("windThrottleFrames")]  public int WindThrottleFrames { get; set; } = 3;
 
     [JsonIgnore] public bool DebugCascades { get; set; }
 
@@ -32,6 +33,7 @@ public class ShadowConfig : IJsonOnDeserialized
     [JsonIgnore] public float AuthoredLightSize           { get; private set; }
     [JsonIgnore] public float AuthoredBlockerSearchRadius { get; private set; }
     [JsonIgnore] public float AuthoredMaxPenumbraRadius   { get; private set; }
+    [JsonIgnore] public int   AuthoredWindThrottleFrames  { get; private set; }
 
     public ShadowConfig() => OnDeserialized();
 
@@ -47,5 +49,6 @@ public class ShadowConfig : IJsonOnDeserialized
         AuthoredLightSize           = LightSize;
         AuthoredBlockerSearchRadius = BlockerSearchRadius;
         AuthoredMaxPenumbraRadius   = MaxPenumbraRadius;
+        AuthoredWindThrottleFrames  = WindThrottleFrames;
     }
 }

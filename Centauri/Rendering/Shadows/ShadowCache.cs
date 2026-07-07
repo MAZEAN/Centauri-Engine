@@ -41,21 +41,38 @@ internal readonly struct ShadowCacheKey : IEquatable<ShadowCacheKey>
         HashCode.Combine(_sunDir, _viewProj, _revision, _cascadeCount, _distance, _splitLambda);
 }
 
-// Tracks the key the current depth maps were rendered for. The maps may be reused only when
-// the incoming key matches AND nothing is animating the casters this frame (wind moves
-// foliage every frame regardless of the static key), so that gate is passed in per-frame.
+// Tracks the key the current depth maps were rendered for. The maps may be reused when the
+// incoming key matches, and either nothing is animating the casters this frame, or it is but
+// we're still inside the animating-caster throttle window (see CanReuse) — wind sway is slow
+// and PCSS already softens edges, so redrawing the full cascade set every single frame just to
+// track a few pixels of foliage motion is wasted GPU time; lagging a couple of frames behind
+// the animation is imperceptible.
 internal sealed class ShadowCache
 {
     private ShadowCacheKey _key;
     private bool           _valid;
+    private int            _framesSinceRender;
 
-    public bool CanReuse(in ShadowCacheKey key, bool castersAnimating) =>
-        _valid && !castersAnimating && key.Equals(_key);
-
+    public bool CanReuse(in ShadowCacheKey key, bool castersAnimating, int animatingThrottleFrames)
+    {
+        if (!_valid || !key.Equals(_key))
+            return false;
+        if (!castersAnimating)
+            return true;   // static scene — nothing to catch up on regardless
+        if (animatingThrottleFrames <= 0 || _framesSinceRender >= animatingThrottleFrames)
+        {
+            _framesSinceRender = 0;
+            return false;   // redraw now to catch up with the animation
+        }
+        _framesSinceRender++;
+        return true;   // reuse a still-recent render while only wind is moving
+    }
+    
     public void Record(in ShadowCacheKey key)
     {
         _key   = key;
         _valid = true;
+        _framesSinceRender = 0;
     }
 
     public void Invalidate() => _valid = false;
