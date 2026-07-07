@@ -66,6 +66,7 @@ uniform int uHasAlbedo;          // 1 if bound, 0 if using scalar fallback
 uniform int uHasNormal;
 uniform int uHasRoughness;
 uniform int uHasMetallic;
+uniform int uHasAO;
 
 uniform float uRoughnessScalar;
 uniform float uMetallicScalar;
@@ -145,10 +146,9 @@ mat2 InterleavedGradientRotation()
 // Average depth of samples closer to the light than `current`, searched over a
 // `radiusTexels` disk. Returns -1 when nothing in the window occludes the point, so the
 // caller can skip the PCF pass entirely (fully lit).
-float FindBlockerDepth(int c, vec2 uv, float current, float radiusTexels, float selfBias)
+float FindBlockerDepth(int c, vec2 uv, float current, float radiusTexels, float selfBias, mat2 rot)
 {
     vec2 texel = 1.0 / vec2(textureSize(uShadowMapRaw, 0).xy);
-    mat2 rot   = InterleavedGradientRotation();
 
     float threshold = current - selfBias;
     float sum   = 0.0;
@@ -167,7 +167,7 @@ float FindBlockerDepth(int c, vec2 uv, float current, float radiusTexels, float 
     return count > 0 ? sum / float(count) : -1.0;
 }
 
-float SampleCascade(int c, vec3 N, vec3 L) 
+float SampleCascade(int c, vec3 N, vec3 L, bool allowPcss)
 {
     float nOffset = uNormalBias * uTexelWorld[c];
     vec4 ls = uLightMatrices[c] * vec4(fFragPos + N * nOffset, 1.0);
@@ -180,11 +180,12 @@ float SampleCascade(int c, vec3 N, vec3 L)
     float current = proj.z - bias;
 
     float radius = float(uPcfRadius);
+    mat2  rot    = InterleavedGradientRotation();
 
-    if (uPcss == 1 && uCheapShading == 0)
+    if (uPcss == 1 && uCheapShading == 0 && allowPcss)
     {
         float selfBias   = nOffset / max(uDepthRangeWorld[c], 1e-4);
-        float avgBlocker = FindBlockerDepth(c, proj.xy, current, uBlockerRadius, selfBias);
+        float avgBlocker = FindBlockerDepth(c, proj.xy, current, uBlockerRadius, selfBias, rot);
         if (avgBlocker >= 0.0)
         {
             // orthographic (directional/parallel) light: penumbra grows linearly with
@@ -196,7 +197,6 @@ float SampleCascade(int c, vec3 N, vec3 L)
     }
 
     vec2 texel = 1.0 / vec2(textureSize(uShadowMap, 0).xy);
-    mat2  rot  = InterleavedGradientRotation();
 
     float lit = 0.0;
     for (int i = 0; i < POISSON_COUNT; ++i)
@@ -213,7 +213,7 @@ float ShadowFactor(vec3 N, vec3 L)
 {
     int c = SelectCascade(fViewDepth);
 
-    float shadow = SampleCascade(c, N, L);
+    float shadow = SampleCascade(c, N, L, true);
 
     if (uCheapShading == 0 && c + 1 < uCascadeCount)
     {
@@ -225,7 +225,7 @@ float ShadowFactor(vec3 N, vec3 L)
         {
             float t = clamp((splitFar - fViewDepth) / band, 0.0, 1.0);  // 1 inside, 0 at the seam
             if (t < 1.0)
-                shadow = mix(SampleCascade(c + 1, N, L), shadow, t);
+                shadow = mix(SampleCascade(c + 1, N, L, false), shadow, t);
         }
     }
     
@@ -341,6 +341,7 @@ vec3 CalcSpotLight(SpotLight light, vec3 N, vec3 V, vec3 albedo, float roughness
 
 void ShowShadowCascadesView(vec3 color, vec4  albedoSample) {
     int ci = SelectCascade(fViewDepth);
+    
     vec3 tint = ci == 0 ? vec3(1.0, 0.3, 0.3)
               : ci == 1 ? vec3(0.3, 1.0, 0.3)
               : ci == 2 ? vec3(0.3, 0.3, 1.0)
@@ -449,7 +450,7 @@ void main()
     vec4  albedoSample = uHasAlbedo    == 1 ? texture(uAlbedoMap,    fUv) : uColor;
     float roughness    = uHasRoughness == 1 ? texture(uRoughnessMap, fUv).r : uRoughnessScalar;
     float metallic     = uHasMetallic  == 1 ? texture(uMetallicMap,  fUv).r : uMetallicScalar;
-    float ao           = texture(uAOMap, fUv).r;
+    float ao           = uHasAO == 1 ? texture(uAOMap, fUv).r : 1.0;
 
     vec3 albedo = pow(albedoSample.rgb, vec3(2.2));
     if (albedoSample.a < 0.5)

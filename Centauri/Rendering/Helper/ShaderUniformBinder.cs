@@ -88,13 +88,14 @@ public sealed class ShaderUniformBinder
         shader.SetUniform("uHasNormal",    mat.Normal    != null ? 1 : 0);
         shader.SetUniform("uHasRoughness", mat.Roughness != null ? 1 : 0);
         shader.SetUniform("uHasMetallic",  mat.Metallic  != null ? 1 : 0);
+        shader.SetUniform("uHasAO",        mat.AO        != null ? 1 : 0);
 
         shader.SetUniform("uRoughnessScalar", mat.RoughnessScalar);
         shader.SetUniform("uMetallicScalar",  mat.MetallicScalar);
-        shader.SetUniform("uTranslucency",   mat.Translucency);
-        shader.SetUniform("uColor",          mat.Color);
-        shader.SetUniform("uFoliage",        mat.TwoSided ? 1 : 0);
-        shader.SetUniform("uWind",           mat.Wind ? 1 : 0);
+        shader.SetUniform("uTranslucency",    mat.Translucency);
+        shader.SetUniform("uColor",           mat.Color);
+        shader.SetUniform("uFoliage",         mat.TwoSided ? 1 : 0);
+        shader.SetUniform("uWind",            mat.Wind ? 1 : 0);
     }
     
     public static void UploadWind(GLShader shader, WindConfig wind)
