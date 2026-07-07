@@ -24,10 +24,11 @@ wipes `bin/`/`obj/`, including this copy.
 
 ```bash
 sudo apt install build-essential cmake pkg-config git libglfw3-dev libfreetype-dev libx11-dev
-
-git clone --branch v0.13.4 https://github.com/wolfpld/tracy /tmp/tracy-profiler
+git clone https://github.com/wolfpld/tracy /tmp/tracy-profiler
+cd /tmp/tracy-profiler && git checkout ba8e4bdcbf38417b1a66f5e3dfdd8fc39ac7ec8f && cd -
 cmake -B /tmp/tracy-profiler/profiler/build -S /tmp/tracy-profiler/profiler \
-    -DCMAKE_BUILD_TYPE=Release -DNO_FILESELECTOR=ON -DLEGACY=ON
+    -DCMAKE_BUILD_TYPE=Release -DNO_FILESELECTOR=ON -DLEGACY=ON \
+    -DCMAKE_CXX_FLAGS="-DTRACY_NO_FILESELECTOR"    
 cmake --build /tmp/tracy-profiler/profiler/build --config Release -j"$(nproc)"
 ```
 
@@ -35,15 +36,24 @@ Binary: `/tmp/tracy-profiler/profiler/build/tracy-profiler` — move it wherever
 
 - `-DLEGACY=ON`: X11/GLFW backend, needs only the three `-dev` packages above (works fine under
   XWayland too) instead of Wayland's longer EGL/xkbcommon/wayland-protocols chain.
-- `-DNO_FILESELECTOR=ON`: skips the native-file-dialog dependency — not needed just to connect
-  to a running game.
+- `-DNO_FILESELECTOR=ON`: skips fetching the native-file-dialog dependency (`nfd`) — not needed
+  just to connect to a running game.
+- `-DCMAKE_CXX_FLAGS="-DTRACY_NO_FILESELECTOR"`: required alongside the above. At this vendored
+  commit, `profiler/CMakeLists.txt`'s `NO_FILESELECTOR` option only skips fetching `nfd` — it
+  never defines the `TRACY_NO_FILESELECTOR` macro that `BackendGlfw.cpp` actually checks before
+  including `nfd_glfw3.h`, so without this flag the build fails with that header missing even
+  though `-DNO_FILESELECTOR=ON` is set. A gap in Tracy's own CMake at this unreleased commit, not
+  a packaging issue on your end.
 - Everything else (capstone, imgui, etc.) is fetched by CMake from GitHub on first configure.
-- `--branch v0.13.4` matches the vendored client version
-  (`ThirdParty/tracy/public/common/TracyVersion.hpp`) — not required, just keeps protocols in sync.
+- The checkout pins the exact commit vendored in `ThirdParty/tracy/` — its version string reports
+  0.13.4 (`ThirdParty/tracy/public/common/TracyVersion.hpp`), but that's unreleased; the latest
+  actual tag is v0.13.1, so `--branch v0.13.4` (an earlier, wrong version of this doc) fails
+  outright since no such ref exists. Pinning the commit keeps the viewer's protocol version
+  matched to the vendored client either way.
 
 ## 4. Use it
 
-1. Run `tracy-profiler`.
+1. Run `/tmp/tracy-profiler/profiler/build/tracy-profiler`.
 2. Launch the game, Properties → Scene → Tracy Profiler → check **Enabled**
    (`debug.tracyEnabled` in `config.json`, off by default).
 3. The game appears in the viewer's connect list automatically.

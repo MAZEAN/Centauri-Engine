@@ -25,7 +25,7 @@ public sealed class TracySection : ISection
 
         if (!Tracy.IsAvailable)
         {
-            ImGui.TextWrapped("Native library not found — see Docs/TracyProfiler.md to build it.");
+            ImGui.TextWrapped("Native library not found, see Docs/TracyProfiler.md to build it.");
             return;
         }
 
