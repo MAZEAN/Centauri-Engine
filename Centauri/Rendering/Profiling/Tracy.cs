@@ -23,13 +23,24 @@ public static class Tracy
 
     public static bool Enabled { get; set; }
     public static bool IsAvailable { get; }
+    
+    public static string? LoadError { get; }
+
 
     private static readonly Dictionary<string, ulong> SrcLocs = new();
 
     static Tracy()
     {
-        IsAvailable = NativeLibrary.TryLoad(Lib, typeof(Tracy).Assembly, DllImportSearchPath.SafeDirectories, out _);
-    }
+        try
+        {
+            NativeLibrary.Load(Lib, typeof(Tracy).Assembly, DllImportSearchPath.SafeDirectories);
+            IsAvailable = true;
+        }
+        catch (Exception ex)
+        {
+            IsAvailable = false;
+            LoadError = ex.Message;
+        }    }
 
     // A CPU zone, active from Scope() to Dispose(). No-ops (default, inert) when Tracy isn't
     // available or isn't enabled, so `using var _ = Tracy.Scope("X");` is always safe to leave in.

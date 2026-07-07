@@ -13,12 +13,20 @@ cmake --build ThirdParty/tracy/build --config Release
 
 ## 2. Deploy it
 
+`Tracy.cs` loads the library via `NativeLibrary.Load(name, assembly, DllImportSearchPath.SafeDirectories)`,
+which on Linux does **not** check the bare output directory — it probes a RID-specific
+`runtimes/<rid>/native/` subfolder instead (the standard NuGet native-asset layout), plus the
+shared .NET framework directory. Put it there, not directly in `net10.0/`:
+
 ```bash
-cp ThirdParty/tracy/build/libTracyClient.so Centauri/bin/Debug/net10.0/
+mkdir -p Centauri/bin/Debug/net10.0/runtimes/linux-x64/native
+cp ThirdParty/tracy/build/libTracyClient.so Centauri/bin/Debug/net10.0/runtimes/linux-x64/native/
 ```
 
-Adjust the destination to your actual build output dir. Re-run after a `dotnet clean` — that
-wipes `bin/`/`obj/`, including this copy.
+Adjust `Debug`/`linux-x64` to your actual build config/RID. Re-run after a `dotnet clean` — that
+wipes `bin/`/`obj/`, including this copy. If it's still not found, check the exact error now
+shown under Properties → Scene → Tracy Profiler — it reports the real dlopen failure reason,
+including every path that was tried.
 
 ## 3. Build the profiler viewer (Ubuntu / Pop!_OS — no apt package exists)
 
