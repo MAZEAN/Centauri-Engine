@@ -43,7 +43,7 @@
 * [ ] Extend shadows to spot- and point lights
 * [ ] Sky variantions
 * [ ] Keybindings
-* [ ] UI improvements (DPI-scaling etc.)
+* [x] UI improvements (DPI-scaling etc.)
 
 ## Optional
 * [ ] Hosek-Wilkie sky algorithm

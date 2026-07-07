@@ -7,6 +7,7 @@ using System.Numerics;
 // Applied once, after the ImGui context exists, so every panel inherits it.
 internal static class Theme
 {
+    // Widgets.SetFontScale must run first (ImGuiManager does this right after loading the font).
     public static void ApplyBlenderDark()
     {
         var style = ImGui.GetStyle();
@@ -32,6 +33,12 @@ internal static class Theme
         style.WindowBorderSize = 0f;
         style.FrameBorderSize  = 0f;
         style.PopupBorderSize  = 1f;
+
+        // Every metric above is tuned for an 18px (Widgets.DesignFontSize) font; ScaleAllSizes
+        // is Dear ImGui's own recommended way to keep padding/spacing/rounding proportioned
+        // when the actual font size differs, instead of every widget looking cramped (or,
+        // overscaled the other way, too loose) relative to the text.
+        style.ScaleAllSizes(Widgets.FontScale);
 
         style.WindowTitleAlign    = new Vector2(0.0f, 0.5f);
         style.ColorButtonPosition = ImGuiDir.Left;

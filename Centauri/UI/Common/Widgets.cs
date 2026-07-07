@@ -6,7 +6,21 @@ using System.Globalization;
 
 internal static class Widgets
 {
-    private const float LabelFraction = 0.42f; 
+    // Every fixed-pixel layout constant across the UI (label widths, graph padding, panel
+    // sizes, Theme's style metrics) is tuned against this design-time font size — matching
+    // config.json's default imGui.fontSize. Scale() converts a baseline value to whatever font
+    // size is actually active, so panels stay proportioned instead of overlapping/clipping when
+    // fontSize changes (see GPUTimingGraph's header-alignment crash for what skipping this
+    // leads to). Set once at startup (ImGuiManager, alongside loading the font) rather than
+    // derived from ImGui.GetFontSize() per call: several panels compute window position/size
+    // before pushing the UI font each frame, where GetFontSize() would still read whatever
+    // font was last active (the default font, before the first PushFont) instead of the real one.
+    public const  float DesignFontSize = 18f;
+    public static float FontScale { get; private set; } = 1f;
+    public static void  SetFontScale(float fontSize) => FontScale = fontSize / DesignFontSize;
+    public static float Scale(float px) => px * FontScale;
+
+    private const float LabelFraction = 0.42f;
     private const float LabelGap      = 8f;
     private const float PanelIndent   = 8f;
     
@@ -34,15 +48,15 @@ internal static class Widgets
         if (tinted) 
             ImGui.PopStyleColor();
 
-        if (open) 
-            ImGui.Indent(PanelIndent);
+        if (open)
+            ImGui.Indent(Scale(PanelIndent));
         return open;
     }
 
     public static void EndPanel(bool open)
     {
-        if (open) 
-            ImGui.Unindent(PanelIndent);
+        if (open)
+            ImGui.Unindent(Scale(PanelIndent));
         ImGui.Spacing();
     }
     
@@ -77,7 +91,7 @@ internal static class Widgets
         var textW  = ImGui.CalcTextSize(label).X;
 
         ImGui.AlignTextToFramePadding();
-        ImGui.SetCursorPosX(startX + MathF.Max(0f, labelW - textW - LabelGap));
+        ImGui.SetCursorPosX(startX + MathF.Max(0f, labelW - textW - Scale(LabelGap)));
         ImGui.TextUnformatted(label);
         ImGui.SameLine();
         ImGui.SetCursorPosX(startX + labelW);

@@ -23,8 +23,8 @@ internal sealed class GPUTimingGraph
     private const float SampleIntervalMs = 50f;    // one plotted point per 50 ms
     private const float WindowSeconds    = Capacity * SampleIntervalMs / 1000f;
     private const int   MaxZones         = 8;
-    private const int   WarmupFrames     = 200;
-    private const int Divs = 5;
+    private const int   WarmupFrames     = 100;
+    private const int   Divs = 5;
 
     private static readonly string WindowLabel = $"-{WindowSeconds:0}s";
     
@@ -140,12 +140,17 @@ internal sealed class GPUTimingGraph
 
     public void Draw()
     {
+        var graphHeight = Widgets.Scale(GraphHeight);
+        var leftPad     = Widgets.Scale(LeftPad);
+        var botPad      = Widgets.Scale(BotPad);
+        var topPad      = Widgets.Scale(TopPad);
+
         var avail  = ImGui.GetContentRegionAvail().X;
         var origin = ImGui.GetCursorScreenPos();
-        ImGui.Dummy(new Vector2(avail, GraphHeight));    // reserve layout space
+        ImGui.Dummy(new Vector2(avail, graphHeight));    // reserve layout space
 
-        var p0 = new Vector2(origin.X + LeftPad, origin.Y + TopPad);
-        var p1 = new Vector2(origin.X + avail,   origin.Y + GraphHeight - BotPad);
+        var p0 = new Vector2(origin.X + leftPad, origin.Y + topPad);
+        var p1 = new Vector2(origin.X + avail,   origin.Y + graphHeight - botPad);
         var w  = p1.X - p0.X;
         var h  = p1.Y - p0.Y;
         if (w <= 1f || h <= 1f) return;
@@ -170,7 +175,7 @@ internal sealed class GPUTimingGraph
 
             var label = _tickLabels[d];
             var sz = ImGui.CalcTextSize(label);
-            dl.AddText(new Vector2(p0.X - 6f - sz.X, y - sz.Y * 0.5f), tick, label);
+            dl.AddText(new Vector2(p0.X - Widgets.Scale(6f) - sz.X, y - sz.Y * 0.5f), tick, label);
         }
 
         // ── stacked bands ───────────────────────────────────────────────────────
@@ -206,10 +211,11 @@ internal sealed class GPUTimingGraph
         }
 
         
-        dl.AddText(new Vector2(p0.X, p1.Y + 2f), tick, WindowLabel);
+        var labelGap = Widgets.Scale(2f);
+        dl.AddText(new Vector2(p0.X, p1.Y + labelGap), tick, WindowLabel);
         var nowSz = ImGui.CalcTextSize("now");
-        dl.AddText(new Vector2(p1.X - nowSz.X, p1.Y + 2f), tick, "now");
-        
+        dl.AddText(new Vector2(p1.X - nowSz.X, p1.Y + labelGap), tick, "now");
+
         DrawLegend();
     }
 
@@ -236,8 +242,8 @@ internal sealed class GPUTimingGraph
             return false;
 
         ImGui.TableSetupColumn("Pass", ImGuiTableColumnFlags.WidthStretch);
-        ImGui.TableSetupColumn("Time (ms)", ImGuiTableColumnFlags.WidthFixed, 90f);
-        ImGui.TableSetupColumn("%", ImGuiTableColumnFlags.WidthFixed, 70f);
+        ImGui.TableSetupColumn("Time (ms)", ImGuiTableColumnFlags.WidthFixed, Widgets.Scale(90f));
+        ImGui.TableSetupColumn("%", ImGuiTableColumnFlags.WidthFixed, Widgets.Scale(70f));
 
         ImGui.TableNextRow(ImGuiTableRowFlags.Headers);
 
@@ -257,11 +263,11 @@ internal sealed class GPUTimingGraph
 
         switch (align)
         {
-            case HeaderAlign.Right when avail > width:
-                ImGui.SetCursorPosX(ImGui.GetCursorPosX() + avail - width);
+            case HeaderAlign.Right:
+                if (avail > width)
+                    ImGui.SetCursorPosX(ImGui.GetCursorPosX() + avail - width);
                 break;
             case HeaderAlign.Left:
-                ImGui.SetCursorPosX(ImGui.GetCursorPosX());
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(align), align, null);
@@ -293,9 +299,11 @@ internal sealed class GPUTimingGraph
     private void DrawPassCell(int zone)
     {
         ImGui.TableSetColumnIndex(0);
-        
+
+        var iconSize = Widgets.Scale(IconSize);
+
         // vertical centering inside row
-        const float yOffset = IconSize * 0.5f;
+        var yOffset = iconSize * 0.5f;
         if (yOffset > 0f)
             ImGui.SetCursorPosY(ImGui.GetCursorPosY() + yOffset);
 
@@ -303,9 +311,9 @@ internal sealed class GPUTimingGraph
             $"##gpu{zone}",
             Palette[zone % Palette.Length],
             ImGuiColorEditFlags.NoTooltip | ImGuiColorEditFlags.NoBorder,
-            new Vector2(IconSize, IconSize));
+            new Vector2(iconSize, iconSize));
 
-        ImGui.SameLine(0f, 6f);
+        ImGui.SameLine(0f, Widgets.Scale(6f));
 
         // reset Y so text aligns with row baseline nicely
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() - yOffset);

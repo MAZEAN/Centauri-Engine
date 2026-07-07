@@ -34,9 +34,10 @@ public sealed class TracySection : ISection
         Widgets.CheckRow("Enabled", _config.TracyEnabled, v => _config.TracyEnabled = v);
 
         var startX = ImGui.GetCursorPosX();
+        var textW  = ImGui.CalcTextSize("Connected").X;
         ImGui.TextUnformatted("Connected");
         ImGui.SameLine();
-        ImGui.SetCursorPosX(startX + LabelWidth);
+        ImGui.SetCursorPosX(startX + MathF.Max(Widgets.Scale(LabelWidth), textW + Widgets.Scale(8f)));
 
         var connected = Tracy.Connected;
         ImGui.TextColored(Widgets.BooleanColor(connected), connected ? "Yes" : "No");

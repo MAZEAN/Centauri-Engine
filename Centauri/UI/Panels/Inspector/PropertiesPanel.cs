@@ -96,15 +96,17 @@ public class PropertiesPanel
     private static void SetupWindow()
     {
         var viewport = ImGui.GetMainViewport();
+        var padding  = Widgets.Scale(Padding);
+        var width    = Widgets.Scale(Width);
 
         // stack beneath the outliner: outliner padding + height + a gap
-        var top = viewport.WorkPos.Y + Padding + HierarchyPanel.Height + Padding;
-        var anchor = new Vector2(viewport.WorkPos.X + viewport.WorkSize.X - Padding, top);
+        var top = viewport.WorkPos.Y + padding + HierarchyPanel.Height + padding;
+        var anchor = new Vector2(viewport.WorkPos.X + viewport.WorkSize.X - padding, top);
 
         ImGui.SetNextWindowPos(anchor, ImGuiCond.Always, new Vector2(1f, 0f));   // pivot top-right
         ImGui.SetNextWindowSizeConstraints(
-            new Vector2(Width, 0),
-            new Vector2(Width, viewport.WorkPos.Y + viewport.WorkSize.Y - Padding - top));   // fill to bottom edge
+            new Vector2(width, 0),
+            new Vector2(width, viewport.WorkPos.Y + viewport.WorkSize.Y - padding - top));   // fill to bottom edge
         ImGui.SetNextWindowBgAlpha(BgAlpha);
     }
 }

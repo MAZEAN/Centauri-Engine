@@ -87,7 +87,7 @@ public sealed class ViewportToolbar
     
     private void DrawModeIndicator()
     {
-        ImGui.SameLine(0f, 16f);
+        ImGui.SameLine(0f, Widgets.Scale(16f));
         ImGui.AlignTextToFramePadding();
 
         var mode  = _config.Input.Mode;
@@ -122,7 +122,7 @@ public sealed class ViewportToolbar
         var viewport = ImGui.GetMainViewport();
         var anchor = new Vector2(
             viewport.WorkPos.X + viewport.WorkSize.X * 0.5f,   // horizontal centre
-            viewport.WorkPos.Y + Padding);                     // top edge
+            viewport.WorkPos.Y + Widgets.Scale(Padding));       // top edge
 
         ImGui.SetNextWindowPos(anchor, ImGuiCond.Always, new Vector2(0.5f, 0f)); // pivot top-centre
         ImGui.SetNextWindowBgAlpha(BgAlpha);

@@ -11,10 +11,14 @@ using Common;
 // PropertiesPanel inspector, which already edits lights/materials/transforms.
 public sealed class HierarchyPanel
 {
-    private const float Width   = 300f;
-    private const float Padding = 10f;
-    private const float BgAlpha = 0.85f;
-    public  const float Height  = 220f;
+    private const float Width      = 300f;
+    private const float Padding    = 10f;
+    private const float BgAlpha    = 0.85f;
+    private const float BaseHeight = 220f;
+
+    // Cross-referenced by PropertiesPanel to stack beneath this one — a property (not a const)
+    // since it needs Widgets.FontScale, set at runtime once the UI font is known.
+    public static float Height => Widgets.Scale(BaseHeight);
 
     private readonly ImFontPtr _font;
     private const ImGuiWindowFlags Flags = Widgets.PanelBase;
@@ -79,13 +83,14 @@ public sealed class HierarchyPanel
     private static void SetupWindow()
     {
         var viewport = ImGui.GetMainViewport();
-        
+        var padding  = Widgets.Scale(Padding);
+
         var anchor = new Vector2(
-            viewport.WorkPos.X + viewport.WorkSize.X - Padding,
-            viewport.WorkPos.Y + Padding);
+            viewport.WorkPos.X + viewport.WorkSize.X - padding,
+            viewport.WorkPos.Y + padding);
 
         ImGui.SetNextWindowPos(anchor, ImGuiCond.Always, new Vector2(1f, 0f));
-        ImGui.SetNextWindowSize(new Vector2(Width, Height), ImGuiCond.Always);
+        ImGui.SetNextWindowSize(new Vector2(Widgets.Scale(Width), Height), ImGuiCond.Always);
         ImGui.SetNextWindowBgAlpha(BgAlpha);
     }
 }

@@ -12,9 +12,9 @@ using Graphs;
 
 public class StatsOverlay
 {
-    private const int   Width   = 350;
-    private const float Padding = 10f;
-    private const float BgAlpha = 0.85f;
+    private const float Width      = 350f;
+    private const float Padding    = 10f;
+    private const float BgAlpha    = 0.85f;
     private const float LabelWidth = 120f;
     
     private const ImGuiWindowFlags Flags = Widgets.PanelBase | ImGuiWindowFlags.NoBringToFrontOnFocus; 
@@ -137,12 +137,14 @@ public class StatsOverlay
     private static void SetupWindow()
     {
         var viewport = ImGui.GetMainViewport();
-        var anchor = new Vector2(viewport.WorkPos.X + Padding, viewport.WorkPos.Y + Padding);
+        var padding = Widgets.Scale(Padding);
+        var width   = Widgets.Scale(Width);
+        var anchor  = new Vector2(viewport.WorkPos.X + padding, viewport.WorkPos.Y + padding);
 
         ImGui.SetNextWindowPos(anchor, ImGuiCond.Always, new Vector2(0f, 0f));
         ImGui.SetNextWindowSizeConstraints(
-            new Vector2(Width, 0),
-            new Vector2(Width, float.MaxValue));
+            new Vector2(width, 0),
+            new Vector2(width, float.MaxValue));
         ImGui.SetNextWindowBgAlpha(BgAlpha);
     }
 
@@ -167,10 +169,14 @@ public class StatsOverlay
     private static void StatRow(string label, string value, Vector4 color)
     {
         var startX = ImGui.GetCursorPosX();
-        
+        var textW  = ImGui.CalcTextSize(label).X;
+
         ImGui.TextUnformatted(label);
         ImGui.SameLine();
-        ImGui.SetCursorPosX(startX + LabelWidth);
+        // MathF.Max, not the scaled width alone: a label longer than the design width (bigger
+        // font, or just a long label) must still get pushed past its own text instead of the
+        // value starting mid-label — this is what threw when it didn't (see GPUTimingGraph).
+        ImGui.SetCursorPosX(startX + MathF.Max(Widgets.Scale(LabelWidth), textW + Widgets.Scale(8f)));
 
         var tinted = color.W > 0f;
         if (tinted) 

@@ -37,6 +37,7 @@ public class ImGuiManager : IDisposable
         });
 
         Font = font;
+        Widgets.SetFontScale(config.FontSize);
         Theme.ApplyBlenderDark();
     }
 

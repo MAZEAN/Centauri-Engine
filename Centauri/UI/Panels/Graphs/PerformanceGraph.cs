@@ -69,12 +69,17 @@ internal sealed class PerformanceGraph
 
     public void Draw()
     {
+        var graphHeight = Widgets.Scale(GraphHeight);
+        var leftPad     = Widgets.Scale(LeftPad);
+        var botPad      = Widgets.Scale(BotPad);
+        var topPad      = Widgets.Scale(TopPad);
+
         var avail  = ImGui.GetContentRegionAvail().X;
         var origin = ImGui.GetCursorScreenPos();
-        ImGui.Dummy(new Vector2(avail, GraphHeight));    // reserve layout space
+        ImGui.Dummy(new Vector2(avail, graphHeight));    // reserve layout space
 
-        var p0 = new Vector2(origin.X + LeftPad, origin.Y + TopPad);
-        var p1 = new Vector2(origin.X + avail,   origin.Y + GraphHeight - BotPad);
+        var p0 = new Vector2(origin.X + leftPad, origin.Y + topPad);
+        var p1 = new Vector2(origin.X + avail,   origin.Y + graphHeight - botPad);
         var w  = p1.X - p0.X;
         var h  = p1.Y - p0.Y;
         if (w <= 1f || h <= 1f) return;
@@ -103,7 +108,7 @@ internal sealed class PerformanceGraph
 
             var label = _tickLabels[d];
             var sz = ImGui.CalcTextSize(label);
-            dl.AddText(new Vector2(p0.X - 6f - sz.X, y - sz.Y * 0.5f), tick, label);
+            dl.AddText(new Vector2(p0.X - Widgets.Scale(6f) - sz.X, y - sz.Y * 0.5f), tick, label);
         }
 
         // ── series ────────────────────────────────────────────────────────────
@@ -122,14 +127,15 @@ internal sealed class PerformanceGraph
         }
 
         // ── X labels + current value ───────────────────────────────────────────
-        dl.AddText(new Vector2(p0.X, p1.Y + 2f), tick, WindowLabel);
+        var labelGap = Widgets.Scale(2f);
+        dl.AddText(new Vector2(p0.X, p1.Y + labelGap), tick, WindowLabel);
         var nowSz = ImGui.CalcTextSize("now");
-        dl.AddText(new Vector2(p1.X - nowSz.X, p1.Y + 2f), tick, "now");
+        dl.AddText(new Vector2(p1.X - nowSz.X, p1.Y + labelGap), tick, "now");
 
         if (_count > 0)
         {
             var sz = ImGui.CalcTextSize(_currentLabel);
-            dl.AddText(new Vector2(p1.X - sz.X - 4f, p0.Y + 2f), line, _currentLabel);
+            dl.AddText(new Vector2(p1.X - sz.X - Widgets.Scale(4f), p0.Y + labelGap), line, _currentLabel);
         }
     }
 
