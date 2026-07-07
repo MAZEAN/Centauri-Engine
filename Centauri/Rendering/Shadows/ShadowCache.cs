@@ -2,6 +2,8 @@ namespace Centauri.Rendering.Shadows;
 
 using System.Numerics;
 
+using Utils.Misc;
+
 // Everything that shapes the cascade depth maps. Two equal keys mean last frame's maps are
 // still valid, so the whole shadow render can be skipped. Value equality over the sun
 // direction, the camera (cascades fit its frustum), the scene revision and the cascade-fit
@@ -45,34 +47,31 @@ internal readonly struct ShadowCacheKey : IEquatable<ShadowCacheKey>
 // incoming key matches, and either nothing is animating the casters this frame, or it is but
 // we're still inside the animating-caster throttle window (see CanReuse) — wind sway is slow
 // and PCSS already softens edges, so redrawing the full cascade set every single frame just to
-// track a few pixels of foliage motion is wasted GPU time; lagging a couple of frames behind
-// the animation is imperceptible.
+// track a few pixels of foliage motion is wasted GPU time; lagging a fraction of a second behind
+// the animation is imperceptible. Throttling is time- rather than frame-based so the same
+// setting gives the same real-world lag regardless of framerate.
 internal sealed class ShadowCache
 {
     private ShadowCacheKey _key;
     private bool           _valid;
-    private int            _framesSinceRender;
+    private float          _lastRenderTime;
 
-    public bool CanReuse(in ShadowCacheKey key, bool castersAnimating, int animatingThrottleFrames)
+    public bool CanReuse(in ShadowCacheKey key, bool castersAnimating, float animatingThrottleSeconds)
     {
         if (!_valid || !key.Equals(_key))
             return false;
         if (!castersAnimating)
             return true;   // static scene — nothing to catch up on regardless
-        if (animatingThrottleFrames <= 0 || _framesSinceRender >= animatingThrottleFrames)
-        {
-            _framesSinceRender = 0;
+        if (animatingThrottleSeconds <= 0f || Time.Now - _lastRenderTime >= animatingThrottleSeconds)
             return false;   // redraw now to catch up with the animation
-        }
-        _framesSinceRender++;
         return true;   // reuse a still-recent render while only wind is moving
     }
-    
+
     public void Record(in ShadowCacheKey key)
     {
-        _key   = key;
-        _valid = true;
-        _framesSinceRender = 0;
+        _key            = key;
+        _valid          = true;
+        _lastRenderTime = Time.Now;
     }
 
     public void Invalidate() => _valid = false;

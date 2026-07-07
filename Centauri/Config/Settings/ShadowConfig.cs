@@ -19,7 +19,11 @@ public class ShadowConfig : IJsonOnDeserialized
     [JsonPropertyName("lightSize")]           public float LightSize           { get; set; } = 0.02f;  // tan(sun half-angle) — world penumbra growth per unit occluder distance
     [JsonPropertyName("blockerSearchRadius")] public float BlockerSearchRadius { get; set; } = 5f;      // texels
     [JsonPropertyName("maxPenumbraRadius")]   public float MaxPenumbraRadius   { get; set; } = 24f;     // texels — caps softness/cost
-    [JsonPropertyName("windThrottleFrames")]  public int WindThrottleFrames { get; set; } = 3;
+    // Milliseconds to keep reusing the last cascade render while only wind-animated casters (not
+    // a real sun/camera/config change) would otherwise force a redraw every frame — see
+    // ShadowCache.CanReuse. Time-based (not frame-based) so the lag is the same real-world
+    // duration regardless of framerate. 0 disables throttling (always redraw while animating).
+    [JsonPropertyName("windThrottleMs")]      public float WindThrottleMs { get; set; } = 50f;
 
     [JsonIgnore] public bool DebugCascades { get; set; }
 
@@ -33,7 +37,7 @@ public class ShadowConfig : IJsonOnDeserialized
     [JsonIgnore] public float AuthoredLightSize           { get; private set; }
     [JsonIgnore] public float AuthoredBlockerSearchRadius { get; private set; }
     [JsonIgnore] public float AuthoredMaxPenumbraRadius   { get; private set; }
-    [JsonIgnore] public int   AuthoredWindThrottleFrames  { get; private set; }
+    [JsonIgnore] public float AuthoredWindThrottleMs      { get; private set; }
 
     public ShadowConfig() => OnDeserialized();
 
@@ -49,6 +53,6 @@ public class ShadowConfig : IJsonOnDeserialized
         AuthoredLightSize           = LightSize;
         AuthoredBlockerSearchRadius = BlockerSearchRadius;
         AuthoredMaxPenumbraRadius   = MaxPenumbraRadius;
-        AuthoredWindThrottleFrames  = WindThrottleFrames;
+        AuthoredWindThrottleMs      = WindThrottleMs;
     }
 }
