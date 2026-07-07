@@ -118,6 +118,12 @@ layout(std140) uniform Lights {
 // Debugging
 uniform int uShowCascades;
 
+// 1 = skip the PCSS blocker search, the cascade cross-fade second sample, and the full IBL
+// split-sum in favor of the cheap fallbacks already below — used for secondary views (planar
+// reflections) whose output gets blurred/composited, where the extra fidelity isn't visible.
+uniform int uCheapShading;
+
+
 int SelectCascade(float viewDepth) 
 {
     for (int i = 0; i < uCascadeCount; ++i)
@@ -175,7 +181,7 @@ float SampleCascade(int c, vec3 N, vec3 L)
 
     float radius = float(uPcfRadius);
 
-    if (uPcss == 1)
+    if (uPcss == 1 && uCheapShading == 0)
     {
         float selfBias   = nOffset / max(uDepthRangeWorld[c], 1e-4);
         float avgBlocker = FindBlockerDepth(c, proj.xy, current, uBlockerRadius, selfBias);
@@ -208,8 +214,8 @@ float ShadowFactor(vec3 N, vec3 L)
     int c = SelectCascade(fViewDepth);
 
     float shadow = SampleCascade(c, N, L);
-    
-    if (c + 1 < uCascadeCount)
+
+    if (uCheapShading == 0 && c + 1 < uCascadeCount)
     {
         float splitFar  = uCascadeSplits[c];
         float splitNear = c == 0 ? 0.0 : uCascadeSplits[c - 1];
@@ -411,7 +417,7 @@ vec3 AmbientLighting(vec3 N, vec3 V, vec3 albedo, float roughness, float metalli
     vec3 F0 = mix(vec3(0.04), albedo, metallic);
     vec3 ambient;
 
-    if (uHasIBL == 1) {
+    if (uHasIBL == 1 && uCheapShading == 0) {
         vec3 kS = FresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
         vec3 kD = (1.0 - kS) * (1.0 - metallic);
         vec3 diffuse = texture(uIrradianceMap, N).rgb * albedo;

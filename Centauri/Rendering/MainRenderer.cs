@@ -26,7 +26,8 @@ public readonly record struct RenderRequest(
     Camera Camera,
     Matrix4x4 View,
     Vector3 Position,
-    Vector4 ClipPlane = default
+    Vector4 ClipPlane = default,
+    bool CheapShading = false
 );
 
 public class MainRenderer : IDisposable
@@ -59,7 +60,8 @@ public class MainRenderer : IDisposable
         float IblScale,
         bool SsaoActive,
         CullingSystem Culling,
-        Vector4 ClipPlane 
+        Vector4 ClipPlane,
+        bool CheapShading
     );
 
     private GLShader? _activeShader;
@@ -101,7 +103,8 @@ public class MainRenderer : IDisposable
             DaylightIblScale(request.Scene),
             request.SsaoActive,
             request.Culling,
-            request.ClipPlane
+            request.ClipPlane,
+            request.CheapShading
         );
         BeginFrame(request.Scene, request.DeltaTime, ref stats, request.SsaoTexture, request.SsaoActive);
 

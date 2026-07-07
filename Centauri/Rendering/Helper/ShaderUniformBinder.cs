@@ -24,9 +24,11 @@ public sealed class ShaderUniformBinder
         _shadows = shadows;
     }
 
-    public void UploadGlobals(GLShader shader, Camera camera, bool iblActive, float iblIntensityScale, bool ssaoActive)
+    public void UploadGlobals(GLShader shader, Camera camera, bool iblActive, float iblIntensityScale,
+        bool ssaoActive, bool cheapShading = false)
     {
         shader.SetUniform("uProjection", camera.GetProjectionMatrix());
+        shader.SetUniform("uCheapShading", cheapShading ? 1 : 0);
         UploadWind(shader, _config.Wind);
 
         UploadTextureSlots(shader);
