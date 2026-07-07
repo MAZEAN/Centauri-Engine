@@ -92,6 +92,8 @@ public class MainRenderer : IDisposable
 
     public void Render(in RenderRequest request, ref FrameStats stats)
     {
+        using var _ = Profiling.Tracy.Scope("MainRenderer.Render");
+
         var context = new RenderContext(
             request.Camera,
             request.View,

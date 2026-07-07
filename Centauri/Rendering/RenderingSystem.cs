@@ -120,6 +120,9 @@ public class RenderingSystem : IDisposable
 
     public void Render(Scene scene, float deltaTime)
     {
+        Profiling.Tracy.Enabled = _config.Debug.TracyEnabled;
+        using var frameZone = Profiling.Tracy.Scope("Frame");
+        
         BeginFrame(scene);
         
         UpdateProceduralIbl(scene);
@@ -145,6 +148,8 @@ public class RenderingSystem : IDisposable
             _post.Composite(in compositeRequest);
         
         RenderAfterPostComponents(scene, deltaTime);
+        
+        Profiling.Tracy.FrameMark();
     }
 
     private CompositeRequest CreateCompositeRequest(Scene scene, float deltaTime)

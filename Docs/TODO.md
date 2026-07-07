@@ -36,8 +36,9 @@
 * [x] Procedural sky
 * [x] Improved sky transitions
 * [ ] (auto) LOD system (Impostor)
-* [ ] auto-exposure 
+* [x] auto-exposure 
 * [ ] volumetric fog
+* [ ] Tracy Profiler integration
 * [ ] Better wind (hierarchy) & leaves (orientation)
 * [ ] Extend shadows to spot- and point lights
 * [ ] Sky variantions

@@ -9,6 +9,7 @@ using Renderers;
 using Culling;
 using Targets;
 using Utils.Misc;
+using Utils.Geometry;
 
 // Planar reflections: renders the scene a second time from a camera mirrored about a
 // horizontal plane (y = PlaneHeight) into an off-screen target. The SSR resolve then samples
@@ -30,7 +31,9 @@ public sealed class PlanarReflectionPass : IDisposable
     private readonly MainRenderer _main;
     private readonly SkyboxRenderer _skybox;
     
-    private readonly CullingSystem _noCulling = new();   // never enabled -> everything is visible in the mirror
+    private readonly CullingSystem _mirrorCulling = new();   // culled against the mirrored camera's own frustum
+    private readonly Frustum _mirrorFrustum = new();
+    
     private readonly RenderTarget _target;
 
     private float _resolvedHeight;
@@ -71,6 +74,8 @@ public sealed class PlanarReflectionPass : IDisposable
     public void Render(Scene scene, float deltaTime, ref FrameStats stats)
     {
         if (!_config.Enabled) return;
+        
+        using var _ = Profiling.Tracy.Scope("PlanarReflectionPass.Render");
 
         var camera = scene.Cameras.Active;
         var h = ResolvePlaneHeight(scene);
@@ -88,8 +93,11 @@ public sealed class PlanarReflectionPass : IDisposable
         var reflPos  = new Vector3(camera.Position.X, 2f * h - camera.Position.Y, camera.Position.Z);
         var proj     = camera.GetProjectionMatrix();
         
-        _noCulling.Update(scene, camera, enabled: false, cellSize: 16f, oversizeFactor: 8f);
-
+        // Cull against the mirrored view, not the main camera's — an entity outside the
+        // reflected frustum can't appear in the reflection even if it's visible directly.
+        _mirrorFrustum.Update(reflView * proj);
+        _mirrorCulling.Update(scene, _mirrorFrustum, enabled: true, cellSize: 16f, oversizeFactor: 8f);
+        
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, _msaaFbo);
         _gl.Viewport(0, 0, _target.Width, _target.Height);
         _gl.ClearColor(0f, 0f, 0f, 1f);
@@ -105,7 +113,7 @@ public sealed class PlanarReflectionPass : IDisposable
         // convention for the geometry pass so back-face culling keeps the correct (front) faces.
         _gl.FrontFace(FrontFaceDirection.CW);
         _main.Render(new RenderRequest(scene, deltaTime, SsaoTexture: 0, SsaoActive: false,
-            _noCulling, camera, reflView, reflPos, clip), ref stats);
+            _mirrorCulling, camera, reflView, reflPos, clip), ref stats);
         _gl.FrontFace(FrontFaceDirection.Ccw);
         
         _gl.BindFramebuffer(FramebufferTarget.ReadFramebuffer, _msaaFbo);

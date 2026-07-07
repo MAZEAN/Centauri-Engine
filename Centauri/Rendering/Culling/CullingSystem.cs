@@ -14,7 +14,7 @@ public sealed class CullingSystem
     private float _oversizeFactor;
     
     public SpatialGrid Grid { get; private set; }
-    private readonly HashSet<Entity> _visible = new();
+    private readonly HashSet<Entity> _visible = [];
     
     private int   _builtRevision = -1;
     private bool  _enabled = true;
@@ -30,11 +30,22 @@ public sealed class CullingSystem
         
         Grid           = new SpatialGrid(cellSize, oversizeFactor);
     }
-
+    
     // Rebuild the grid when the scene changes (revision-gated, like the shadow bounds cache —
     // runtime transform animation must bump the revision), then cull against the camera.
     public void Update(Scene scene, Camera camera, bool enabled, float cellSize, float oversizeFactor)
     {
+        camera.UpdateFrustum();
+        Update(scene, camera.Frustum, enabled, cellSize, oversizeFactor);
+    }
+    
+    // Same as above but against an arbitrary frustum instead of a Camera's own — lets a pass
+    // that renders from a derived view (e.g. a mirrored planar-reflection camera) cull against
+    // the frustum it's actually rendering with, instead of skipping culling altogether.
+    public void Update(Scene scene, Frustum frustum, bool enabled, float cellSize, float oversizeFactor)
+    {
+        using var _ = Profiling.Tracy.Scope("CullingSystem.Update");
+
         _enabled = enabled;
         
         if (Math.Abs(cellSize - _cellSize) > Tolerance || Math.Abs(oversizeFactor - _oversizeFactor) > Tolerance)
@@ -50,12 +61,10 @@ public sealed class CullingSystem
             Grid.Rebuild(scene.Entities);
             _builtRevision = scene.Revision;
         }
-
-        camera.UpdateFrustum();
-
+        
         _visible.Clear();
         if (enabled)
-            Grid.Cull(camera.Frustum, _visible);
+            Grid.Cull(frustum, _visible);
     }
 
     // When culling is disabled every entity counts as visible.

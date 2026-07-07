@@ -2,6 +2,10 @@
 bin/
 obj/
 
+# Tracy profiler native build output (see Docs/TracyProfiler.md)
+ThirdParty/tracy/build/
+ThirdParty/tracy/profiler-build/
+
 # User-specific files
 *.user
 *.userosscache

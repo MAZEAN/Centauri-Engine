@@ -59,6 +59,8 @@ public sealed class ShadowMapper : IDisposable
 
     public void Render(Scene scene, CullingSystem culling, ref FrameStats stats)
     {
+        using var _ = Profiling.Tracy.Scope("ShadowMapper.Render");
+
         stats.ShadowCasters = 0;
         stats.ShadowCulled  = 0;
 

@@ -31,7 +31,8 @@
   },
   "debug": {
     "enableCulling": true,
-    "showGrid": false
+    "showGrid": false,
+    "tracyEnabled": false
   },
   "input": {
     "mode": "Fly",

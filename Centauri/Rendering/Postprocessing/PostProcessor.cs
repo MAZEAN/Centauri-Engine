@@ -104,6 +104,8 @@ public sealed class PostProcessor : IDisposable
 
     public void Composite(in CompositeRequest request)
     {
+        using var _ = Profiling.Tracy.Scope("PostProcessor.Composite");
+
         _hdr.Resolve();
 
         var sceneColor = _hdr.ResolvedTexture;

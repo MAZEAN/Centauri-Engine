@@ -60,7 +60,10 @@ public sealed class GPUProfiler : IDisposable
         }
 
         for (var z = 0; z < _zoneCount; z++)
+        {
             _results.Add(new GpuTiming(_names[z], _ms[z]));
+            Tracy.Plot("GPU/" + _names[z], _ms[z]);
+        }
     }
 
     public Scope Measure(string name) => new(this, name);
