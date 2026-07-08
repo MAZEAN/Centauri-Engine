@@ -244,20 +244,32 @@ public class RenderingSystem : IDisposable
                 _gridRenderer.Render(scene);
         }
         
-        using (_context.Profiler.Measure("ZPrepass"))
-            _zPrepass.Render(scene, scene.Cameras.Active, _context.Culling);
+        var zPrepassEnabled = _config.Debug.EnableZPrepass;
+
+        if (zPrepassEnabled)
+            using (_context.Profiler.Measure("ZPrepass"))
+                _zPrepass.Render(scene, scene.Cameras.Active, _context.Culling);
 
         // Forward reuses the depth ZPrepass just wrote instead of its own fresh buffer: LEQUAL
         // (not LESS) so the correctly-depth-matching visible surface still passes, no writes
         // since the depth is already right. Lets hardware early-Z reject shading for anything
         // ZPrepass already knows is hidden — the win scales with overdraw, biggest exactly where
         // it hurts most (dense, close-up, overlapping alpha-tested foliage).
-        _gl.DepthFunc(DepthFunction.Lequal);
-        _gl.DepthMask(false);
+        // With EnableZPrepass off, Forward instead does a completely normal fresh depth
+        // test/write (Less/true), exactly as it did before ZPrepass existed — a clean A/B
+        // toggle for isolating bugs suspected to live in the depth-reuse mechanism itself.
+        if (zPrepassEnabled)
+        {
+            _gl.DepthFunc(DepthFunction.Lequal);
+            _gl.DepthMask(false);
+        }
         using (_context.Profiler.Measure("Forward"))
             _mainRenderer.Render(scene, deltaTime, ref _context.Stats, _ssao.AoTexture, _context.SsaoActive, _context.Culling);
-        _gl.DepthFunc(DepthFunction.Less);
-        _gl.DepthMask(true);
+        if (zPrepassEnabled)
+        {
+            _gl.DepthFunc(DepthFunction.Less);
+            _gl.DepthMask(true);
+        }
 
         using (_context.Profiler.Measure("Debug"))
         {

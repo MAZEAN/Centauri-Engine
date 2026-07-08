@@ -20,7 +20,11 @@ public class DebugConfig
     [JsonPropertyName("showGPUTimings")]    public bool ShowGPUTimings    { get; set; } = true;
     [JsonPropertyName("tracyEnabled")]      public bool TracyEnabled      { get; set; } = false;
     [JsonPropertyName("showAnisotropicFilter")] public bool AnisotropicFilter { get; set; } = true;
-    
+    // Diagnostic: fall back to Forward doing its own fresh depth test/write (DepthFunc(Less),
+    // DepthMask(true)) instead of reusing ZPrepass's depth via Lequal. Lets a suspected
+    // depth-reuse bug be A/B tested with a single toggle instead of a code round-trip.
+    [JsonPropertyName("enableZPrepass")]    public bool EnableZPrepass    { get; set; } = true;
+
     [JsonIgnore] public ShadingMode Shading { get; set; } = ShadingMode.Shaded;
 
     public void ToggleShowStatsOverlay()  => ShowStatsOverlay = !ShowStatsOverlay;

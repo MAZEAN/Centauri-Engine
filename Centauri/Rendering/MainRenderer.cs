@@ -217,7 +217,11 @@ public class MainRenderer : IDisposable
         if (twoSided)
         {
             _gl.Disable(EnableCap.CullFace);
-            _gl.Enable(EnableCap.SampleAlphaToCoverage);
+            
+            if (_config.Debug.EnableZPrepass)
+                _gl.Disable(EnableCap.SampleAlphaToCoverage);
+            else
+                _gl.Enable(EnableCap.SampleAlphaToCoverage);
         }
         else
         {
@@ -234,7 +238,8 @@ public class MainRenderer : IDisposable
     
     private GLShader BindShader(GLShader shader, RenderContext context)
     {
-        if (ReferenceEquals(shader, _activeShader)) return shader;
+        if (ReferenceEquals(shader, _activeShader)) 
+            return shader;
 
         shader.Use();
         if (_lightBlockBound.Add(shader))

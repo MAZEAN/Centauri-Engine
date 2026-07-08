@@ -118,8 +118,10 @@ public sealed class ZPrepass : IDisposable
         if (_cullEnabled == enabled) return;
         _cullEnabled = enabled;
 
-        if (enabled) _gl.Enable(EnableCap.CullFace);
-        else         _gl.Disable(EnableCap.CullFace);
+        if (enabled) 
+            _gl.Enable(EnableCap.CullFace);
+        else         
+            _gl.Disable(EnableCap.CullFace);
     }
 
     private void EndPass()

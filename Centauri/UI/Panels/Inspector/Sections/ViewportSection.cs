@@ -19,6 +19,7 @@ public sealed class ViewportSection : ISection
         Widgets.CheckRow("Skybox",          _config.ShowSkybox,        v => _config.ShowSkybox        = v);
         Widgets.CheckRow("Stats Overlay",   _config.ShowStatsOverlay,  v => _config.ShowStatsOverlay  = v);
         Widgets.CheckRow("Frustum Culling", _config.EnableCulling,     v => _config.EnableCulling     = v);
+        Widgets.CheckRow("Z-Prepass",       _config.EnableZPrepass,   v => _config.EnableZPrepass    = v);
         Widgets.CheckRow("Anisotropic",     _config.AnisotropicFilter, v => _config.AnisotropicFilter = v);
         Widgets.CheckRow("Bounding Boxes",  _config.ShowBoundingBoxes, v => _config.ShowBoundingBoxes = v);
         Widgets.CheckRow("Spatial Grid",    _config.ShowCullingGrid,   v => _config.ShowCullingGrid   = v);
