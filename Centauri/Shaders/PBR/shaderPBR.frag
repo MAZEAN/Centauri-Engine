@@ -17,6 +17,7 @@ const int   MAX_CASCADES = 4;
 const float CASCADE_BLEND = 0.1;   // fraction of a cascade's depth range used as the cross-fade band
 const float SHADOW_FADE = 0.1;   // fraction of the shadow distance over which shadows fade out
 const int   BLOCKER_TAPS = 8;   // subset of POISSON_DISK — cheaper than the full PCF tap count
+const float FOLIAGE_FRESNEL_ATTEN = 0.05;
 
 const int  POISSON_COUNT = 16;
 const vec2 POISSON_DISK[16] = vec2[](
@@ -28,6 +29,12 @@ const vec2 POISSON_DISK[16] = vec2[](
         vec2(-0.26496911, -0.41893023), vec2( 0.79197514,  0.19090188),
         vec2(-0.24188840,  0.99706507), vec2(-0.81409955,  0.91437590),
         vec2( 0.19984126,  0.78641367), vec2( 0.14383161, -0.14100790)
+);
+const float BAYER_4X4[16] = float[](
+        0.0,  8.0,  2.0, 10.0,
+        12.0,  4.0, 14.0,  6.0,
+        3.0, 11.0,  1.0,  9.0,
+        15.0,  7.0, 13.0,  5.0
 );
 
 // ─── light structs (std140 — every member padded to vec4) ───────────────────────
@@ -127,6 +134,13 @@ uniform int uShowCascades;
 // split-sum in favor of the cheap fallbacks already below — used for secondary views (planar
 // reflections) whose output gets blurred/composited, where the extra fidelity isn't visible.
 uniform int uCheapShading;
+
+// Methods
+float DitherThreshold(vec2 fragCoord)
+{
+    ivec2 p = ivec2(fragCoord) & 3;
+    return (BAYER_4X4[p.y * 4 + p.x] + 0.5) / 16.0;
+}
 
 // Decorrelated hash of a world-space point — 3 independent dot-product hashes so the result
 // isn't axis-aligned (a naive per-component sin(p) would be).
@@ -278,15 +292,6 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
     float NdotL = max(dot(N, L), 0.0);
     return GeometrySchlick(NdotV, roughness) * GeometrySchlick(NdotL, roughness);
 }
-
-// Schlick assumes a smooth dielectric, so the grazing term shoots to ~1.0 (mirror-bright,
-// sky-tinted) at the silhouette. That's correct for a smooth surface but wrong for a leaf
-// card: real foliage cuticle/wax microstructure scatters grazing reflection instead of
-// mirroring it, and a flat two-sided quad can be edge-on to the camera across large visible
-// spans (not just a thin rim like round geometry), so the unsuppressed spike reads as a
-// bright blue-white outline hugging every leaf silhouette. Attenuating just the grazing term
-// keeps normal-incidence Fresnel (and every non-foliage material) untouched.
-const float FOLIAGE_FRESNEL_ATTEN = 0.15;
 
 // fresnel — how reflective a surface is at grazing angles
 // metals reflect their color, non-metals reflect white
@@ -488,10 +493,11 @@ void main()
         albedoSample.rgb /= max(albedoSample.a, 1e-4);
 
     vec3 albedo = pow(albedoSample.rgb, vec3(2.2));
-    // Tunable (RenderConfig.FoliageAlphaCutoff) so this can be tuned against the actual leaf
+    
+    // Tunable (FoliageConfig.AlphaCutoff) so this can be tuned against the actual leaf
     // texture's alpha falloff instead of guessed. Must match ZPrepass's threshold exactly — see
     // uFoliageAlphaCutoff's declaration above and RenderConfig.cs.
-    if (albedoSample.a < uFoliageAlphaCutoff)
+    if (albedoSample.a < uFoliageAlphaCutoff || albedoSample.a < DitherThreshold(gl_FragCoord.xy))
         discard;
 
     vec3 N    = SurfaceNormal();

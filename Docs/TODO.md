@@ -48,6 +48,7 @@
 ## Optional
 * [ ] Hosek-Wilkie sky algorithm
 * [ ] Full raymarched volumetric clouds
+* [ ] Better AA for leaves
 
 ---
 
