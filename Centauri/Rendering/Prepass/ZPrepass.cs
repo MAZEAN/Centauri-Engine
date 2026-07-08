@@ -65,9 +65,10 @@ public sealed class ZPrepass : IDisposable
         SetCullState(true);
 
         _shader.Use();
-        _shader.SetUniform("uView",       camera.GetViewMatrix());
-        _shader.SetUniform("uProjection", camera.GetProjectionMatrix());
-        _shader.SetUniform("uAlbedo",     0);
+        _shader.SetUniform("uView",               camera.GetViewMatrix());
+        _shader.SetUniform("uProjection",          camera.GetProjectionMatrix());
+        _shader.SetUniform("uAlbedo",              0);
+        _shader.SetUniform("uFoliageAlphaCutoff",  _config.Render.FoliageAlphaCutoff);
         ShaderUniformBinder.UploadWind(_shader, _config.Wind);
     }
 

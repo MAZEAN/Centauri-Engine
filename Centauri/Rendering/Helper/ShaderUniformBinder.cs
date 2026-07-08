@@ -29,6 +29,7 @@ public sealed class ShaderUniformBinder
     {
         shader.SetUniform("uProjection", camera.GetProjectionMatrix());
         shader.SetUniform("uCheapShading", cheapShading ? 1 : 0);
+        shader.SetUniform("uFoliageAlphaCutoff", _config.Render.FoliageAlphaCutoff);
         UploadWind(shader, _config.Wind);
 
         UploadTextureSlots(shader);

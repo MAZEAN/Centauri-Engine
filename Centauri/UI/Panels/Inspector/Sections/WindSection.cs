@@ -10,14 +10,19 @@ using Common;
 public sealed class WindSection : ISection
 {
     private readonly WindConfig _config;
+    private readonly RenderConfig _render;
 
-    public WindSection(WindConfig config) => _config = config;
+    public WindSection(WindConfig config, RenderConfig render)
+    {
+        _config = config;
+        _render = render;
+    }
 
     public void Draw(Scene scene)
     {
         using var s = Widgets.Section("Wind", startCollapsed: true);
         if (!s.Open) return;
-        
+
         Widgets.CheckRow("Enabled", _config.Enabled, v => _config.Enabled = v);
 
         Widgets.DragRow("Strength", _config.Strength, v => _config.Strength = MathF.Max(0f, v),
@@ -26,5 +31,8 @@ public sealed class WindSection : ISection
             0.05f, 0f, 10f, "%.2f", _config.AuthoredSpeed);
         Widgets.SliderRow("Direction", _config.Direction, v => _config.Direction = v,
             0f, 360f, _config.AuthoredDirection);
+        Widgets.DragRow("Leaf Alpha Cutoff", _render.FoliageAlphaCutoff,
+            v => _render.FoliageAlphaCutoff = Math.Clamp(v, 0f, 1f),
+            0.01f, 0f, 1f, "%.2f", _render.AuthoredFoliageAlphaCutoff);
     }
 }

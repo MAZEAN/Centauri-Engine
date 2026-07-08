@@ -73,6 +73,10 @@ uniform float uMetallicScalar;
 uniform float uTranslucency;
 uniform vec4  uColor;
 
+// Alpha-tested cutout threshold — tunable (RenderConfig.FoliageAlphaCutoff), must match
+// ZPrepass's uFoliageAlphaCutoff exactly. See RenderConfig.cs for why.
+uniform float uFoliageAlphaCutoff;
+
 // IBL
 uniform samplerCube uIrradianceMap;   // unit 5
 uniform samplerCube uPrefilterMap;    // unit 6
@@ -462,7 +466,10 @@ void main()
     float ao           = uHasAO == 1 ? texture(uAOMap, fUv).r : 1.0;
 
     vec3 albedo = pow(albedoSample.rgb, vec3(2.2));
-    if (albedoSample.a < 0.05)
+    // Tunable (RenderConfig.FoliageAlphaCutoff) so this can be tuned against the actual leaf
+    // texture's alpha falloff instead of guessed. Must match ZPrepass's threshold exactly — see
+    // uFoliageAlphaCutoff's declaration above and RenderConfig.cs.
+    if (albedoSample.a < uFoliageAlphaCutoff)
         discard;
 
     vec3 N    = SurfaceNormal();
