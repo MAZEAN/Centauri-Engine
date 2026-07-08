@@ -74,17 +74,22 @@ bool onPlanarReflector(vec3 P, vec3 N)
     return hMask * fMask > 0.5;
 }
 
-// March the reflection ray in screen space between the projected endpoints; on the first
-// in-front→behind crossing, binary-refine and thickness-test it. Returns the hit UV.
-bool marchRay(vec2 uvP, vec2 uvQ, float invWP, float invWQ, out vec2 hitUv)
+//
+// `rayLen` and `roughness` scale the work down from the configured maximums: a ray clamped
+// well short of uMaxDistance (the R.z>0 case in main() below) needs proportionally fewer
+// steps to keep the same sampling density, and a hit near the roughness cutoff gets heavily
+// blurred (ssr_blur.frag) and roughness-faded (reflectionConfidence) downstream regardless of
+// how precisely it was refined, so it doesn't need the full refine-step budget either.
+bool marchRay(vec2 uvP, vec2 uvQ, float invWP, float invWQ, float rayLen, float roughness, out vec2 hitUv)
 {
-    float stepS = 1.0 / float(uMaxSteps);
+    int   effSteps = max(4, int(float(uMaxSteps) * clamp(rayLen / uMaxDistance, 0.0, 1.0)));
+    float stepS    = 1.0 / float(effSteps);
 
     hitUv = vec2(0.0);
     float prevS    = 0.0;
     float prevDiff = 0.0;
 
-    for (int i = 1; i <= uMaxSteps; i++)
+    for (int i = 1; i <= effSteps; i++)
     {
         float s  = float(i) * stepS;
 
@@ -101,16 +106,23 @@ bool marchRay(vec2 uvP, vec2 uvQ, float invWP, float invWQ, out vec2 hitUv)
         // leave a black miss. Thickness is applied AFTER refine, where the gap is ~0.
         if (i > 1 && prevDiff < 0.0 && diff > 0.0)
         {
+            int effRefine = max(1, int(mix(float(uRefineSteps), 1.0,
+                    clamp(roughness / max(uRoughnessCutoff, 1e-4), 0.0, 1.0))));
+            
             // ── binary refine in screen fraction between prevS and s ──
             float lo = prevS, hi = s;
             vec2  muv = uv;
-            for (int j = 0; j < uRefineSteps; j++)
+            for (int j = 0; j < effRefine; j++)
             {
                 float midS = (lo + hi) * 0.5;
                 muv        = mix(uvP, uvQ, midS);
                 float mz   = rayViewZ(invWP, invWQ, midS);
 
-                if (viewPos(muv).z - mz > 0.0) hi = midS; else lo = midS;
+                if (viewPos(muv).z - mz > 0.0) 
+                    hi = midS; 
+                else 
+                    lo = midS;
+                
                 hitUv = muv;
             }
 
@@ -132,8 +144,8 @@ bool marchRay(vec2 uvP, vec2 uvQ, float invWP, float invWQ, out vec2 hitUv)
 }
 
 // Confidence the SSR hit is trustworthy: fades at screen edges, high roughness, long distance,
-// silhouettes (background bleeding past a foreground edge) and back-facing hits.
-float reflectionConfidence(vec2 hitUv, vec3 P, vec3 R, float roughness)
+// silhouettes (background bleeding past a foreground edge), back-facing hits, and grazing origins.
+float reflectionConfidence(vec2 hitUv, vec3 P, vec3 N, vec3 V, vec3 R, float roughness)
 {
     vec3  hitPos    = viewPos(hitUv);
     vec3  hitNormal = normalize(texture(uNormal, hitUv).xyz * 2.0 - 1.0);
@@ -146,21 +158,41 @@ float reflectionConfidence(vec2 hitUv, vec3 P, vec3 R, float roughness)
     float distFade  = 1.0 - clamp(length(hitPos - P) / uMaxDistance, 0.0, 1.0);
     float silFade   = silhouetteConfidence(hitUv, hitPos.z);
 
-    return edgeFade * roughFade * distFade * silFade * backFade;
+    // A ray leaving its origin at a near-90° grazing angle stays close to that same surface for
+    // several march steps before diverging, which self-intersects and reports a spurious "hit"
+    // far more often than a well-posed one — most visible on shallow-angle undersides, where the
+    // resolve pass's Fresnel term (correctly, physically) amplifies whatever SSR found, making a
+    // bad self-intersecting hit stand out even more. Fade it out before it reaches that point.
+    float NoV       = max(dot(N, -V), 0.0);
+    float grazeFade = smoothstep(0.0, 0.08, NoV);
+
+    return edgeFade * roughFade * distFade * silFade * backFade * grazeFade;
 }
 
 void main()
 {
     float depth = texture(uDepth, vUv).r;
-    if (depth >= 1.0) { FragColor = vec4(0.0); return; }   // background — nothing to reflect
+    if (depth >= 1.0) 
+    { 
+        FragColor = vec4(0.0);
+        return; 
+    }   // background — nothing to reflect
 
     float roughness = texture(uMaterial, vUv).r;
-    if (roughness > uRoughnessCutoff) { FragColor = vec4(0.0); return; }
+    if (roughness > uRoughnessCutoff) 
+    { 
+        FragColor = vec4(0.0);
+        return; 
+    }
 
     vec3 P = viewPos(vUv);                                  // view-space position
     vec3 N = normalize(texture(uNormal, vUv).xyz * 2.0 - 1.0);
 
-    if (onPlanarReflector(P, N)) { FragColor = vec4(0.0); return; }
+    if (onPlanarReflector(P, N)) 
+    { 
+        FragColor = vec4(0.0); 
+        return;
+    }
 
     vec3 V = normalize(P);                                  // camera→fragment (cam at origin)
     vec3 R = normalize(reflect(V, N));                      // reflection direction
@@ -169,7 +201,11 @@ void main()
     float rayLen = uMaxDistance;
     if (R.z > 0.0)
         rayLen = min(rayLen, (-0.05 - P.z) / R.z);
-    if (rayLen <= 0.0) { FragColor = vec4(0.0); return; }
+    if (rayLen <= 0.0) 
+    { 
+        FragColor = vec4(0.0);
+        return;
+    }
 
     vec3 Q = P + R * rayLen;                                // ray end, view space
 
@@ -180,10 +216,14 @@ void main()
     vec2 uvQ   = (clipQ.xy / clipQ.w) * 0.5 + 0.5;
 
     vec2 hitUv;
-    if (!marchRay(uvP, uvQ, 1.0 / clipP.w, 1.0 / clipQ.w, hitUv)) { FragColor = vec4(0.0); return; }
-
+    if (!marchRay(uvP, uvQ, 1.0 / clipP.w, 1.0 / clipQ.w, rayLen, roughness, hitUv)) 
+    { 
+        FragColor = vec4(0.0); 
+        return; 
+    }
+    
     vec3  reflColor  = texture(uScene, hitUv).rgb * uIntensity;
-    float confidence = reflectionConfidence(hitUv, P, R, roughness);
+    float confidence = reflectionConfidence(hitUv, P, N, V, R, roughness);
 
     FragColor = vec4(reflColor, confidence);   // rgb = reflected radiance, a = confidence
 }
