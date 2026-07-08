@@ -54,6 +54,7 @@ public class RenderingSystem : IDisposable
     private GeometryPrepass _prepass = null!;
     private SsaoPass _ssao = null!;
     private PlanarReflectionPass _planar = null!;
+    private ZPrepass _zPrepass = null!;
     private CloudPass _clouds = null!;
     private BufferDebugView _bufferDebug = null!;
     
@@ -101,6 +102,7 @@ public class RenderingSystem : IDisposable
         _ssao    = new SsaoPass(_gl, _config.SSAO, (uint)framebufferSize.X, (uint)framebufferSize.Y);
         _planar  = new PlanarReflectionPass(_gl, _config.PlanarReflection, _mainRenderer, _skyboxRenderer,
             (uint)framebufferSize.X, (uint)framebufferSize.Y, (uint)_config.Window.Samples);
+        _zPrepass = new ZPrepass(_gl, _config, _instances);
         _clouds  = new CloudPass(_gl, _config.Sky, _skyboxRenderer.Cube, (uint)framebufferSize.X, (uint)framebufferSize.Y);
         _cloudInvViewport = new Vector2(1f / framebufferSize.X, 1f / framebufferSize.Y);
         _bufferDebug = new BufferDebugView(_gl);
@@ -241,9 +243,21 @@ public class RenderingSystem : IDisposable
             if (_config.Debug.ShowGrid)
                 _gridRenderer.Render(scene);
         }
+        
+        using (_context.Profiler.Measure("ZPrepass"))
+            _zPrepass.Render(scene, scene.Cameras.Active, _context.Culling);
 
+        // Forward reuses the depth ZPrepass just wrote instead of its own fresh buffer: LEQUAL
+        // (not LESS) so the correctly-depth-matching visible surface still passes, no writes
+        // since the depth is already right. Lets hardware early-Z reject shading for anything
+        // ZPrepass already knows is hidden — the win scales with overdraw, biggest exactly where
+        // it hurts most (dense, close-up, overlapping alpha-tested foliage).
+        _gl.DepthFunc(DepthFunction.Lequal);
+        _gl.DepthMask(false);
         using (_context.Profiler.Measure("Forward"))
             _mainRenderer.Render(scene, deltaTime, ref _context.Stats, _ssao.AoTexture, _context.SsaoActive, _context.Culling);
+        _gl.DepthFunc(DepthFunction.Less);
+        _gl.DepthMask(true);
 
         using (_context.Profiler.Measure("Debug"))
         {
@@ -346,6 +360,7 @@ public class RenderingSystem : IDisposable
         _prepass.Dispose();
         _ssao.Dispose();
         _clouds.Dispose();
+        _zPrepass.Dispose();
         _bufferDebug.Dispose();
         _ibl.Dispose();
         _reflectionProbe.Dispose();
