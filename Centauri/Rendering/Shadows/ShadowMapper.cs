@@ -84,7 +84,7 @@ public sealed class ShadowMapper : IDisposable
         var key = new ShadowCacheKey(dir, camera.GetViewMatrix() * camera.GetProjectionMatrix(),
             scene.Revision, s.CascadeCount, s.Distance, s.SplitLambda);
 
-        if (_cache.CanReuse(key, _sceneHasWind && _config.Wind.Animating, _config.Shadows.WindThrottleMs / 1000f))
+        if (_cache.CanReuse(key, _sceneHasWind && _config.Foliage.WindAnimating, _config.Shadows.WindThrottleMs / 1000f))
         {
             Active = true;   // last frame's depth maps + Cascades are still valid
             return;
@@ -97,7 +97,7 @@ public sealed class ShadowMapper : IDisposable
         _depth.Use();
         
         _depth.SetUniform("uAlbedo", 0);
-        ShaderUniformBinder.UploadWind(_depth, _config.Wind);
+        ShaderUniformBinder.UploadWind(_depth, _config.Foliage);
         
         var totalCasters = culling.EntityCount;
         for (var c = 0; c < Cascades.Length; c++)

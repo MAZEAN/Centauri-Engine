@@ -23,8 +23,7 @@
     "modelCacheSize": 64,
     "shaderCacheSize": 32,
     "scenePath": "Loading/scene.json",
-    "defaultShader": "Shaders/PBR/shaderPBR",
-    "foliageAlphaCutoff": 0.05
+    "defaultShader": "Shaders/PBR/shaderPBR"
   },
   "imGui": {
     "font": "Assets/Fonts/IosevkaCharon-Regular.ttf",
@@ -123,11 +122,12 @@
     "enabled": false,
     "feedback": 0.5
   },
-  "wind": {
-    "enabled": true,
-    "strength": 0.1,
-    "speed": 0.85,
-    "direction": 37.0
+  "foliage": {
+    "windEnabled": true,
+    "windStrength": 0.1,
+    "windSpeed": 0.85,
+    "windDirection": 37.0,
+    "alphaCutoff": 0.05
   },
   "culling": {
     "cellSize": 16.0,

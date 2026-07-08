@@ -465,6 +465,13 @@ void main()
     float metallic     = uHasMetallic  == 1 ? texture(uMetallicMap,  fUv).r : uMetallicScalar;
     float ao           = uHasAO == 1 ? texture(uAOMap, fUv).r : 1.0;
 
+    // uAlbedoMap is stored premultiplied (GLTexture.Decode premultiplies LDR textures at load
+    // time) specifically so mipmap generation/filtering blends toward black at transparent
+    // edges instead of whatever RGB the source image happened to store there — undo that here
+    // before the color is used for anything. uColor (the no-texture fallback) isn't premultiplied.
+    if (uHasAlbedo == 1)
+        albedoSample.rgb /= max(albedoSample.a, 1e-4);
+
     vec3 albedo = pow(albedoSample.rgb, vec3(2.2));
     // Tunable (RenderConfig.FoliageAlphaCutoff) so this can be tuned against the actual leaf
     // texture's alpha falloff instead of guessed. Must match ZPrepass's threshold exactly — see

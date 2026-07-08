@@ -20,7 +20,7 @@ public class AppConfig
     [JsonPropertyName("autoExposure")] public AutoExposureConfig AutoExposure { get; init; } = new();
     [JsonPropertyName("ssr")]     public SSRConfig    SSR { get; init; } = new();
     [JsonPropertyName("taa")]     public TAAConfig    TAA { get; init; } = new();
-    [JsonPropertyName("wind")]    public WindConfig   Wind { get; init; } = new();
+    [JsonPropertyName("foliage")] public FoliageConfig Foliage { get; init; } = new();
     [JsonPropertyName("culling")] public CullingConfig Culling { get; init; } = new();
     [JsonPropertyName("sky")]     public SkyConfig    Sky { get; init; } = new();
 }

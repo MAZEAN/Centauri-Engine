@@ -23,7 +23,7 @@ public class GLTexture : GLResource
     private const TextureParameterName TextureMaxAniso   = (TextureParameterName)0x84FE;
     private const float                AnisoRequest      = 8f;
     
-    private static readonly List<GLTexture> Anisotropic = new();
+    private static readonly List<GLTexture> Anisotropic = [];
     private static bool _anisoEnabled = true;
 
     private float _maxAniso = 1f;   // driver-clamped per-texture ceiling (>= 1)
@@ -72,6 +72,8 @@ public class GLTexture : GLResource
 
         var pixels = new byte[image.Width * image.Height * 4];
         image.CopyPixelDataTo(pixels);
+        PremultiplyAlpha(pixels);
+
         return new TextureData { IsHdr = false, Width = image.Width, Height = image.Height, Ldr = pixels };
     }
 
@@ -89,6 +91,27 @@ public class GLTexture : GLResource
         }
 
         SetParameters(hdr: false);
+    }
+    
+    // Mipmap generation and bilinear/anisotropic filtering blend neighboring texels' RGB
+    // independent of alpha (not alpha-weighted). For an alpha-tested cutout texture (foliage),
+    // the "transparent" texels surrounding a leaf shape often carry leftover matte/background
+    // color from however the source image was authored/exported, and that color bleeds into
+    // the leaf's edge at every mip level and any grazing-angle sample — the classic colored
+    // fringe around alpha-tested foliage. Premultiplying means that bleed is toward black (0
+    // RGB at 0 alpha) instead of an arbitrary color; shaderPBR.frag un-premultiplies on read so
+    // surviving, alpha-tested pixels still get their real, correct color.
+    private static void PremultiplyAlpha(byte[] rgba)
+    {
+        for (var i = 0; i < rgba.Length; i += 4)
+        {
+            var a = rgba[i + 3];
+            if (a == 255) continue;   // fully opaque — no change, and skips the common case fast
+
+            rgba[i]     = (byte)(rgba[i]     * a / 255);
+            rgba[i + 1] = (byte)(rgba[i + 1] * a / 255);
+            rgba[i + 2] = (byte)(rgba[i + 2] * a / 255);
+        }
     }
 
     private void SetParameters(bool hdr)

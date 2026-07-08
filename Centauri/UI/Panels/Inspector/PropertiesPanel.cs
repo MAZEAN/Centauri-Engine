@@ -33,7 +33,7 @@ public class PropertiesPanel
                 new SkySection(config.Sky),
                 new DayNightSection(),
                 new ShadowSection(config.Shadows),
-                new WindSection(config.Wind, config.Render)
+                new FoliageSection(config.Foliage)
             ]),
             new SectionGroup("Reflections", ColorPalette.Blue, [
                 new IBLSection(config.IBL),

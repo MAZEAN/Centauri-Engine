@@ -29,8 +29,8 @@ public sealed class ShaderUniformBinder
     {
         shader.SetUniform("uProjection", camera.GetProjectionMatrix());
         shader.SetUniform("uCheapShading", cheapShading ? 1 : 0);
-        shader.SetUniform("uFoliageAlphaCutoff", _config.Render.FoliageAlphaCutoff);
-        UploadWind(shader, _config.Wind);
+        shader.SetUniform("uFoliageAlphaCutoff", _config.Foliage.AlphaCutoff);
+        UploadWind(shader, _config.Foliage);
 
         UploadTextureSlots(shader);
         UploadIbl(shader, iblActive, iblIntensityScale);
@@ -99,11 +99,11 @@ public sealed class ShaderUniformBinder
         shader.SetUniform("uWind",            mat.Wind ? 1 : 0);
     }
     
-    public static void UploadWind(GLShader shader, WindConfig wind)
+    public static void UploadWind(GLShader shader, FoliageConfig foliage)
     {
         shader.SetUniform("uTime",         Time.Now);
-        shader.SetUniform("uWindStrength", wind.Enabled ? wind.Strength : 0f);
-        shader.SetUniform("uWindSpeed",    wind.Speed);
-        shader.SetUniform("uWindDir",      wind.DirectionVector);
+        shader.SetUniform("uWindStrength", foliage.WindEnabled ? foliage.WindStrength : 0f);
+        shader.SetUniform("uWindSpeed",    foliage.WindSpeed);
+        shader.SetUniform("uWindDir",      foliage.WindDirectionVector);
     }
 }

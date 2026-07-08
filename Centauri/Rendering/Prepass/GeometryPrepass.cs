@@ -73,7 +73,7 @@ public sealed class GeometryPrepass : IDisposable
         _shader.SetUniform("uAlbedo",       0);
         _shader.SetUniform("uRoughnessMap", 2);
         _shader.SetUniform("uMetallicMap",  3);
-        ShaderUniformBinder.UploadWind(_shader, _config.Wind);
+        ShaderUniformBinder.UploadWind(_shader, _config.Foliage);
     }
 
     private void RenderBatch(Batch batch, CullingSystem culling)
