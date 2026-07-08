@@ -279,15 +279,30 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
     return GeometrySchlick(NdotV, roughness) * GeometrySchlick(NdotL, roughness);
 }
 
+// Schlick assumes a smooth dielectric, so the grazing term shoots to ~1.0 (mirror-bright,
+// sky-tinted) at the silhouette. That's correct for a smooth surface but wrong for a leaf
+// card: real foliage cuticle/wax microstructure scatters grazing reflection instead of
+// mirroring it, and a flat two-sided quad can be edge-on to the camera across large visible
+// spans (not just a thin rim like round geometry), so the unsuppressed spike reads as a
+// bright blue-white outline hugging every leaf silhouette. Attenuating just the grazing term
+// keeps normal-incidence Fresnel (and every non-foliage material) untouched.
+const float FOLIAGE_FRESNEL_ATTEN = 0.15;
+
 // fresnel — how reflective a surface is at grazing angles
 // metals reflect their color, non-metals reflect white
 vec3 FresnelSchlick(float cosTheta, vec3 F0)
 {
-    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+    float grazing = pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+    if (uFoliage == 1)
+        grazing *= FOLIAGE_FRESNEL_ATTEN;
+    return F0 + (1.0 - F0) * grazing;
 }
 
 vec3 FresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness) {
-    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+    float grazing = pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+    if (uFoliage == 1)
+        grazing *= FOLIAGE_FRESNEL_ATTEN;
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * grazing;
 }
 
 // Geometric specular antialiasing (Kaplanyan / Frostbite). A near-mirror highlight is

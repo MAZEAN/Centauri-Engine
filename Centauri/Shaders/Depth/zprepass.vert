@@ -40,8 +40,8 @@ vec3 WindSway(vec3 worldPos, vec3 origin)
     float gust = 0.7 + 0.3 * sin(uTime * 0.15) + 0.15 * sin(uTime * 0.07 + seed * 3.0);
 
     float sway = sin(uTime * uWindSpeed + phase)
-    + 0.4 * sin(uTime * uWindSpeed * 2.1 + phase * 2.7)
-    + 0.2 * sin(uTime * uWindSpeed * 4.7 + phase * 5.1);
+        + 0.4 * sin(uTime * uWindSpeed * 2.1 + phase * 2.7)
+        + 0.2 * sin(uTime * uWindSpeed * 4.7 + phase * 5.1);
 
     float amount = sway * gust * uWindStrength * bendWeight * leafAmp;
 
@@ -57,7 +57,7 @@ void main()
 
     vec4 worldPos = iModel * vec4(vPos, 1.0);
     if (uWind == 1)
-    worldPos.xyz = WindSway(worldPos.xyz, iModel[3].xyz);
+        worldPos.xyz = WindSway(worldPos.xyz, iModel[3].xyz);
 
     gl_Position = uProjection * uView * worldPos;
 }
