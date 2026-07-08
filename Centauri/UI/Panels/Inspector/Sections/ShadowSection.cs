@@ -42,7 +42,7 @@ public sealed class ShadowSection : ISection
         Widgets.DragRow("Split Blend", _config.SplitLambda, v => _config.SplitLambda = v,
             0.01f, 0f, 1f, "%.2f", _config.AuthoredSplitLambda);
         
-        Widgets.DragRow("Wind Throttle (ms)", _config.WindThrottleMs, v => _config.WindThrottleMs = v,
+        Widgets.DragRow("Wind Throttle", _config.WindThrottleMs, v => _config.WindThrottleMs = v,
             5f, 0f, 250f, "%.0f", _config.AuthoredWindThrottleMs);
         
         Widgets.CheckRow("Contact Hardening", _config.ContactHardening, v => _config.ContactHardening = v);

@@ -124,6 +124,15 @@ uniform int uShowCascades;
 // reflections) whose output gets blurred/composited, where the extra fidelity isn't visible.
 uniform int uCheapShading;
 
+// Decorrelated hash of a world-space point — 3 independent dot-product hashes so the result
+// isn't axis-aligned (a naive per-component sin(p) would be).
+vec3 hash3(vec3 p)
+{
+    float x = fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+    float y = fract(sin(dot(p, vec3(93.989, 67.345, 12.153))) * 24634.6345);
+    float z = fract(sin(dot(p, vec3(51.321, 15.732, 88.921))) * 95421.2321);
+    return vec3(x, y, z);
+}
 
 int SelectCascade(float viewDepth) 
 {
@@ -453,7 +462,7 @@ void main()
     float ao           = uHasAO == 1 ? texture(uAOMap, fUv).r : 1.0;
 
     vec3 albedo = pow(albedoSample.rgb, vec3(2.2));
-    if (albedoSample.a < 0.5)
+    if (albedoSample.a < 0.05)
         discard;
 
     vec3 N    = SurfaceNormal();

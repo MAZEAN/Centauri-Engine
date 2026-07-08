@@ -27,14 +27,24 @@ vec3 WindSway(vec3 worldPos, vec3 origin)
     float bendWeight = h * h;
 
     float seed = fract(sin(dot(origin.xz, vec2(12.9898, 78.233))) * 43758.5453);
-    float phase = dot(worldPos.xz, windDir) * 0.4 + seed * 6.28318;
+
+    // High-frequency hash on the vertex's own world position (not just the tree's origin) so
+    // individual leaf cards desync from each other instead of the whole canopy moving as one
+    // rigid gradient. Nearby vertices on the same small leaf card land on nearly the same
+    // value (still internally coherent), but neighboring cards a short distance apart land on
+    // a very different phase/amplitude. Must stay identical across shaderPBR.vert/prepass.vert/
+    // depth.vert — see uWind's comment.
+    float leafSeed = fract(sin(dot(worldPos.xyz, vec3(269.5, 183.3, 311.7))) * 43758.5453);
+    float leafAmp  = 0.7 + 0.3 * leafSeed;
+    float phase = dot(worldPos.xz, windDir) * 0.4 + seed * 6.28318 + leafSeed * 6.28318;
+
     float gust = 0.7 + 0.3 * sin(uTime * 0.15) + 0.15 * sin(uTime * 0.07 + seed * 3.0);
 
     float sway = sin(uTime * uWindSpeed + phase)
-                + 0.4 * sin(uTime * uWindSpeed * 2.1 + phase * 2.7)
-                + 0.2 * sin(uTime * uWindSpeed * 4.7 + phase * 5.1);
+        + 0.4 * sin(uTime * uWindSpeed * 2.1 + phase * 2.7)
+        + 0.2 * sin(uTime * uWindSpeed * 4.7 + phase * 5.1);
 
-    float amount = sway * gust * uWindStrength * bendWeight;
+    float amount = sway * gust * uWindStrength * bendWeight * leafAmp;
 
     worldPos.xz += windDir * amount;
     worldPos.y -= abs(amount) * 0.1;

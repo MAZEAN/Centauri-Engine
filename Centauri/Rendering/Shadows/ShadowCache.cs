@@ -10,7 +10,7 @@ using Utils.Misc;
 // config — the sampling-side params (bias, pcf) don't change the stored depth, so they're out.
 internal readonly struct ShadowCacheKey : IEquatable<ShadowCacheKey>
 {
-    private const float Tolerance = 0.001f;
+    private const float Tolerance = 0.01f;
     
     private readonly Vector3   _sunDir;
     private readonly Matrix4x4 _viewProj;
