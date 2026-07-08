@@ -3,6 +3,8 @@
 in vec3 vViewNormal;
 in vec2 fUv;
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 layout (location = 0) out vec4 gNormal;   // view-space normal, encoded to [0,1]
 layout (location = 1) out vec4 gMaterial;
 
@@ -15,6 +17,8 @@ uniform int   uHasRoughness;
 uniform int   uHasMetallic;
 uniform float uRoughnessValue;
 uniform float uMetallicValue;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 void main()
 {

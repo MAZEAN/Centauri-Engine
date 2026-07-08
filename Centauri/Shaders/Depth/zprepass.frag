@@ -2,6 +2,8 @@
 
 in vec2 fUv;
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 // 4x4 Bayer matrix keyed by screen pixel — must stay byte-for-byte identical to
 // shaderPBR.frag's copy, so both passes agree exactly on which fragments survive. Hardware
 // alpha-to-coverage can't guarantee that agreement across two separate draw calls for the
@@ -28,6 +30,8 @@ uniform int       uAlphaTest;  // 1 = discard by albedo alpha
 // alpha band would have nothing to depth-sort against each other — showing as flickery,
 // arbitrarily-ordered noise/fringing right at leaf silhouettes.
 uniform float uFoliageAlphaCutoff;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 float DitherThreshold(vec2 fragCoord)
 {

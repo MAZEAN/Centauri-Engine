@@ -8,7 +8,10 @@
 // hit, binary-refine and sample the resolved HDR scene, weighted by Fresnel + fades.
 
 in  vec2 vUv;
+
 out vec4 FragColor;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 uniform sampler2D uScene;     // resolved HDR scene color (what we reflect)
 uniform sampler2D uDepth;     // prepass depth ([0,1], engine convention)
@@ -30,6 +33,8 @@ uniform vec2  uTexel;                 // 1 / this target's resolution
 uniform mat4  uInvView;
 uniform int   uHasPlanar;
 uniform float uPlanarHeight;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 // reconstruct view-space position from stored depth (matches ssao.frag / CascadeBuilder)
 vec3 viewPos(vec2 uv)

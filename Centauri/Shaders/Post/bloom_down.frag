@@ -4,10 +4,15 @@
 // give a wide, stable, firefly-resistant blur as the pyramid shrinks each level by half.
 
 in  vec2 vUv;
+
 out vec4 FragColor;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 uniform sampler2D uSrc;
 uniform vec2 uTexel;   // 1 / source size
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 void main()
 {

@@ -2,8 +2,12 @@
 
 in vec2 fUv;
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 uniform sampler2D uAlbedo;     // bound only for alpha-tested (foliage) casters
 uniform int       uAlphaTest;  // 1 = discard by albedo alpha so leaves cast a cutout shadow
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 void main()
 {

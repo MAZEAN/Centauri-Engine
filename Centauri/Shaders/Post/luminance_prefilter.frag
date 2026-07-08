@@ -7,10 +7,15 @@
 // a plain linear average would.
 
 in  vec2 vUv;
+
 out vec4 FragColor;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 uniform sampler2D uSrc;
 uniform vec2  uTexel;   // 1 / source size
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 void main()
 {

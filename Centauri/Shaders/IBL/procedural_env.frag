@@ -1,7 +1,10 @@
 #version 330 core
 
 in  vec3 vLocalPos;
+
 out vec4 FragColor;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const vec3 RAYLEIGH_WEIGHT = vec3(0.35, 0.55, 1.0);
 
@@ -14,6 +17,8 @@ uniform float uCloudScale;
 uniform float uCloudSpeed;
 uniform float uCloudShading;
 uniform float uTime;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 float hash3(vec3 p)
 {

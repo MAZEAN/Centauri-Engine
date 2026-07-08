@@ -4,6 +4,8 @@ in  vec3 vDir;
 
 out vec4 FragColor;
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 const vec2 invAtan = vec2(0.1591549, 0.3183099); // 1/(2π), 1/π
 const vec3 RAYLEIGH_WEIGHT = vec3(0.35, 0.55, 1.0);
 
@@ -26,6 +28,8 @@ uniform float uSkyIntensity; // scales relative sky radiance into the exposure/t
 uniform sampler2D uCloudMap;
 uniform vec2      uInvViewport;
 uniform int       uHasCloudMap;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 vec3 proceduralSky(vec3 dir, vec3 sunDir, float turbidity, float intensity)
 {

@@ -1,9 +1,14 @@
 #version 330 core
 
 in  vec2 vUv;
+
 out vec4 FragColor;
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 uniform sampler2D uSsao;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 // 4x4 box blur — exactly the noise tile size, so it averages out the rotation pattern
 void main()

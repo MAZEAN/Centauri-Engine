@@ -7,12 +7,17 @@
 // under a moving camera reprojects correctly.
 
 in  vec2 vUv;
+
 out vec4 FragColor;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 uniform sampler2D uDepth;          // current prepass depth ([0,1])
 
 uniform mat4 uInvViewProj;         // inverse(view*proj), current frame (jittered)
 uniform mat4 uPrevViewProj;        // view*proj, previous frame (jittered)
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 void main()
 {

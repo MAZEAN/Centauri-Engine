@@ -1,13 +1,18 @@
 #version 330 core
 
 in vec3 vLocalPos;
+
 out vec4 FragColor;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const float PI = 3.14159265359;
 
 uniform samplerCube uEnv;
 uniform float uMaxRadiance;
 uniform float uSampleDelta;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 void main() {
     vec3 N = normalize(vLocalPos);

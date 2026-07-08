@@ -3,6 +3,8 @@
 in  vec2 vUv;
 out vec4 FragColor;
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 uniform sampler2D uNormal;   // view-space normals, encoded [0,1]
 uniform sampler2D uDepth;    // non-linear depth [0,1]
 uniform sampler2D uAo;       // screen-space AO (R)
@@ -11,6 +13,8 @@ uniform sampler2D uVelocity; // TAA motion vectors (uv delta, RG)
 uniform int   uMode;         // 1 = normals, 2 = depth
 uniform float uNear;
 uniform float uFar;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 void main()
 {

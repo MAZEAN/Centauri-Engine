@@ -4,6 +4,8 @@ in  vec2 vUv;
 
 out vec4 FragColor;
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 const float maxVal = 65504.0;
 
 uniform sampler2D uHdr;
@@ -24,6 +26,8 @@ uniform int       uAutoExposureEnabled;
 uniform float     uAutoKeyValue;        // "middle grey" target the adapted luminance is aimed at
 uniform float     uAutoMinExposure;
 uniform float     uAutoMaxExposure;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 vec3 ACESFilm(vec3 x)
 {

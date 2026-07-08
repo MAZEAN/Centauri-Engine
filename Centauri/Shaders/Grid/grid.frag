@@ -21,12 +21,13 @@ const float FOG_START         = 50.0;
 const float FOG_END           = 200.0;
 
 const float BIAS              = 1e-7;
-// ─────────────────────────────────────────────────────────────────────────────
 
 uniform mat4 uView;
 uniform mat4 uProjection;
 uniform vec3 uCameraPos;
 uniform vec4 background;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 float log10(float x)
 {

@@ -6,7 +6,10 @@
 // so the resolution loss is invisible while the repeated fbm noise evaluations drop ~4x.
 
 in  vec3 vDir;
+
 out vec4 FragColor;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 uniform vec3  uSunDir;
 uniform float uCloudCoverage;  // 0 = none (skipped entirely), 1 = fully overcast
@@ -14,6 +17,8 @@ uniform float uCloudScale;     // noise frequency — higher = smaller, more num
 uniform float uCloudSpeed;     // scroll speed
 uniform float uCloudShading;   // shading contrast: 0 = flat cutout, 1 = full effect, >1 = harder
 uniform float uTime;           // seconds, for scrolling
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 float hash3(vec3 p)
 {

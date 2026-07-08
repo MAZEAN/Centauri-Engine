@@ -1,7 +1,10 @@
 #version 330 core
 
 in  vec2 vUv;
+
 out vec4 FragColor;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const float CLAMP_GAMMA = 1.25;
 
@@ -13,6 +16,8 @@ uniform int   uHasSsr;
 
 uniform vec2  uTexel;
 uniform float uFeedback;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 vec3 sceneAt(vec2 uv)
 {

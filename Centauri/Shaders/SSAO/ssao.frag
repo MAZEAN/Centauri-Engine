@@ -1,7 +1,10 @@
 #version 330 core
 
 in  vec2 vUv;
+
 out vec4 FragColor;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 uniform sampler2D uDepth;     // prepass depth ([0,1], engine convention)
 uniform sampler2D uNormal;    // prepass view-space normal, encoded to [0,1]
@@ -15,6 +18,8 @@ uniform int   uKernelSize;
 uniform float uRadius;
 uniform float uBias;
 uniform float uPower;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 // reconstruct view-space position from the stored depth (ndc.z = depth, [0,1] — matches
 // CascadeBuilder's frustum unprojection)

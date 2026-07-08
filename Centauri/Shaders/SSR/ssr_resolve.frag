@@ -1,7 +1,10 @@
 #version 330 core
 
 in  vec2 vUv;
+
 out vec4 FragColor;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 uniform sampler2D   uSsr;       // blurred reflection: rgb = reflected radiance, a = confidence
 uniform sampler2D   uDepth;     // prepass depth
@@ -37,6 +40,8 @@ uniform float     uPlanarHeight;
 uniform float     uPlanarIntensity;
 uniform float     uPlanarDistortion;
 uniform float     uPlanarBlur;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 vec3 viewPos(vec2 uv)
 {

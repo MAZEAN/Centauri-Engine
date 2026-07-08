@@ -3,6 +3,8 @@
 out vec3 vViewNormal;
 out vec2 fUv;
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 layout (location = 0) in vec3 vPos;
 layout (location = 1) in vec3 vNormal;
 layout (location = 2) in vec2 vUv;
@@ -18,6 +20,8 @@ uniform float uTime;        // seconds, latched once per frame
 uniform float uWindStrength;   // sway amplitude
 uniform float uWindSpeed;      // oscillation freq
 uniform vec2  uWindDir;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 vec3 WindSway(vec3 worldPos, vec3 origin)
 {

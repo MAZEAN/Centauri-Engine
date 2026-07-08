@@ -5,11 +5,11 @@ using System.Runtime.CompilerServices;
 
 public static class Time
 {
-    private static readonly long _start = Stopwatch.GetTimestamp();
+    private static readonly long Start = Stopwatch.GetTimestamp();
 
     public static float Now { get; private set; }
 
-    public static void BeginFrame() => Now = (float)Stopwatch.GetElapsedTime(_start).TotalSeconds;
+    public static void BeginFrame() => Now = (float)Stopwatch.GetElapsedTime(Start).TotalSeconds;
     
     public readonly struct Scope : IDisposable
     {
@@ -35,6 +35,7 @@ public static class Time
     {
         var start = Stopwatch.GetTimestamp();
         action();
+        
         Log(ClassName(file), label, start);
     }
 
@@ -42,6 +43,7 @@ public static class Time
     {
         var start = Stopwatch.GetTimestamp();
         var result = func();
+        
         Log(ClassName(file), label, start);
         return result;
     }

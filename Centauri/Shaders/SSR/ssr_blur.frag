@@ -1,7 +1,10 @@
 #version 330 core
 
 in  vec2 vUv;
+
 out vec4 FragColor;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const int   MAXR       = 3;      // bounded kernel half-width
 const float MIN_RADIUS = 1.5;    // floor — covers the 4 direct + 4 diagonal neighbors
@@ -11,6 +14,8 @@ uniform sampler2D uSsr;        // raw reflection
 uniform sampler2D uMaterial;   // r = roughness
 uniform vec2  uTexel;          // 1 / size
 uniform float uRoughnessCutoff;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 void main()
 {

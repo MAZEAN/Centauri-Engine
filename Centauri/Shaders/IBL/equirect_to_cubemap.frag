@@ -1,13 +1,18 @@
 #version 330 core
 
 in vec3 vLocalPos;
+
 out vec4 FragColor;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const vec2 invAtan = vec2(0.1591549, 0.3183099);
 const float maxVal = 65504.0;
 
 uniform sampler2D uEquirect;
 uniform float uExposure;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 void main() {
     vec3 v = normalize(vLocalPos);

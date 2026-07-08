@@ -4,11 +4,16 @@
 // larger mip, so each level's blur accumulates into a smooth, wide bloom.
 
 in  vec2 vUv;
+
 out vec4 FragColor;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 uniform sampler2D uSrc;
 uniform vec2  uTexel;    // 1 / source (smaller mip) size
 uniform float uRadius;   // spread multiplier
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 void main()
 {

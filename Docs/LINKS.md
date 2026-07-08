@@ -8,3 +8,4 @@
 - [Kenney Assets] (https://kenney.nl/)
 - [Sketchfab Assets] (https://sketchfab.com/)
 - [Itch.io Assets] (https://itch.io/)
+- [CGBookcase Assets] (https://www.cgbookcase.com/)

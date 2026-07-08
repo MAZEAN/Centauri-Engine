@@ -10,6 +10,8 @@ in vec3 fInstanceOrigin;  // this instance's world position (iModel[3].xyz) — 
 
 out vec4 FragColor;
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 //  ─── constants ───────────────────────────────────────────────────────────────
 const float PI               = 3.14159265359;
 const int   MAX_POINT_LIGHTS = 16;
@@ -136,7 +138,8 @@ uniform int uShowCascades;
 // reflections) whose output gets blurred/composited, where the extra fidelity isn't visible.
 uniform int uCheapShading;
 
-// Methods
+// ─────────────────────────────────────────────────────────────────────────────
+
 float DitherThreshold(vec2 fragCoord)
 {
     ivec2 p = ivec2(fragCoord) & 3;

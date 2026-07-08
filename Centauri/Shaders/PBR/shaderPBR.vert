@@ -8,6 +8,8 @@ out float fViewDepth;
 out vec4 fClipPos;  // clip-space position, for screen-space lookups (SSAO)
 out vec3 fInstanceOrigin;  // this instance's world position (iModel[3].xyz) — foliage outward-normal reference
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 layout (location = 0) in vec3 vPos;      // world position of vertex
 layout (location = 1) in vec3 vNormal;   // surface direction at vertex
 layout (location = 2) in vec2 vUv;       // texture coordinate
@@ -24,6 +26,8 @@ uniform float uTime;        // seconds, latched once per frame
 uniform float uWindStrength;   // sway amplitude
 uniform float uWindSpeed;      // oscillation freq
 uniform vec2  uWindDir;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 vec3 WindSway(vec3 worldPos, vec3 origin)
 {
