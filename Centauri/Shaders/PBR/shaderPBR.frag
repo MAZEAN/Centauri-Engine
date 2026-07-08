@@ -6,6 +6,7 @@ in vec3 fFragPos;
 in mat3 fTBN;
 in float fViewDepth;
 in vec4 fClipPos;
+in vec3 fInstanceOrigin;  // this instance's world position (iModel[3].xyz) — foliage outward-normal reference
 
 out vec4 FragColor;
 
@@ -140,16 +141,6 @@ float DitherThreshold(vec2 fragCoord)
 {
     ivec2 p = ivec2(fragCoord) & 3;
     return (BAYER_4X4[p.y * 4 + p.x] + 0.5) / 16.0;
-}
-
-// Decorrelated hash of a world-space point — 3 independent dot-product hashes so the result
-// isn't axis-aligned (a naive per-component sin(p) would be).
-vec3 hash3(vec3 p)
-{
-    float x = fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
-    float y = fract(sin(dot(p, vec3(93.989, 67.345, 12.153))) * 24634.6345);
-    float z = fract(sin(dot(p, vec3(51.321, 15.732, 88.921))) * 95421.2321);
-    return vec3(x, y, z);
 }
 
 int SelectCascade(float viewDepth) 
@@ -394,6 +385,12 @@ vec3 SurfaceNormal()
 
     if (!gl_FrontFacing)
         N = -N;
+
+    if (uFoliage == 1 && uHasNormal == 0)
+    {
+        vec3 outward = normalize(fFragPos - fInstanceOrigin);
+        N = normalize(mix(N, outward, 0.6));
+    }
 
     return N;
 }

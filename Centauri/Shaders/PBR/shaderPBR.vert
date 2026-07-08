@@ -6,6 +6,7 @@ out vec3 fFragPos;  // world space position of this fragment
 out mat3 fTBN;      // tangent space to world space matrix
 out float fViewDepth;
 out vec4 fClipPos;  // clip-space position, for screen-space lookups (SSAO)
+out vec3 fInstanceOrigin;  // this instance's world position (iModel[3].xyz) — foliage outward-normal reference
 
 layout (location = 0) in vec3 vPos;      // world position of vertex
 layout (location = 1) in vec3 vNormal;   // surface direction at vertex
@@ -70,6 +71,7 @@ void main()
 
     fUv         = vUv * iUvScaleOffset.xy + iUvScaleOffset.zw;
     fFragPos    = worldPos.xyz;
+    fInstanceOrigin = iModel[3].xyz;
 
     vec3 T = normalize(normalMatrix * vTangent);
     vec3 N = normalize(normalMatrix * vNormal);
