@@ -59,5 +59,13 @@ void main()
     if (uWind == 1)
         worldPos.xyz = WindSway(worldPos.xyz, iModel[3].xyz);
 
-    gl_Position = uProjection * uView * worldPos;
+    // Must match shaderPBR.vert's exact operation order — (uProjection * uView) * worldPos and
+    // uProjection * (uView * worldPos) are mathematically equal but round differently in
+    // floating point. Forward reuses this pass's depth via DepthFunc(Lequal)/DepthMask(false),
+    // so any per-vertex rounding mismatch becomes a coin-flip at the depth-test comparison —
+    // most visible exactly at silhouette edges, where depth changes fastest per screen pixel,
+    // intermittently failing the test and leaving whatever was drawn earlier (the skybox)
+    // showing through instead of this fragment's color.
+    vec4 viewPos = uView * worldPos;
+    gl_Position  = uProjection * viewPos;
 }

@@ -24,29 +24,5 @@
         <None Update="Assets\**\*">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
-        <None Update="Assets\Objects\3DShapes\cone.glb">
-          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="Assets\Objects\3DShapes\cube.glb">
-          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="Assets\Objects\3DShapes\sphere.glb">
-          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="Assets\Objects\3DShapes\torus.glb">
-          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="Assets\Objects\Models\medium_dragon.glb">
-          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="Assets\Objects\Models\reduced_dragon.glb">
-          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-    </ItemGroup>
-
-    <ItemGroup>
-      <Folder Include="Assets\Objects\Trees\" />
-      <Folder Include="Assets\Textures\Bark\" />
-      <Folder Include="Rendering\Reflections\" />
     </ItemGroup>
 </Project>
