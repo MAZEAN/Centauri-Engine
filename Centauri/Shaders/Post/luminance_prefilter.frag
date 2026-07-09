@@ -27,5 +27,14 @@ void main()
     vec3  avg  = (s0 + s1 + s2 + s3) * 0.25;
     float luma = dot(avg, vec3(0.2126, 0.7152, 0.0722));
 
+    // A single NaN/Inf pixel anywhere upstream (bloom, SSR, a bad lighting edge case) poisons
+    // this average — and unlike this frame's own visible glitch, that poisoned reading then
+    // feeds AutoExposurePass's persistent adapted-luminance state (luminance_adapt.frag), which
+    // blends every future frame against its own previous value and so never recovers on its
+    // own once NaN gets in. min()/max() with NaN is driver-defined, so check explicitly rather
+    // than relying on the clamp below to neutralize it.
+    if (isnan(luma) || isinf(luma))
+        luma = 1e-4;
+
     FragColor = vec4(log(max(luma, 1e-4)), 0.0, 0.0, 1.0);
 }

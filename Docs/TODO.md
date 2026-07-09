@@ -45,6 +45,7 @@
 * [ ] Sky variantions
 * [ ] Keybindings
 * [x] UI improvements (DPI-scaling etc.)
+* [x] Improve tree models
 
 ## Optional
 * [ ] Hosek-Wilkie sky algorithm
@@ -55,8 +56,7 @@
 
 ## Bug Fixes
 
-* [ ] Auto-exposure explodes sometimes -> overly bright
-* [ ] Leaves become disconnected from the branch, because of the wind
+* [ ] Leaves become disconnected from the branch (not linked)
 
 ---
 

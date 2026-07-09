@@ -36,10 +36,18 @@ vec3 WindSway(vec3 worldPos, vec3 origin)
     // value (still internally coherent), but neighboring cards a short distance apart land on
     // a very different phase/amplitude. Must stay identical across shaderPBR.vert/prepass.vert/
     // depth.vert/zprepass.vert — see uWind's comment.
+    //
+    // The per-leaf phase jitter is kept small (a fraction of a radian, not a full 0-2*pi turn)
+    // deliberately: leaves and the branch mesh they're attached to are separate draw calls with
+    // no shared skinning, so each vertex's sway is computed independently. A full-circle jitter
+    // let a leaf land arbitrarily out of phase with its own branch — including anti-phase —
+    // which reads as the leaf visibly detaching from the tree as both animate. A small jitter
+    // still desyncs neighboring leaves' timing/wobble without ever letting a leaf swing
+    // opposite to the branch it's rooted on.
     float leafSeed = fract(sin(dot(worldPos.xyz, vec3(269.5, 183.3, 311.7))) * 43758.5453);
     float leafAmp  = 0.7 + 0.3 * leafSeed;
 
-    float phase = dot(worldPos.xz, windDir) * 0.4 + seed * 6.28318 + leafSeed * 6.28318;
+    float phase = dot(worldPos.xz, windDir) * 0.4 + seed * 6.28318 + leafSeed * 1.2;
 
     float gust = 0.7 + 0.3 * sin(uTime * 0.15) + 0.15 * sin(uTime * 0.07 + seed * 3.0);
 

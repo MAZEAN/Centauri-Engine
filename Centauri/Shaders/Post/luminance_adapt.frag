@@ -24,6 +24,14 @@ void main()
     float target = texture(uCurrent, vec2(0.5)).r;
     float prev   = texture(uPrevious, vec2(0.5)).r;
 
+    // Second line of defense (see luminance_prefilter.frag): this value ping-pongs back into
+    // "prev" next frame regardless, so a single bad reading that slips through unguarded would
+    // otherwise poison every frame after it forever — mix(NaN, x, t) is NaN for any t. Hold at
+    // whichever side is still finite, so a one-off glitch self-heals on the very next good frame
+    // instead of latching a permanently-blown-out exposure for the rest of the session.
+    if (isnan(target) || isinf(target)) target = prev;
+    if (isnan(prev)   || isinf(prev))   prev   = target;
+
     float t = clamp(1.0 - exp(-uAdaptSpeed * uDeltaTime), 0.0, 1.0);
     FragColor = vec4(mix(prev, target, t), 0.0, 0.0, 1.0);
 }
