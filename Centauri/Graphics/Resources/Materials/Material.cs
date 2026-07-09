@@ -4,7 +4,7 @@ using System.Numerics;
 
 public class Material
 {
-    public string Name          { get; set; }
+    public string     Name      { get; set; } = null!;
     public GLShader   Shader    { get; set; }
     public GLTexture? Albedo    { get; set; } // base color
     public GLTexture? Normal    { get; set; } // normal map

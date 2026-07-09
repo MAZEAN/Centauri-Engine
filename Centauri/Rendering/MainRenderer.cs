@@ -202,7 +202,8 @@ public class MainRenderer : IDisposable
     
     private void RegisterDraw(ref FrameStats stats, Mesh mesh, Material? material, int instanceCount)
     {
-        stats.TextureBinds += _textures.BindMaterial(material);
+        if (material != null) 
+            stats.TextureBinds += _textures.BindMaterial(material);
         stats.DrawCalls++;
         stats.NaiveDrawCalls += instanceCount;
         stats.TotalIndices += (int)mesh.IndexCount * instanceCount;
