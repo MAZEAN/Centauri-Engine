@@ -17,13 +17,13 @@
 * [x] Screen Space Reflections (SSR) (with ray tracing or PBR Accumulation)
 * [x] Reflection Probes (maybe "Planar Reflections" for mirrors)
 * [ ] GTAO (Ground-Truth AO)
-* [ ] Contact-hardening / PCSS
+* [x] Contact-hardening / PCSS
 * [ ] Raytracing with BVH (only experimental, not real-time)
 * [ ] Physics engine integration (BEPUphysics2)
 * [ ] Basis for game
 * [ ] Terrain
 * [ ] Water simulation (Sea of Thieves algorithm)
-* [ ] Complex foliage rendering
+* [x] Complex foliage rendering
 
 ## Enhancements
 
