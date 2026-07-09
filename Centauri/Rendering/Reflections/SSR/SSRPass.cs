@@ -16,7 +16,7 @@ using Postprocessing;
 // that, where SSR is confident, it replaces the environment reflection the lit pass already
 // applied (rather than stacking on it); where it is not, the scene keeps that fallback. The
 // result is the delta the post stack folds into the scene before tonemapping.
-// See Assets/Shaders/SSR/ssr.frag (march), ssr_blur.frag (roughness blur) and
+// See Shaders/SSR/ssr.frag (march), ssr_blur.frag (roughness blur) and
 // ssr_resolve.frag (IBL blend).
 public sealed class SSRPass : IDisposable
 {
@@ -44,14 +44,14 @@ public sealed class SSRPass : IDisposable
         _resDivisor = config.HalfResolution ? 2u : 1u;
         
         _shader = new GLShader(gl,
-            PathResolver.Resolve("Assets/Shaders/Post/post.vert"),
-            PathResolver.Resolve("Assets/Shaders/SSR/ssr.frag"));
+            PathResolver.Resolve("Shaders/Post/post.vert"),
+            PathResolver.Resolve("Shaders/SSR/ssr.frag"));
         _blur = new GLShader(gl,
-            PathResolver.Resolve("Assets/Shaders/Post/post.vert"),
-            PathResolver.Resolve("Assets/Shaders/SSR/ssr_blur.frag"));
+            PathResolver.Resolve("Shaders/Post/post.vert"),
+            PathResolver.Resolve("Shaders/SSR/ssr_blur.frag"));
         _resolve = new GLShader(gl,
-            PathResolver.Resolve("Assets/Shaders/Post/post.vert"),
-            PathResolver.Resolve("Assets/Shaders/SSR/ssr_resolve.frag"));
+            PathResolver.Resolve("Shaders/Post/post.vert"),
+            PathResolver.Resolve("Shaders/SSR/ssr_resolve.frag"));
         
         _target = new RenderTarget(gl, width / _resDivisor, height / _resDivisor,
             [InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Linear);

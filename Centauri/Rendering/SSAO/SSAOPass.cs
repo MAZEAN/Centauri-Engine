@@ -42,11 +42,11 @@ public sealed class SsaoPass : IDisposable
         _config = config;
 
         _ssao = new GLShader(gl,
-            PathResolver.Resolve("Assets/Shaders/Post/post.vert"),
-            PathResolver.Resolve("Assets/Shaders/SSAO/ssao.frag"));
+            PathResolver.Resolve("Shaders/Post/post.vert"),
+            PathResolver.Resolve("Shaders/SSAO/ssao.frag"));
         _blur = new GLShader(gl,
-            PathResolver.Resolve("Assets/Shaders/Post/post.vert"),
-            PathResolver.Resolve("Assets/Shaders/SSAO/ssao_blur.frag"));
+            PathResolver.Resolve("Shaders/Post/post.vert"),
+            PathResolver.Resolve("Shaders/SSAO/ssao_blur.frag"));
         _aoTarget   = new RenderTarget(gl, width / ResDivisor, height / ResDivisor,
             [InternalFormat.Rgba16f], withDepth: false);
         _blurTarget = new RenderTarget(gl, width / ResDivisor, height / ResDivisor,

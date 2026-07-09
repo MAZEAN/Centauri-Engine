@@ -43,9 +43,9 @@ public sealed class AutoExposurePass : IDisposable
         _gl = gl;
         _config = config;
 
-        _prefilter = Load(gl, "Assets/Shaders/Post/luminance_prefilter.frag");
-        _down      = Load(gl, "Assets/Shaders/Post/luminance_down.frag");
-        _adapt     = Load(gl, "Assets/Shaders/Post/luminance_adapt.frag");
+        _prefilter = Load(gl, "Shaders/Post/luminance_prefilter.frag");
+        _down      = Load(gl, "Shaders/Post/luminance_down.frag");
+        _adapt     = Load(gl, "Shaders/Post/luminance_adapt.frag");
 
         for (var i = 0; i < MipCount; i++)
         {
@@ -128,7 +128,7 @@ public sealed class AutoExposurePass : IDisposable
     }
 
     private static GLShader Load(GL gl, string frag) =>
-        new(gl, PathResolver.Resolve("Assets/Shaders/Post/post.vert"), PathResolver.Resolve(frag));
+        new(gl, PathResolver.Resolve("Shaders/Post/post.vert"), PathResolver.Resolve(frag));
 
     private void Bind(TextureUnit unit, uint tex)
     {

@@ -36,8 +36,8 @@ public sealed class CloudPass : IDisposable
         _cube = cube;
 
         _shader = new GLShader(gl,
-            PathResolver.Resolve("Assets/Shaders/Sky/skybox.vert"),
-            PathResolver.Resolve("Assets/Shaders/Sky/clouds.frag"));
+            PathResolver.Resolve("Shaders/Sky/skybox.vert"),
+            PathResolver.Resolve("Shaders/Sky/clouds.frag"));
 
         _target = new RenderTarget(gl, Size(width), Size(height),
             [InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Linear);

@@ -25,5 +25,3 @@ Thumbs.db
 *.log
 
 /Centauri/Assets/*
-!/Centauri/Assets/Materials/
-!/Centauri/Assets/Shaders/
