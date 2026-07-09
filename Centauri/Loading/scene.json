@@ -33,7 +33,7 @@
       "position": [6, -1.5, -3]
     },
     { "name": "Tree2",
-      "model": "Assets/Objects/Trees/TreeDense.glb",
+      "model": "Assets/Objects/Trees/Tree.glb",
       "materials": ["Assets/Materials/Bark.mat", "Assets/Materials/LeavesCommon.mat"],
       "position": [8, -1.5, -5]
     },

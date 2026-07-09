@@ -56,6 +56,7 @@ public class MaterialDefinition
     [JsonPropertyName("roughness")] public string? Roughness { get; set; }
     [JsonPropertyName("metallic")]  public string? Metallic  { get; set; }
     [JsonPropertyName("ao")]        public string? AO        { get; set; }
+    [JsonPropertyName("opacity")]   public string? Opacity   { get; set; } // merged into albedo's alpha channel at load
 
     [JsonPropertyName("roughnessScalar")] public float RoughnessScalar { get; set; } = 0.5f;
     [JsonPropertyName("metallicScalar")]  public float MetallicScalar  { get; set; } = 0.1f;

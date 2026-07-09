@@ -76,6 +76,35 @@ public class GLTexture : GLResource
 
         return new TextureData { IsHdr = false, Width = image.Width, Height = image.Height, Ldr = pixels };
     }
+    
+    // Merges a standalone greyscale opacity map into the albedo's alpha channel at load time —
+    // most PBR/foliage texture packs ship opacity as its own file, and the cutout test
+    // (shaderPBR.frag, ZPrepass, ShadowMapper) reads alpha straight off the albedo texture, so
+    // this is where that gets baked in instead of requiring an offline compositing step.
+    public static TextureData DecodeWithOpacity(string albedoPath, string opacityPath)
+    {
+        using var albedo  = Image.Load<Rgba32>(Path.GetFullPath(albedoPath));
+        using var opacity = Image.Load<Rgba32>(Path.GetFullPath(opacityPath));
+
+        if (opacity.Size != albedo.Size)
+            opacity.Mutate(x => x.Resize(albedo.Size));
+
+        albedo.Mutate(x => x.Flip(FlipMode.Vertical));
+        opacity.Mutate(x => x.Flip(FlipMode.Vertical));
+
+        var pixels = new byte[albedo.Width * albedo.Height * 4];
+        albedo.CopyPixelDataTo(pixels);
+
+        var opacityPixels = new byte[opacity.Width * opacity.Height * 4];
+        opacity.CopyPixelDataTo(opacityPixels);
+
+        for (var i = 0; i < pixels.Length; i += 4)
+            pixels[i + 3] = opacityPixels[i];   // opacity map's red channel -> albedo's alpha
+
+        PremultiplyAlpha(pixels);
+
+        return new TextureData { IsHdr = false, Width = albedo.Width, Height = albedo.Height, Ldr = pixels };
+    }
 
     public unsafe GLTexture(GL gl, Span<byte> data, uint width, uint height) : base(gl)
     {

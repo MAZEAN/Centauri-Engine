@@ -14,6 +14,8 @@ using Graphics.Geometry;
 
 public class ResourceSystem : IDisposable
 {
+    private const string OpacityKeyMarker = "|opacity=";
+    
     private readonly GL _gl;
     private readonly AppConfig _config;
     
@@ -30,7 +32,7 @@ public class ResourceSystem : IDisposable
         _config = config;
         
         Textures = new AssetCache<GLTexture>(
-            path => new GLTexture(gl, PathResolver.Resolve(path))
+            key => new GLTexture(gl, DecodeTextureKey(key))
         );
 
         Shaders = new AssetCache<GLShader>(
@@ -78,7 +80,7 @@ public class ResourceSystem : IDisposable
         {
             
             var m = ReadMaterialDef(matPath);
-            AddPath(texturePaths, m.Albedo);
+            AddPath(texturePaths, AlbedoKey(m.Albedo, m.Opacity));
             AddPath(texturePaths, m.Normal);
             AddPath(texturePaths, m.Roughness);
             AddPath(texturePaths, m.Metallic);
@@ -95,7 +97,7 @@ public class ResourceSystem : IDisposable
     {
         // CPU decode off the GL thread
         var textureTask = Task.WhenAll(texturePaths.Select(key =>
-            Task.Run(() => (key, data: GLTexture.Decode(PathResolver.Resolve(key))))));
+            Task.Run(() => (key, data: DecodeTextureKey(key)))));
 
         var modelTask = Task.WhenAll(modelPaths.Select(key =>
             Task.Run(() => (key, data: Model.Decode(PathResolver.Resolve(key))))));
@@ -126,6 +128,19 @@ public class ResourceSystem : IDisposable
     {
         if (!string.IsNullOrEmpty(path)) 
             set.Add(path);
+    }
+
+    private static string? AlbedoKey(string? albedo, string? opacity) =>
+        albedo == null ? null : opacity == null ? albedo : $"{albedo}{OpacityKeyMarker}{opacity}";
+
+    private static TextureData DecodeTextureKey(string key)
+    {
+        var split = key.IndexOf(OpacityKeyMarker, StringComparison.Ordinal);
+        return split < 0
+            ? GLTexture.Decode(PathResolver.Resolve(key))
+            : GLTexture.DecodeWithOpacity(
+                PathResolver.Resolve(key[..split]),
+                PathResolver.Resolve(key[(split + OpacityKeyMarker.Length)..]));
     }
 
     private static MaterialDefinition ReadMaterialDef(string path)
