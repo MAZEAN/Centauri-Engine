@@ -4,7 +4,7 @@
     "state": "Maximized",
     "border": "Hidden",
     "enableVSync": false,
-    "samples": 2,
+    "samples": 1,
     "clearColor": [0.3, 0.3, 0.3, 1.0]
   },
   "camera": {
@@ -119,7 +119,7 @@
     "silhouetteThreshold": 0.6
   },
   "taa": {
-    "enabled": false,
+    "enabled": true,
     "feedback": 0.5
   },
   "foliage": {

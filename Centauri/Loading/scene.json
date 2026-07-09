@@ -35,7 +35,8 @@
     { "name": "Tree2",
       "model": "Assets/Objects/Trees/Tree.glb",
       "materials": ["Assets/Materials/Bark.mat", "Assets/Materials/LeavesCommon.mat"],
-      "position": [8, -1.5, -5]
+      "position": [8, -1.5, -5],
+      "rotation": [0, 45, 0]
     },
     {
       "name":     "Sphere1",

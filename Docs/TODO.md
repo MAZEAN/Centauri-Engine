@@ -37,9 +37,10 @@
 * [x] Improved sky transitions
 * [ ] (auto) LOD system (Impostor)
 * [x] auto-exposure 
+* [x] Triplanar / world-space UV projection
 * [ ] volumetric fog
-* [ ] Tracy Profiler integration
-* [ ] Better wind (hierarchy) & leaves (orientation)
+* [x] Tracy Profiler integration
+* [x] Better wind (hierarchy) & leaves (orientation)
 * [ ] Extend shadows to spot- and point lights
 * [ ] Sky variantions
 * [ ] Keybindings
@@ -48,7 +49,7 @@
 ## Optional
 * [ ] Hosek-Wilkie sky algorithm
 * [ ] Full raymarched volumetric clouds
-* [ ] Better AA for leaves
+* [ ] Replace MSAA
 
 ---
 
