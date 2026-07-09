@@ -1,0 +1,9 @@
+{
+  "name":      "CorrugatedIron",
+  "shader":    "Assets/Shaders/PBR/shaderPBR",
+  "albedo":    "Assets/Textures/CorrugatedIron/corrugated_iron_diff_1k.jpg",
+  "normal":    "Assets/Textures/CorrugatedIron/corrugated_iron_nor_gl_1k.jpg",
+  "roughness": "Assets/Textures/CorrugatedIron/corrugated_iron_rough_1k.jpg",
+  "metallic":  "Assets/Textures/CorrugatedIron/corrugated_iron_metal_1k.jpg",
+  "ao":        "Assets/Textures/CorrugatedIron/corrugated_iron_ao_1k.jpg"
+}

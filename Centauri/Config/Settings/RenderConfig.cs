@@ -9,5 +9,5 @@ public class RenderConfig
     [JsonPropertyName("modelCacheSize")]   public int    ModelCacheSize   { get; init; } = 64;
     [JsonPropertyName("shaderCacheSize")]  public int    ShaderCacheSize  { get; init; } = 32;
     [JsonPropertyName("scenePath")]        public string ScenePath        { get; init; } = "Loading/scene.json";
-    [JsonPropertyName("defaultShader")]    public string DefaultShader    { get; init; } = "Shaders/shaderPBR";
+    [JsonPropertyName("defaultShader")]    public string DefaultShader    { get; init; } = "Assets/Shaders/shaderPBR";
 }

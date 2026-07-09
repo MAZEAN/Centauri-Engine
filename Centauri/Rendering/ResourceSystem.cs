@@ -117,10 +117,13 @@ public class ResourceSystem : IDisposable
     
     private static IEnumerable<string> MaterialPaths(EntityDefinition e)
     {
-        if (e.Materials is { Length: > 0 }) 
-            return e.Materials;
+        if (e.Materials?.Indexed is { Length: > 0 } indexed)
+            return indexed;
         
-        if (!string.IsNullOrEmpty(e.Material)) 
+        if (e.Materials?.Named is { Count: > 0 } named)
+            return named.Values;
+        
+        if (!string.IsNullOrEmpty(e.Material))
             return [e.Material!];
         
         return [];

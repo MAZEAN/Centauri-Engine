@@ -38,8 +38,8 @@ public sealed class ZPrepass : IDisposable
         _instances = instances;
 
         _shader = new GLShader(gl,
-            PathResolver.Resolve("Shaders/Depth/zprepass.vert"),
-            PathResolver.Resolve("Shaders/Depth/zprepass.frag"));
+            PathResolver.Resolve("Assets/Shaders/Depth/zprepass.vert"),
+            PathResolver.Resolve("Assets/Shaders/Depth/zprepass.frag"));
     }
 
     // Draws into whatever's currently bound (the HDR framebuffer) with color writes masked —

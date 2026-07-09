@@ -1,0 +1,13 @@
+{
+  "name":      "LeavesCommon",
+  "shader":    "Assets/Shaders/PBR/shaderPBR",
+  "albedo":    "Assets/Textures/Leaves/Standard/GreenLeaf12_1K_front_BaseColor.png",
+  "opacity":   "Assets/Textures/Leaves/Standard/GreenLeaf12_1K_front_Opacity.png",
+  "normal":    "Assets/Textures/Leaves/Standard/GreenLeaf12_1K_front_Normal.png",
+  "roughness": "Assets/Textures/Leaves/Standard/GreenLeaf12_1K_front_Roughness.png",
+  "ao":        "Assets/Textures/Leaves/Standard/GreenLeaf12_1K_front_AO.png",
+  "metallicScalar": 0.0,
+  "translucencyScalar": 0.4,
+  "twoSided": true,
+  "wind": true
+}

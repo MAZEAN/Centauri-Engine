@@ -15,7 +15,7 @@ using Renderers;
 // world position into a cubemap (6 faces, no per-face culling since this is a one-time bake,
 // not a per-frame cost) and hands it to IBLBaker's existing GGX prefilter — the same math the
 // skybox's own IBL bake uses. Unlike the skybox, no diffuse/irradiance term is produced; this
-// probe only feeds SSR's resolve fallback (Assets/Shaders/SSR/ssr_resolve.frag), which needs
+// probe only feeds SSR's resolve fallback (Assets/Assets/Shaders/SSR/ssr_resolve.frag), which needs
 // the prefiltered specular map and BRDF LUT only, not a diffuse ambient term.
 //
 // Camera can't represent 2 of the 6 cubemap faces (its yaw/pitch parameterization degenerates

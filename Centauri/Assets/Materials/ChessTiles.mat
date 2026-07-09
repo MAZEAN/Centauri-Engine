@@ -1,0 +1,7 @@
+{
+  "name":      "ChessTiles",
+  "shader":    "Assets/Shaders/PBR/shaderPBR",
+  "albedo":    "Assets/Textures/ChessTiles/chess_tiles_diff_1k.jpg",
+  "normal":    "Assets/Textures/ChessTiles/chess_tiles_nor_gl_1k.jpg",
+  "roughness": "Assets/Textures/ChessTiles/chess_tiles_rough_1k.jpg"
+}

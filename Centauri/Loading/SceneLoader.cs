@@ -103,7 +103,21 @@ public class SceneLoader
         var count = model.Meshes.Count;
         var result = new Material?[count];
 
-        var paths = e.Materials is { Length: > 0 } ? e.Materials
+        // Named binding: matched to each mesh's name from the model file, not array position —
+        // no need to know/verify mesh order inside the exported model.
+        if (e.Materials?.Named is { Count: > 0 } named)
+        {
+            for (var i = 0; i < count; i++)
+            {
+                var meshName = model.Meshes[i].Name;
+                result[i] = !string.IsNullOrEmpty(meshName) && named.TryGetValue(meshName, out var path)
+                    ? _resourceSystem.GetMaterial(path)
+                    : _resourceSystem.DefaultMaterial;
+            }
+            return result;
+        }
+
+        var paths = e.Materials?.Indexed is { Length: > 0 } indexed ? indexed
             : !string.IsNullOrEmpty(e.Material) ? new[] { e.Material! }
             : null;
 

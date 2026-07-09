@@ -44,11 +44,11 @@ public sealed class TAAPass : IDisposable
         _config = config;
 
         _velocity = new GLShader(gl,
-            PathResolver.Resolve("Shaders/Post/post.vert"),
-            PathResolver.Resolve("Shaders/TAA/velocity.frag"));
+            PathResolver.Resolve("Assets/Shaders/Post/post.vert"),
+            PathResolver.Resolve("Assets/Shaders/TAA/velocity.frag"));
         _resolve = new GLShader(gl,
-            PathResolver.Resolve("Shaders/Post/post.vert"),
-            PathResolver.Resolve("Shaders/TAA/taa.frag"));
+            PathResolver.Resolve("Assets/Shaders/Post/post.vert"),
+            PathResolver.Resolve("Assets/Shaders/TAA/taa.frag"));
 
         _velocityTarget = new RenderTarget(gl, width, height, [InternalFormat.Rgba16f], withDepth: false);
         _history[0] = new RenderTarget(gl, width, height, [InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Linear);

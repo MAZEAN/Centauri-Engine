@@ -55,6 +55,9 @@
 
 ## Bug Fixes
 
+* [ ] Auto-exposure explodes sometimes -> overly bright
+* [ ] Leaves become disconnected from the branch, because of the wind
+
 ---
 
 ## Notes

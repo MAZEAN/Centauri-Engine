@@ -17,8 +17,8 @@ public class GridRenderer : IDisposable
     {
         _gl     = gl;
         _shader = new GLShader(gl,
-            PathResolver.Resolve("Shaders/Grid/grid.vert"),
-            PathResolver.Resolve("Shaders/Grid/grid.frag"));
+            PathResolver.Resolve("Assets/Shaders/Grid/grid.vert"),
+            PathResolver.Resolve("Assets/Shaders/Grid/grid.frag"));
         
         float[] vertices =
         [

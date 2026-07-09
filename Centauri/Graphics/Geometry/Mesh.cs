@@ -18,10 +18,12 @@ public class Mesh : IDisposable
     public uint        VertexCount { get; }
     public uint        IndexCount  { get; }
     public BoundingBox Bounds      { get; }
+    public string      Name        { get; } // mesh/node name from the source file, empty for code-generated meshes
 
-    public Mesh(GL gl, float[] vertices, uint[] indices)
+    public Mesh(GL gl, float[] vertices, uint[] indices, string name = "")
     {
         _gl = gl;
+        Name = name;
 
         // correct vertex count — total floats / floats per vertex
         VertexCount = (uint)vertices.Length / Stride;

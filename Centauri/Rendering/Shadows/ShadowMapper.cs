@@ -53,8 +53,8 @@ public sealed class ShadowMapper : IDisposable
         _cascadeBuilder = new CascadeBuilder(config);
         _maps = new ShadowArray(gl, config.Shadows.Size, config.Shadows.MaxCascades);
         _depth = new GLShader(gl,
-            PathResolver.Resolve("Shaders/Shadow/depth.vert"),
-            PathResolver.Resolve("Shaders/Shadow/depth.frag"));
+            PathResolver.Resolve("Assets/Shaders/Shadow/depth.vert"),
+            PathResolver.Resolve("Assets/Shaders/Shadow/depth.frag"));
     }
 
     public void Render(Scene scene, CullingSystem culling, ref FrameStats stats)

@@ -62,8 +62,8 @@ public sealed class IBLBaker : IDisposable
         _prefilter  = Load("prefilter");
         _proceduralEnv = Load("procedural_env");
         _brdf = new GLShader(gl,
-            PathResolver.Resolve("Shaders/Post/post.vert"),
-            PathResolver.Resolve("Shaders/IBL/brdf.frag"));
+            PathResolver.Resolve("Assets/Shaders/Post/post.vert"),
+            PathResolver.Resolve("Assets/Shaders/IBL/brdf.frag"));
 
         _proj = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 2f, 1f, 0.1f, 10f);
         _views = CaptureViews();
@@ -294,8 +294,8 @@ public sealed class IBLBaker : IDisposable
     }
 
     private GLShader Load(string name) => new(_gl,
-        PathResolver.Resolve("Shaders/IBL/cube.vert"),
-        PathResolver.Resolve($"Shaders/IBL/{name}.frag"));
+        PathResolver.Resolve("Assets/Shaders/IBL/cube.vert"),
+        PathResolver.Resolve($"Assets/Shaders/IBL/{name}.frag"));
 
     private static Matrix4x4[] CaptureViews()
     {

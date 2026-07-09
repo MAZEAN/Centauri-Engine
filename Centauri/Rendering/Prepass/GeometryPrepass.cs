@@ -40,8 +40,8 @@ public sealed class GeometryPrepass : IDisposable
         _instances = instances;
         
         _shader = new GLShader(gl,
-            PathResolver.Resolve("Shaders/Prepass/prepass.vert"),
-            PathResolver.Resolve("Shaders/Prepass/prepass.frag"));
+            PathResolver.Resolve("Assets/Shaders/Prepass/prepass.vert"),
+            PathResolver.Resolve("Assets/Shaders/Prepass/prepass.frag"));
         _target = new RenderTarget(gl, width, height,
             [InternalFormat.Rgba16f, InternalFormat.Rgba8], withDepth: true);
     }

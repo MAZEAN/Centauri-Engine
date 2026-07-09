@@ -77,8 +77,8 @@ public sealed class PostProcessor : IDisposable
         _height = height;
         
         _tonemap = new GLShader(gl,
-            PathResolver.Resolve("Shaders/Post/post.vert"),
-            PathResolver.Resolve("Shaders/Post/post.frag"));
+            PathResolver.Resolve("Assets/Shaders/Post/post.vert"),
+            PathResolver.Resolve("Assets/Shaders/Post/post.frag"));
         _bloom = new BloomPass(gl, _config.Bloom, width, height);
         _autoExposure = new AutoExposurePass(gl, _config.AutoExposure, width, height);
         _ssr = new SSRPass(gl, _config.SSR, width, height);

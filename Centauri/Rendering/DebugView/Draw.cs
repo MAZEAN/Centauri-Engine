@@ -25,8 +25,8 @@ public sealed class Draw : IDisposable
     {
         _gl = gl;
         _shader = new GLShader(gl,
-            PathResolver.Resolve("Shaders/Debug/debug.vert"),
-            PathResolver.Resolve("Shaders/Debug/debug.frag"));
+            PathResolver.Resolve("Assets/Shaders/Debug/debug.vert"),
+            PathResolver.Resolve("Assets/Shaders/Debug/debug.frag"));
 
         _vao = _gl.GenVertexArray();
         _vbo = _gl.GenBuffer();

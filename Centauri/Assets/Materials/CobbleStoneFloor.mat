@@ -1,0 +1,8 @@
+{
+  "name":      "CobbleStoneFloor",
+  "shader":    "Assets/Shaders/PBR/shaderPBR",
+  "albedo":    "Assets/Textures/CobbleStoneFloor/cobblestone_floor_diff_1k.jpg",
+  "normal":    "Assets/Textures/CobbleStoneFloor/cobblestone_floor_nor_gl_1k.jpg",
+  "roughness": "Assets/Textures/CobbleStoneFloor/cobblestone_floor_rough_1k.jpg",
+  "ao":        "Assets/Textures/CobbleStoneFloor/cobblestone_floor_ao_1k.jpg"
+}

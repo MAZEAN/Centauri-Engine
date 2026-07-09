@@ -1,0 +1,14 @@
+{
+  "name":      "Bark",
+  "shader":    "Assets/Shaders/PBR/shaderPBR",
+  "albedo":    "Assets/Textures/Bark/Standard/Bark014_2K-JPG_Color.jpg",
+  "normal":    "Assets/Textures/Bark/Standard/Bark014_2K-JPG_NormalGL.jpg",
+  "roughness": "Assets/Textures/Bark/Standard/Bark014_2K-JPG_Roughness.jpg",
+  "ao":        "Assets/Textures/Bark/Standard/Bark014_2K-JPG_AmbientOcclusion.jpg",
+  "metallicScalar": 0.0,
+  "twoSided": false,
+  "wind": false,
+  "wind": false,
+  "triplanar": true,
+  "triplanarScale": 1.0
+}

@@ -3,6 +3,7 @@ namespace Centauri.Graphics.Geometry;
 using Silk.NET.Assimp;
 using Silk.NET.OpenGL;
 using System.Numerics;
+using System.Text;
 
 using Utils.Geometry;
 
@@ -10,14 +11,16 @@ using AssimpMesh = Silk.NET.Assimp.Mesh;
 
 public sealed class MeshData
 {
-    public MeshData(float[] vertices, uint[] indices)
+    public float[] Vertices { get; }
+    public uint[]  Indices  { get; }
+    public string  Name     { get; }
+    
+    public MeshData(float[] vertices, uint[] indices, string name = "")
     {
         Vertices = vertices;
         Indices  = indices;
+        Name     = name;
     }
-
-    public float[] Vertices { get; }
-    public uint[]  Indices  { get; }
 }
 
 public sealed class ModelData
@@ -37,7 +40,7 @@ public class Model : IDisposable
     public Model(GL gl, ModelData data)
     {
         AssetDirectory = data.AssetDirectory;
-        Meshes = data.Meshes.Select(m => new Mesh(gl, m.Vertices, m.Indices)).ToList();
+        Meshes = data.Meshes.Select(m => new Mesh(gl, m.Vertices, m.Indices, m.Name)).ToList();
         Bounds = ComputeBounds(Meshes);
     }
     
@@ -129,7 +132,8 @@ public class Model : IDisposable
                 indices[idx++] = face.MIndices[j];
         }
 
-        return new MeshData(vertices, indices);
+        var name = Encoding.UTF8.GetString(mesh->MName.Data, (int)mesh->MName.Length);
+        return new MeshData(vertices, indices, name);
     }
 
     private static BoundingBox ComputeBounds(List<Mesh> meshes)

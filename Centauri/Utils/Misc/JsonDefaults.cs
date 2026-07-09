@@ -12,6 +12,7 @@ public static class JsonDefaults
         PropertyNameCaseInsensitive = true,
         WriteIndented               = true,
         DefaultIgnoreCondition      = JsonIgnoreCondition.WhenWritingNull,
+        UnmappedMemberHandling      = JsonUnmappedMemberHandling.Disallow,
         Converters                  = { new JsonStringEnumConverter() }
     };
 }
