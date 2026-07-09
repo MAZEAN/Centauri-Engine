@@ -26,6 +26,9 @@ public class ResourceSystem : IDisposable
     
     private readonly Dictionary<string, Material> _materials = new();
     private readonly Dictionary<string, string> _materialRegistry;
+    private readonly Dictionary<string, string> _modelRegistry;
+    private readonly Dictionary<string, ModelDefinition> _modelDefinitions;
+    
     public GLTexture DefaultTexture { get; private set; }
 
     public ResourceSystem(GL gl, AppConfig config)
@@ -47,6 +50,7 @@ public class ResourceSystem : IDisposable
 
         DefaultTexture = CreateDefaultTexture(gl);
         _materialRegistry = BuildMaterialRegistry();
+        (_modelRegistry, _modelDefinitions) = BuildModelRegistry();
     }
 
     // Indexes every .mat under Assets/Materials by id, so entities/materials can reference
@@ -104,6 +108,69 @@ public class ResourceSystem : IDisposable
             $"Unknown material '{idOrPath}'. Available: {string.Join(", ", _materialRegistry.Keys.OrderBy(k => k))}");
     }
     
+    // Indexes every .model under Assets/Objects by id, the same way materials are indexed —
+    // "model": "Tree" instead of "Assets/Objects/Trees/Tree.glb", plus (unlike a .mat, which
+    // *is* the resource) each .model file points at the actual geometry file via "path" and
+    // can carry reusable defaults (default material binding, default triplanar override) for
+    // every entity that places it, so a repeated placement doesn't need to repeat them.
+    private (Dictionary<string, string>, Dictionary<string, ModelDefinition>) BuildModelRegistry()
+    {
+        var registry    = new Dictionary<string, string>();
+        var definitions  = new Dictionary<string, ModelDefinition>();
+        var objectsDir   = PathResolver.Resolve("Assets/Objects");
+
+        if (!Directory.Exists(objectsDir))
+            return (registry, definitions);
+
+        foreach (var file in Directory.EnumerateFiles(objectsDir, "*.model", SearchOption.AllDirectories))
+        {
+            ModelDefinition def;
+            try
+            {
+                def = JsonSerializer.Deserialize<ModelDefinition>(File.ReadAllText(file), JsonDefaults.Options)
+                      ?? throw new Exception($"Failed to deserialize model file: {file}");
+            }
+            catch (JsonException e)
+            {
+                throw new Exception($"Malformed model file '{file}': {e.Message}", e);
+            }
+
+            if (string.IsNullOrEmpty(def.Path))
+                throw new Exception($"Model file '{file}' is missing its required \"path\".");
+
+            var id = string.IsNullOrEmpty(def.Id) ? Path.GetFileNameWithoutExtension(file) : def.Id;
+
+            if (registry.TryGetValue(id, out var existing))
+                throw new Exception($"Duplicate model id '{id}': '{existing}' and '{def.Path}'.");
+
+            registry[id]    = def.Path;
+            definitions[id] = def;
+        }
+
+        return (registry, definitions);
+    }
+
+    // Same convention as ResolveMaterialPath: a literal path is used as-is, anything else is
+    // looked up by id.
+    private string ResolveModelPath(string idOrPath)
+    {
+        if (idOrPath.Contains('/'))
+            return idOrPath;
+
+        if (_modelRegistry.TryGetValue(idOrPath, out var path))
+            return path;
+
+        throw new Exception(
+            $"Unknown model '{idOrPath}'. Available: {string.Join(", ", _modelRegistry.Keys.OrderBy(k => k))}");
+    }
+
+    public Model GetModel(string idOrPath) => Models.Get(ResolveModelPath(idOrPath));
+
+    // Null for a literal path or an id with no .model file (nothing to default from) — callers
+    // fall back to whatever the entity itself specifies.
+    public ModelDefinition? GetModelDefinition(string idOrPath) =>
+        !idOrPath.Contains('/') && _modelDefinitions.TryGetValue(idOrPath, out var def) ? def : null;
+    
     private static GLTexture CreateDefaultTexture(GL gl)
     {
         Span<byte> pixel = [255, 255, 255, 255];
@@ -127,11 +194,11 @@ public class ResourceSystem : IDisposable
     {
         var modelPaths = def.Entities
             .Where(e => !string.IsNullOrEmpty(e.Model))
-            .Select(e => e.Model!)
+            .Select(e => ResolveModelPath(e.Model!))
             .Distinct()
             .ToList();
         
-        var materialPaths = def.Entities.SelectMany(MaterialPaths).Distinct();
+        var materialPaths = def.Entities.SelectMany(EntityMaterialPaths).Distinct();
         var texturePaths = new HashSet<string>();
         
         foreach (var matPath in materialPaths)
@@ -173,16 +240,19 @@ public class ResourceSystem : IDisposable
         });
     }
     
-    private static IEnumerable<string> MaterialPaths(EntityDefinition e)
+    // Same priority SceneLoader.ResolveMaterials uses: the entity's own binding, else its
+    // singular "material", else whatever the placed model declares as its default.
+    private IEnumerable<string> EntityMaterialPaths(EntityDefinition e)
     {
-        if (e.Materials?.Indexed is { Length: > 0 } indexed)
+        var binding = e.Materials
+                      ?? (!string.IsNullOrEmpty(e.Material) ? new MaterialBinding { Indexed = [e.Material!] } : null)
+                      ?? (!string.IsNullOrEmpty(e.Model) ? GetModelDefinition(e.Model)?.Materials : null);
+
+        if (binding?.Indexed is { Length: > 0 } indexed)
             return indexed;
         
-        if (e.Materials?.Named is { Count: > 0 } named)
+        if (binding?.Named is { Count: > 0 } named)
             return named.Values;
-        
-        if (!string.IsNullOrEmpty(e.Material))
-            return [e.Material!];
         
         return [];
     }

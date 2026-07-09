@@ -79,7 +79,7 @@ public class SceneLoader
     private Entity BuildEntity(EntityDefinition e)
     {
         var model = !string.IsNullOrEmpty(e.Model)
-            ? _resourceSystem.Models.Get(e.Model)
+            ? _resourceSystem.GetModel(e.Model)
             : null;
         
         var materials = ResolveMaterials(e, model);
@@ -126,29 +126,52 @@ public class SceneLoader
 
         var count = model.Meshes.Count;
         var result = new Material?[count];
+        
+        // Priority: the entity's own binding, else its singular "material", else whatever the
+        // placed model declares as its default (Assets/Objects/**/*.model) — so placing the
+        // same model repeatedly doesn't require repeating its material list every time.
+        var modelDef = !string.IsNullOrEmpty(e.Model) ? _resourceSystem.GetModelDefinition(e.Model) : null;
+        var binding = e.Materials
+                      ?? (!string.IsNullOrEmpty(e.Material) ? new MaterialBinding { Indexed = [e.Material!] } : null)
+                      ?? modelDef?.Materials;
+
+        // Overrides the resolved material's own triplanar setting for this entity, entity value
+        // taking priority over the model's default. Rarely set — see EntityDefinition's comment.
+        var triplanar      = e.TriplanarOverride      ?? modelDef?.TriplanarOverride;
+        var triplanarScale = e.TriplanarScaleOverride ?? modelDef?.TriplanarScaleOverride;
+
+        Material Resolve(string path)
+        {
+            var mat = _resourceSystem.GetMaterial(path);
+            if (triplanar is null && triplanarScale is null)
+                return mat;
+
+            var overridden = mat.Clone();
+            if (triplanar is { } t) overridden.Triplanar = t;
+            if (triplanarScale is { } s) overridden.TriplanarScale = s;
+            return overridden;
+        }
 
         // Named binding: matched to each mesh's name from the model file, not array position —
         // no need to know/verify mesh order inside the exported model.
-        if (e.Materials?.Named is { Count: > 0 } named)
+        if (binding?.Named is { Count: > 0 } named)
         {
             for (var i = 0; i < count; i++)
             {
                 var meshName = model.Meshes[i].Name;
                 result[i] = !string.IsNullOrEmpty(meshName) && named.TryGetValue(meshName, out var path)
-                    ? _resourceSystem.GetMaterial(path)
+                    ? Resolve(path)
                     : _resourceSystem.DefaultMaterial;
             }
             return result;
         }
 
-        var paths = e.Materials?.Indexed is { Length: > 0 } indexed ? indexed
-            : !string.IsNullOrEmpty(e.Material) ? new[] { e.Material! }
-            : null;
+        var paths = binding?.Indexed is { Length: > 0 } indexed ? indexed : null;
 
         for (var i = 0; i < count; i++)
             result[i] = paths is null
                 ? _resourceSystem.DefaultMaterial
-                : _resourceSystem.GetMaterial(paths[Math.Min(i, paths.Length - 1)]);
+                : Resolve(paths[Math.Min(i, paths.Length - 1)]);
 
         return result;
     }
