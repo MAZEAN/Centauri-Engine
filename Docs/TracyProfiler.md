@@ -61,7 +61,10 @@ Binary: `/tmp/tracy-profiler/profiler/build/tracy-profiler` — move it wherever
 
 ## 4. Use it
 
-1. Run `/tmp/tracy-profiler/profiler/build/tracy-profiler`.
-2. Launch the game, Properties → Scene → Tracy Profiler → check **Enabled**
+```bash
+tracy-profiler
+```
+
+1. Launch the game, Properties → Scene → Tracy Profiler → check **Enabled**
    (`debug.tracyEnabled` in `config.json`, off by default).
-3. The game appears in the viewer's connect list automatically.
+2. The game appears in the viewer's connect list automatically.
