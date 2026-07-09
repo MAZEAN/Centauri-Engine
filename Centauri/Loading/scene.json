@@ -3,12 +3,12 @@
     {
       "name":     "Cube",
       "model":    "Assets/Objects/Shapes/cube.glb",
-      "material": "Assets/Materials/BrickWall.mat"
+      "material": "BrickWall"
     },
     {
       "name":     "Rectangle",
       "model":    "Assets/Objects/Shapes/cube.glb",
-      "material": "Assets/Materials/CobbleStoneFloor.mat",
+      "material": "CobbleStoneFloor",
       "position": [-3, 1, 0],
       "scale":    [1, 0.2, 1],
       "rotation": [0, 0, -45],
@@ -22,38 +22,38 @@
     {
       "name":     "Floor",
       "model":    "Assets/Objects/Shapes/cube.glb",
-      "material": "Assets/Materials/ChessTiles.mat",
+      "material": "ChessTiles",
       "position": [0, -2, 0],
       "scale":    [100, 1, 100],
       "uvScale":  [10.0, 10.0]
     },
     { "name": "Tree1", 
       "model": "Assets/Objects/Trees/Tree.glb",
-      "materials": ["Assets/Materials/Bark.mat", "Assets/Materials/LeavesCommon.mat"],
+      "materials": ["Bark", "LeavesCommon"],
       "position": [6, -1.5, -3]
     },
     { "name": "Tree2",
       "model": "Assets/Objects/Trees/Tree.glb",
-      "materials": ["Assets/Materials/Bark.mat", "Assets/Materials/LeavesCommon.mat"],
+      "materials": ["Bark", "LeavesCommon"],
       "position": [8, -1.5, -5],
       "rotation": [0, 45, 0]
     },
     {
       "name":     "Sphere1",
       "model":    "Assets/Objects/Shapes/sphere.glb",
-      "material": "Assets/Materials/RustyMetal.mat",
+      "material": "RustyMetal",
       "position": [0, 2, -4]
     },
     {
       "name":     "Sphere2",
       "model":    "Assets/Objects/Shapes/sphere.glb",
-      "material": "Assets/Materials/BlueMetalPlate.mat",
+      "material": "BlueMetalPlate",
       "position": [-3, 1, -3]
     },
     {
       "name":     "Sphere3",
       "model":    "Assets/Objects/Shapes/sphere.glb",
-      "material": "Assets/Materials/CorrugatedIron.mat",
+      "material": "CorrugatedIron",
       "position": [3, 0, 0]
     },
     {
@@ -64,7 +64,7 @@
     {
       "name":     "Torus",
       "model":    "Assets/Objects/Shapes/torus.glb",
-      "material": "Assets/Materials/WoodFloorDeck.mat",
+      "material": "WoodFloorDeck",
       "position": [2, 0, -3],
       "rotation": [45, 0, 45]
     },  

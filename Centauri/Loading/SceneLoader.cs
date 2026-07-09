@@ -28,16 +28,40 @@ public class SceneLoader
 
     public void Load()
     {
-        var fullPath = PathResolver.Resolve(_path);
-        var json = File.ReadAllText(fullPath);
-        var def  = JsonSerializer.Deserialize<SceneDefinition>(json, JsonDefaults.Options)
-                   ?? throw new Exception($"Failed to deserialize scene file: {_path}");
-        
+        var def = LoadMerged(_path, []);
+
         _resourceSystem.PreloadScene(def);
-        
+
         LoadEntities(def);
         LoadCameras(def);
         LoadSkyboxes(def);
+    }
+
+    // Recursively resolves "include": each included file's entities/cameras/skybox get folded
+    // into this one before the caller sees it, so a scene can stay a thin index instead of one
+    // file holding everything as content grows. Optional — a single-file scene with no
+    // "include" behaves exactly as before.
+    private SceneDefinition LoadMerged(string path, HashSet<string> visiting)
+    {
+        var fullPath = PathResolver.Resolve(path);
+        if (!visiting.Add(fullPath))
+            throw new Exception($"Scene include cycle detected involving '{path}'.");
+
+        var json = File.ReadAllText(fullPath);
+        var def  = JsonSerializer.Deserialize<SceneDefinition>(json, JsonDefaults.Options)
+                   ?? throw new Exception($"Failed to deserialize scene file: {path}");
+
+        if (def.Include is not { Count: > 0 } includes)
+            return def;
+
+        foreach (var included in includes.Select(inc => LoadMerged(inc, visiting)))
+        {
+            def.Entities.AddRange(included.Entities);
+            def.Cameras.AddRange(included.Cameras);
+            def.Skyboxes.AddRange(included.Skyboxes);
+        }
+
+        return def;
     }
 
     private void LoadEntities(SceneDefinition def)

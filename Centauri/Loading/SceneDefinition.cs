@@ -8,6 +8,12 @@ public class SceneDefinition
     [JsonPropertyName("entities")] public List<EntityDefinition> Entities { get; set; } = [];
     [JsonPropertyName("cameras")]  public List<CameraDefinition> Cameras  { get; set; } = [];
     [JsonPropertyName("skybox")]   public List<SkyboxDefinition> Skyboxes { get; set; } = [];
+
+    // Other scene files (relative to the project root, same as "model"/"material" paths)
+    // whose entities/cameras/skybox get merged into this one at load — keeps a growing scene
+    // as a thin index instead of one file holding everything. Optional; unused scenes are
+    // unaffected.
+    [JsonPropertyName("include")]  public List<string>?          Include  { get; set; }
 }
 
 public class EntityDefinition
@@ -80,6 +86,17 @@ public class LightDefinition
 
 public class MaterialDefinition
 {
+    // Registry id — defaults to the filename (sans extension) when omitted; only needed to
+    // give a material a name that differs from its file, or to disambiguate files that'd
+    // otherwise collide (two "Bark.mat" in different folders). Consumed while building the
+    // registry (ResourceSystem), not read off the deserialized object afterward.
+    [JsonPropertyName("id")]        public string? Id { get; set; }
+
+    // Another material (by id) to inherit from — shared fields are merged at the raw JSON
+    // level before deserialization, so this material only needs to state what differs.
+    // Consumed the same way as "id"; never present on the final merged object.
+    [JsonPropertyName("extends")]   public string? Extends { get; set; }
+
     [JsonPropertyName("name")]     public string Name { get; set; } = "Default";
     [JsonPropertyName("shader")]    public string Shader { get; set; } = "";
     [JsonPropertyName("albedo")]    public string? Albedo    { get; set; }

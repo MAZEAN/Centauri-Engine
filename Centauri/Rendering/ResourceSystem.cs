@@ -3,6 +3,7 @@ namespace Centauri.Rendering;
 using Silk.NET.OpenGL;
 using System.Numerics;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 using Utils.Caching;
 using Graphics.Resources;
@@ -24,13 +25,14 @@ public class ResourceSystem : IDisposable
     public AssetCache<Model> Models { get; }
     
     private readonly Dictionary<string, Material> _materials = new();
+    private readonly Dictionary<string, string> _materialRegistry;
     public GLTexture DefaultTexture { get; private set; }
 
     public ResourceSystem(GL gl, AppConfig config)
     {
         _gl = gl;
         _config = config;
-        
+
         Textures = new AssetCache<GLTexture>(
             key => new GLTexture(gl, DecodeTextureKey(key))
         );
@@ -44,6 +46,62 @@ public class ResourceSystem : IDisposable
             path => new Model(gl, PathResolver.Resolve(path)));
 
         DefaultTexture = CreateDefaultTexture(gl);
+        _materialRegistry = BuildMaterialRegistry();
+    }
+
+    // Indexes every .mat under Assets/Materials by id, so entities/materials can reference
+    // "Bark" instead of "Assets/Materials/Bark.mat" — moving or reorganizing a file no longer
+    // breaks every reference to it. Id defaults to the filename (sans extension); an explicit
+    // "id" field inside the file overrides that. A literal path (anything containing '/') is
+    // still accepted as-is, so existing scene files work unchanged.
+    private Dictionary<string, string> BuildMaterialRegistry()
+    {
+        var registry = new Dictionary<string, string>();
+        var root = PathResolver.Resolve(".");
+        var materialsDir = PathResolver.Resolve("Assets/Materials");
+
+        if (!Directory.Exists(materialsDir))
+            return registry;
+
+        foreach (var file in Directory.EnumerateFiles(materialsDir, "*.mat", SearchOption.AllDirectories))
+        {
+            var relative = Path.GetRelativePath(root, file).Replace('\\', '/');
+            var id = Path.GetFileNameWithoutExtension(file);
+
+            try
+            {
+                using var doc = JsonDocument.Parse(File.ReadAllText(file));
+                if (doc.RootElement.TryGetProperty("id", out var idProp) && idProp.GetString() is { Length: > 0 } explicitId)
+                    id = explicitId;
+            }
+            catch (JsonException)
+            {
+                // malformed JSON — surfaces as a clear error the moment this file is actually
+                // loaded (ReadMaterialDef), no need to duplicate that here
+            }
+
+            if (registry.TryGetValue(id, out var existing))
+                throw new Exception($"Duplicate material id '{id}': '{existing}' and '{relative}'.");
+
+            registry[id] = relative;
+        }
+
+        return registry;
+    }
+
+    // A literal path (contains '/') is used as-is — the escape hatch for anything not under
+    // the registry, and how existing "Assets/Materials/X.mat"-style references keep working.
+    // Anything else is looked up by id.
+    private string ResolveMaterialPath(string idOrPath)
+    {
+        if (idOrPath.Contains('/'))
+            return idOrPath;
+
+        if (_materialRegistry.TryGetValue(idOrPath, out var path))
+            return path;
+
+        throw new Exception(
+            $"Unknown material '{idOrPath}'. Available: {string.Join(", ", _materialRegistry.Keys.OrderBy(k => k))}");
     }
     
     private static GLTexture CreateDefaultTexture(GL gl)
@@ -148,11 +206,37 @@ public class ResourceSystem : IDisposable
                 PathResolver.Resolve(key[(split + OpacityKeyMarker.Length)..]));
     }
 
-    private static MaterialDefinition ReadMaterialDef(string path)
+    private MaterialDefinition ReadMaterialDef(string idOrPath) =>
+        ResolveMaterialJson(idOrPath, [])
+            .Deserialize<MaterialDefinition>(JsonDefaults.Options)
+        ?? throw new Exception($"Failed to deserialize material '{idOrPath}'.");
+
+    // Resolves "extends" by merging the parent's JSON object with this one's at the raw node
+    // level — fields the child doesn't mention simply aren't in its JsonObject, so they pass
+    // through from the parent untouched, no need for every MaterialDefinition field to be
+    // nullable just to distinguish "not set" from "explicitly set to the default value".
+    private JsonObject ResolveMaterialJson(string idOrPath, HashSet<string> visiting)
     {
+        var path = ResolveMaterialPath(idOrPath);
+        if (!visiting.Add(path))
+            throw new Exception($"Material inheritance cycle detected involving '{idOrPath}'.");
+
         var json = File.ReadAllText(PathResolver.Resolve(path));
-        return JsonSerializer.Deserialize<MaterialDefinition>(json, JsonDefaults.Options)
-               ?? throw new Exception($"Failed to deserialize material file: {path}");
+        var node = JsonNode.Parse(json)?.AsObject()
+            ?? throw new Exception($"Failed to parse material file: {path}");
+
+        node.TryGetPropertyValue("extends", out var extendsNode);
+        var parentId = extendsNode?.GetValue<string>();
+        node.Remove("extends"); // strip regardless — never a real MaterialDefinition field
+
+        if (string.IsNullOrEmpty(parentId))
+            return node;
+
+        var merged = ResolveMaterialJson(parentId, visiting).DeepClone()!.AsObject();
+        foreach (var (key, value) in node)
+            merged[key] = value?.DeepClone();
+
+        return merged;
     }
 
     private Material LoadMaterial(string path)
