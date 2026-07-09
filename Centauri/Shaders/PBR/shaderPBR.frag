@@ -83,6 +83,15 @@ uniform float uMetallicScalar;
 uniform float uTranslucency;
 uniform vec4  uColor;
 
+
+// Triplaner projection
+
+// World-space tri-planar projection instead of stored mesh UVs — opt-in per material, for
+// organic/branching geometry (bark, rock) where a clean unwrap isn't practical. See
+// TriplanarWeights()/SampleTriplanar() below.
+uniform int   uTriplanar;
+uniform float uTriplanarScale;   // world meters spanned by one texture tile
+
 // Alpha-tested cutout threshold — tunable (RenderConfig.FoliageAlphaCutoff), must match
 // ZPrepass's uFoliageAlphaCutoff exactly. See RenderConfig.cs for why.
 uniform float uFoliageAlphaCutoff;
@@ -377,14 +386,68 @@ void ShowShadowCascadesView(vec3 color, vec4  albedoSample) {
     FragColor = vec4(color * tint, albedoSample.a);
 }
 
+// Projects a texture from the three world-space axis planes and blends by how much the
+// (geometric, pre-normal-map) surface normal points along each axis — sharpened so the blend
+// favors the dominant axis instead of a mushy 33/33/33 mix on near-diagonal surfaces. Used
+// instead of fUv when uTriplanar == 1, so material appearance no longer depends on how well a
+// mesh happens to be unwrapped.
+vec3 TriplanarWeights(vec3 N)
+{
+    vec3 w = pow(abs(N), vec3(4.0));
+    return w / max(w.x + w.y + w.z, 1e-5);
+}
+
+vec4 SampleTriplanar(sampler2D tex, vec3 worldPos, vec3 weights)
+{
+    vec3 uv = worldPos / uTriplanarScale;
+    
+    return texture(tex, uv.zy) * weights.x
+        + texture(tex, uv.xz) * weights.y
+        + texture(tex, uv.xy) * weights.z;
+}
+
+vec4 SampleMaterialMap(sampler2D tex, vec3 triWeights)
+{
+    return uTriplanar == 1 ? SampleTriplanar(tex, fFragPos, triWeights) : texture(tex, fUv);
+}
+
+// Tangent-space normal maps can't be blended per-axis like color (each projection has its own
+// tangent space and a naive blend cancels detail out) — "whiteout blending" (Ben Golus) adds
+// each projection's tangent-space XY onto the world normal's matching components and
+// reconstructs Z from it instead, so the three stay consistent before blending.
+vec3 SampleTriplanarNormal(sampler2D tex, vec3 worldPos, vec3 N, vec3 weights)
+{
+    vec3 uv = worldPos / uTriplanarScale;
+
+    vec3 tX = texture(tex, uv.zy).rgb * 2.0 - 1.0;
+    vec3 tY = texture(tex, uv.xz).rgb * 2.0 - 1.0;
+    vec3 tZ = texture(tex, uv.xy).rgb * 2.0 - 1.0;
+
+    tX = vec3(tX.xy + N.zy, N.x);
+    tY = vec3(tY.xy + N.xz, N.y);
+    tZ = vec3(tZ.xy + N.xy, N.z);
+
+    return normalize(tX.zyx * weights.x + tY.xzy * weights.y + tZ.xyz * weights.z);
+}
+
 // world-space shading normal: normal-map detail through the TBN when present (and valid),
 // else the interpolated vertex normal; flipped for back faces.
 vec3 SurfaceNormal()
 {
-    vec3 T = fTBN[0];
-    vec3 N = (uHasNormal == 1 && dot(T, T) > 1e-5)
-        ? normalize(fTBN * (texture(uNormalMap, fUv).rgb * 2.0 - 1.0))
-        : normalize(fNormal);
+    vec3 N;
+    
+    if (uTriplanar == 1 && uHasNormal == 1)
+    {
+        vec3 geoN = normalize(fNormal);
+        N = SampleTriplanarNormal(uNormalMap, fFragPos, geoN, TriplanarWeights(geoN));
+    }
+    else
+    {
+        vec3 T = fTBN[0];
+        N = (uHasNormal == 1 && dot(T, T) > 1e-5)
+            ? normalize(fTBN * (texture(uNormalMap, fUv).rgb * 2.0 - 1.0))
+            : normalize(fNormal);
+    }
 
     if (!gl_FrontFacing)
         N = -N;
@@ -480,10 +543,12 @@ void main()
 {
     if (dot(vec4(fFragPos, 1.0), uClipPlane) < 0.0) discard;
 
-    vec4  albedoSample = uHasAlbedo    == 1 ? texture(uAlbedoMap,    fUv) : uColor;
-    float roughness    = uHasRoughness == 1 ? texture(uRoughnessMap, fUv).r : uRoughnessScalar;
-    float metallic     = uHasMetallic  == 1 ? texture(uMetallicMap,  fUv).r : uMetallicScalar;
-    float ao           = uHasAO == 1 ? texture(uAOMap, fUv).r : 1.0;
+    vec3 triWeights = uTriplanar == 1 ? TriplanarWeights(normalize(fNormal)) : vec3(0.0);
+
+    vec4  albedoSample = uHasAlbedo    == 1 ? SampleMaterialMap(uAlbedoMap,    triWeights) : uColor;
+    float roughness    = uHasRoughness == 1 ? SampleMaterialMap(uRoughnessMap, triWeights).r : uRoughnessScalar;
+    float metallic     = uHasMetallic  == 1 ? SampleMaterialMap(uMetallicMap,  triWeights).r : uMetallicScalar;
+    float ao           = uHasAO == 1 ? SampleMaterialMap(uAOMap, triWeights).r : 1.0;
 
     // uAlbedoMap is stored premultiplied (GLTexture.Decode premultiplies LDR textures at load
     // time) specifically so mipmap generation/filtering blends toward black at transparent

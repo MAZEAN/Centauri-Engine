@@ -64,6 +64,8 @@ public class MaterialDefinition
     [JsonPropertyName("color")]          public float[] Color        { get; set; } = [1f, 1f, 1f, 1f];
     [JsonPropertyName("twoSided")]       public bool   TwoSided      { get; set; } = false;
     [JsonPropertyName("wind")]           public bool   Wind          { get; set; } = false;
+    [JsonPropertyName("triplanar")]      public bool   Triplanar      { get; set; } = false;
+    [JsonPropertyName("triplanarScale")] public float  TriplanarScale { get; set; } = 1f;
 }
 
 public class CameraDefinition

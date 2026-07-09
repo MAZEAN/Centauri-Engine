@@ -119,8 +119,10 @@ public class ResourceSystem : IDisposable
     {
         if (e.Materials is { Length: > 0 }) 
             return e.Materials;
+        
         if (!string.IsNullOrEmpty(e.Material)) 
             return [e.Material!];
+        
         return [];
     }
 
@@ -159,7 +161,7 @@ public class ResourceSystem : IDisposable
         return new Material(shader)
         {
             Name      = def.Name,
-            Albedo    = def.Albedo    != null ? Textures.Get(def.Albedo)    : null,
+            Albedo    = AlbedoKey(def.Albedo, def.Opacity) is { } albedoKey ? Textures.Get(albedoKey) : null,
             Normal    = def.Normal    != null ? Textures.Get(def.Normal)    : null,
             Roughness = def.Roughness != null ? Textures.Get(def.Roughness) : null,
             Metallic  = def.Metallic  != null ? Textures.Get(def.Metallic)  : null,
@@ -169,7 +171,9 @@ public class ResourceSystem : IDisposable
             Translucency   = def.TranslucencyScalar,
             Color          = new Vector4(def.Color[0], def.Color[1], def.Color[2], def.Color[3]),
             TwoSided       = def.TwoSided,
-            Wind           = def.Wind
+            Wind           = def.Wind,
+            Triplanar      = def.Triplanar,
+            TriplanarScale = def.TriplanarScale
         };
     }
 

@@ -97,6 +97,8 @@ public sealed class ShaderUniformBinder
         shader.SetUniform("uColor",           mat.Color);
         shader.SetUniform("uFoliage",         mat.TwoSided ? 1 : 0);
         shader.SetUniform("uWind",            mat.Wind ? 1 : 0);
+        shader.SetUniform("uTriplanar",       mat.Triplanar ? 1 : 0);
+        shader.SetUniform("uTriplanarScale",  mat.TriplanarScale);
     }
     
     public static void UploadWind(GLShader shader, FoliageConfig foliage)

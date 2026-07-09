@@ -21,7 +21,7 @@ public sealed class PlanarReflectionSection : ISection
 
         var bound = !string.IsNullOrEmpty(_config.ReflectorEntity);
         if (bound)
-            ImGui.TextDisabled($"Plane bound to \"{_config.ReflectorEntity}\" (tracks its top).");
+            ImGui.TextDisabled($"Plane bound to \"{_config.ReflectorEntity}\"");
         
         Widgets.DragRow(bound ? "Plane Height (fallback)" : "Plane Height",
             _config.PlaneHeight, v => _config.PlaneHeight = v,
@@ -35,7 +35,5 @@ public sealed class PlanarReflectionSection : ISection
         
         Widgets.DragRow("Distortion", _config.Distortion, v => _config.Distortion = v,
             0.001f, 0f, 0.2f, "%.3f", 0f);
-
-        ImGui.TextDisabled("Half-res is a startup/resize setting (config).");
     }
 }

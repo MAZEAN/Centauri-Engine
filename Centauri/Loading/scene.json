@@ -66,14 +66,7 @@
       "material": "Assets/Materials/WoodFloorDeck.mat",
       "position": [2, 0, -3],
       "rotation": [45, 0, 45]
-    },
-    {
-      "name":     "Cone",
-      "model":    "Assets/Objects/Shapes/cone.glb",
-      "material": "Assets/Materials/Gold.mat",
-      "position": [3, 3, -3],
-      "rotation": [0, -90, 15]
-    },    
+    },  
     {
       "name":     "Sun",
       "position": [0, 0, 0],

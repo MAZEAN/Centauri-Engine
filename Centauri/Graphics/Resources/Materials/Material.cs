@@ -20,6 +20,11 @@ public class Material
     
     public bool TwoSided { get; set; } = false;
     public bool Wind { get; set; } = false;
+    
+    // World-space tri-planar projection instead of stored mesh UVs — for organic/branching
+    // geometry (tree bark, rock) where a clean per-vertex unwrap isn't practical.
+    public bool  Triplanar      { get; set; } = false;
+    public float TriplanarScale { get; set; } = 1f; // world meters spanned by one texture tile
 
     public Material(GLShader shader)
     {
@@ -39,7 +44,9 @@ public class Material
         MetallicScalar  = MetallicScalar,
         Translucency   = Translucency,
         TwoSided       = TwoSided,
-        Wind           = Wind
+        Wind           = Wind,
+        Triplanar      = Triplanar,
+        TriplanarScale = TriplanarScale
     };
     
     public ulong SortKey
