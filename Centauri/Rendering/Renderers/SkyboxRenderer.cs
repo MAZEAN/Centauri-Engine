@@ -16,12 +16,11 @@ public class SkyboxRenderer : IDisposable
     private readonly AppConfig _config;
     
     private readonly GLShader _shader;
-    private readonly Mesh     _cube;
-    
+
     private uint   _cloudTexture;
     private Vector2 _cloudInvViewport;
 
-    public Mesh Cube => _cube;   // shared with CloudPass so both sample identical directions
+    public Mesh Cube { get; private set; }
 
     public SkyboxRenderer(GL gl, AppConfig config)
     {
@@ -33,7 +32,7 @@ public class SkyboxRenderer : IDisposable
             PathResolver.Resolve("Shaders/Sky/skybox.frag"));
 
         var (vertices, indices) = BuildCube();
-        _cube = new Mesh(gl, vertices, indices);
+        Cube = new Mesh(gl, vertices, indices);
     }
     
     public void SetCloudMap(uint texture, Vector2 invViewport)
@@ -65,7 +64,7 @@ public class SkyboxRenderer : IDisposable
 
         view.Translation = Vector3.Zero;
 
-        SetSkyboxRenderState();
+        SetRenderState();
 
         _shader.Use();
         _shader.SetUniform("uView",            view);
@@ -97,14 +96,14 @@ public class SkyboxRenderer : IDisposable
 
         UploadSun(scene);
 
-        _cube.Bind();
+        Cube.Bind();
         unsafe
         {
-            _gl.DrawElements(PrimitiveType.Triangles, _cube.IndexCount,
+            _gl.DrawElements(PrimitiveType.Triangles, Cube.IndexCount,
                 DrawElementsType.UnsignedInt, (void*)0);
         }
 
-        ResetSkyboxRenderState();
+        ResetRenderState();
     }
 
     private static (float[] vertices, uint[] indices) BuildCube()
@@ -151,14 +150,14 @@ public class SkyboxRenderer : IDisposable
         _shader.SetUniform("uSunGlowExponent", _config.Sky.SunGlowExponent);
     }
 
-    private void SetSkyboxRenderState()
+    private void SetRenderState()
     {
         _gl.DepthFunc(GLEnum.Lequal);
         _gl.DepthMask(false);
         _gl.Disable(EnableCap.CullFace);
     }
 
-    private void ResetSkyboxRenderState()
+    private void ResetRenderState()
     {
         _gl.Enable(EnableCap.CullFace);
         _gl.DepthMask(true);
@@ -167,7 +166,7 @@ public class SkyboxRenderer : IDisposable
 
     public void Dispose()
     {
-        _cube.Dispose();
+        Cube.Dispose();
         _shader.Dispose();      // cubemap is owned by ResourceSystem, not here
     }
 }

@@ -2,9 +2,6 @@
 
 in  vec2 vUv;
 
-layout(location = 0) out vec4 oColor;   // rgb = reflected radiance, a = confidence
-layout(location = 1) out vec4 oViewZ;   // r = this pixel's view-space Z (for next frame's rejection)
-
 // Temporal accumulation for SSR. The per-frame reflection hit/confidence is unstable on fine or
 // thin geometry (teeth, ridge spikes): whether the march lands on the detail or slips into the
 // gap behind it is sensitive to sub-pixel changes, so it can flip frame to frame under camera
@@ -15,6 +12,11 @@ layout(location = 1) out vec4 oViewZ;   // r = this pixel's view-space Z (for ne
 // reject history using a stored view-space Z rather than a colour-neighbourhood clamp, so
 // background reflections (or lack thereof) don't bilinearly bleed across silhouette edges into
 // foreground geometry the way a naive clamp allows.
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+layout(location = 0) out vec4 oColor;   // rgb = reflected radiance, a = confidence
+layout(location = 1) out vec4 oViewZ;   // r = this pixel's view-space Z (for next frame's rejection)
 
 uniform sampler2D uCurrent;      // this frame's blurred SSR: rgb/a as above
 uniform sampler2D uHistory;      // previous resolved frame's color/confidence
@@ -32,6 +34,7 @@ float viewZ(float d)
 {
     vec4 ndc = vec4(vUv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
     vec4 v   = uInvProjection * ndc;
+    
     return v.z / v.w;
 }
 
@@ -40,7 +43,12 @@ void main()
     vec4 current = texture(uCurrent, vUv);
 
     float d = texture(uDepth, vUv).r;
-    if (d >= 1.0) { oColor = vec4(0.0); oViewZ = vec4(0.0); return; }   // background
+    if (d >= 1.0)
+    { 
+        oColor = vec4(0.0);
+        oViewZ = vec4(0.0);
+        return; 
+    }   // background
 
     float curZ = viewZ(d);
 
@@ -52,8 +60,8 @@ void main()
     bool valid  = prev.w > 1e-4;
     vec2 prevUv = valid ? (prev.xy / prev.w) * 0.5 + 0.5 : vec2(-1.0);
     bool onScreen = valid
-    && prevUv.x >= 0.0 && prevUv.x <= 1.0
-    && prevUv.y >= 0.0 && prevUv.y <= 1.0;
+        && prevUv.x >= 0.0 && prevUv.x <= 1.0
+        && prevUv.y >= 0.0 && prevUv.y <= 1.0;
 
     vec4  hist  = onScreen ? texture(uHistory,  prevUv) : current;
     float histZ = onScreen ? texture(uHistoryZ, prevUv).r : curZ;

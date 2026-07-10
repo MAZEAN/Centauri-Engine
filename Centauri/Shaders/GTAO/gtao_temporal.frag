@@ -21,6 +21,8 @@ out vec4 FragColor;
 // background) differs enormously from the geometry's near Z, so it's dropped and the pixel falls
 // back to its own current-frame value instead of accumulating the bleed.
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 uniform sampler2D uCurrent;      // this frame's blurred AO (half-res), .r
 uniform sampler2D uHistory;      // previous resolved frame: .r = AO, .g = view-space Z
 uniform sampler2D uDepth;        // current prepass depth, full-res ([0,1])
