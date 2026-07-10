@@ -65,29 +65,17 @@ public sealed class SSRPass : IDisposable
 
         _resDivisor = config.HalfResolution ? 2u : 1u;
 
-        _shader = new GLShader(gl,
-            PathResolver.Resolve("Shaders/Post/post.vert"),
-            PathResolver.Resolve("Shaders/SSR/ssr.frag"));
-        _blur = new GLShader(gl,
-            PathResolver.Resolve("Shaders/Post/post.vert"),
-            PathResolver.Resolve("Shaders/SSR/ssr_blur.frag"));
-        _temporal = new GLShader(gl,
-            PathResolver.Resolve("Shaders/Post/post.vert"),
-            PathResolver.Resolve("Shaders/SSR/ssr_temporal.frag"));
-        _resolve = new GLShader(gl,
-            PathResolver.Resolve("Shaders/Post/post.vert"),
-            PathResolver.Resolve("Shaders/SSR/ssr_resolve.frag"));
+        _shader   = CreateShader("ssr.frag");
+        _blur     = CreateShader("ssr_blur.frag");
+        _temporal = CreateShader("ssr_temporal.frag");
+        _resolve  = CreateShader("ssr_resolve.frag");
 
-        _target = new RenderTarget(gl, width / _resDivisor, height / _resDivisor,
-            [InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Linear);
-        _blurTarget = new RenderTarget(gl, width / _resDivisor, height / _resDivisor,
-            [InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Linear);
-        _history[0] = new RenderTarget(gl, width / _resDivisor, height / _resDivisor,
-            [InternalFormat.Rgba16f, InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Linear);
-        _history[1] = new RenderTarget(gl, width / _resDivisor, height / _resDivisor,
-            [InternalFormat.Rgba16f, InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Linear);
-        _resolveTarget = new RenderTarget(gl, width / _resDivisor, height / _resDivisor,
-            [InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Linear);
+        _target        = CreateFilteredTarget(width, height, 1);
+        _blurTarget    = CreateFilteredTarget(width, height, 1);
+        _resolveTarget = CreateFilteredTarget(width, height, 1);
+
+        _history[0] = CreateFilteredTarget(width, height, 2);
+        _history[1] = CreateFilteredTarget(width, height, 2);
 
         _vao = gl.GenVertexArray();
 
@@ -143,14 +131,34 @@ public sealed class SSRPass : IDisposable
         var viewProj = camera.GetViewMatrix() * proj;
         Matrix4x4.Invert(viewProj, out var invViewProj);
 
-        if (Math.Abs(_config.MaxDistance - _lastMaxDistance) > Tolerance
-            || _config.MaxSteps != _lastMaxSteps
-            || _config.RefineSteps != _lastRefineSteps
-            || Math.Abs(_config.Thickness - _lastThickness) > Tolerance
-            || Math.Abs(_config.RoughnessCutoff - _lastRoughnessCutoff) > Tolerance
-            || Math.Abs(_config.SilhouetteThreshold - _lastSilhouetteThreshold) > Tolerance)
+        ValidateHistory(viewProj);
+
+        SetRenderState();
+
+        RenderMarch(sceneTex, gBuffer, proj, invProj, invView, planar);
+        RenderBlur(gBuffer.Material);
+        RenderTemporal(gBuffer.Depth, invProj, invViewProj);
+        RenderResolve(gBuffer, invProj, invView, ibl, gtaoTex, gtaoActive, planar);
+        
+        ResetRenderState();
+
+        SwapHistoryBuffers(viewProj);
+    }
+    
+    private void ValidateHistory(Matrix4x4 viewProj)
+    {
+        var settingsChanged =
+            Math.Abs(_config.MaxDistance - _lastMaxDistance) > Tolerance ||
+            _config.MaxSteps != _lastMaxSteps ||
+            _config.RefineSteps != _lastRefineSteps ||
+            Math.Abs(_config.Thickness - _lastThickness) > Tolerance ||
+            Math.Abs(_config.RoughnessCutoff - _lastRoughnessCutoff) > Tolerance ||
+            Math.Abs(_config.SilhouetteThreshold - _lastSilhouetteThreshold) > Tolerance;
+
+        if (settingsChanged)
         {
-            _hasHistory              = false;   // sampling pattern changed — old history no longer matches it
+            _hasHistory = false;
+
             _lastMaxDistance         = _config.MaxDistance;
             _lastMaxSteps            = _config.MaxSteps;
             _lastRefineSteps         = _config.RefineSteps;
@@ -161,22 +169,33 @@ public sealed class SSRPass : IDisposable
 
         if (!_hasHistory)
             _prevViewProj = viewProj;
+    }
+    
+    private void SwapHistoryBuffers(Matrix4x4 currentViewProj)
+    {
+        _output = _write;
+        _write ^= 1;
 
-        SetRenderState();
+        _prevViewProj = currentViewProj;
+        _hasHistory = true;
+    }
+    
+    private RenderTarget CreateFilteredTarget(uint width, uint height, int colorAttachments)
+    {
+        var formats = Enumerable
+            .Repeat(InternalFormat.Rgba16f, colorAttachments)
+            .ToArray();
 
-        RenderMarch(sceneTex, gBuffer, proj, invProj, invView, planar);
-        RenderBlur(gBuffer.Material);
-        RenderTemporal(gBuffer.Depth, invProj, invViewProj);
-        RenderResolve(gBuffer, invProj, invView, ibl, gtaoTex, gtaoActive, planar);
-
-        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-
-        ResetRenderState();
-
-        _output       = _write;
-        _write       ^= 1;
-        _prevViewProj = viewProj;
-        _hasHistory   = true;
+        return new RenderTarget(_gl, width / _resDivisor, height / _resDivisor, 
+            formats, withDepth: false, filter: GLEnum.Linear);
+    }
+    
+    private GLShader CreateShader(string fragmentShader)
+    {
+        return new GLShader(
+            _gl,
+            PathResolver.Resolve("Shaders/Post/post.vert"),
+            PathResolver.Resolve($"Shaders/SSR/{fragmentShader}"));
     }
 
     // Ray-marches the depth buffer and samples the resolved scene to find each pixel's reflection hit.
@@ -315,6 +334,7 @@ public sealed class SSRPass : IDisposable
 
     private void ResetRenderState()
     {
+        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         _gl.Enable(EnableCap.DepthTest);
     }
 
@@ -326,9 +346,10 @@ public sealed class SSRPass : IDisposable
         _resolve.Dispose();
         _target.Dispose();
         _blurTarget.Dispose();
+        _resolveTarget.Dispose();
         _history[0].Dispose();
         _history[1].Dispose();
-        _resolveTarget.Dispose();
+        
         _gl.DeleteVertexArray(_vao);
     }
 }

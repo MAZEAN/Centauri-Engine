@@ -43,16 +43,12 @@ public sealed class TAAPass : IDisposable
         _gl = gl;
         _config = config;
 
-        _velocity = new GLShader(gl,
-            PathResolver.Resolve("Shaders/Post/post.vert"),
-            PathResolver.Resolve("Shaders/TAA/velocity.frag"));
-        _resolve = new GLShader(gl,
-            PathResolver.Resolve("Shaders/Post/post.vert"),
-            PathResolver.Resolve("Shaders/TAA/taa.frag"));
+        _velocity = CreateShader("velocity.frag");
+        _resolve  = CreateShader("taa.frag");
 
-        _velocityTarget = new RenderTarget(gl, width, height, [InternalFormat.Rgba16f], withDepth: false);
-        _history[0] = new RenderTarget(gl, width, height, [InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Linear);
-        _history[1] = new RenderTarget(gl, width, height, [InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Linear);
+        _velocityTarget = CreateTarget(width, height);
+        _history[0] = CreateFilteredTarget(width, height);
+        _history[1] = CreateFilteredTarget(width, height);
 
         _vao = gl.GenVertexArray();
     }
@@ -83,13 +79,40 @@ public sealed class TAAPass : IDisposable
         var viewProj = camera.GetViewMatrix() * camera.GetProjectionMatrix();
         Matrix4x4.Invert(viewProj, out var invViewProj);
 
-        if (!_hasHistory)
-            _prevViewProj = viewProj;
+        ValidateHistory(viewProj);
 
+        SetRenderState();
+        
+        RenderVelocity(invViewProj, depthTex);
+        RenderResolve(sceneColor, ssrTex, hasSsr);
 
-        _gl.Disable(EnableCap.DepthTest);
+        ResetRenderState();
 
-        // ── motion vectors ──
+        SwapHistoryBuffers(viewProj);
+    }
+    
+    private RenderTarget CreateTarget(uint width, uint height)
+    {
+        return new RenderTarget(_gl, width, height, [InternalFormat.Rgba16f],
+            withDepth: false);
+    }
+
+    private RenderTarget CreateFilteredTarget(uint width, uint height)
+    {
+        return new RenderTarget(_gl, width, height, [InternalFormat.Rgba16f],
+            withDepth: false, filter: GLEnum.Linear);
+    }
+    
+    private GLShader CreateShader(string fragmentShader)
+    {
+        return new GLShader(
+            _gl,
+            PathResolver.Resolve("Shaders/Post/post.vert"),
+            PathResolver.Resolve($"Shaders/TAA/{fragmentShader}"));
+    }
+
+    private void RenderVelocity(Matrix4x4 invViewProj, uint depthTex)
+    {
         _velocityTarget.Bind();
         _velocityTarget.Clear(0f, 0f, 0f, 0f);
         _velocity.Use();
@@ -98,8 +121,10 @@ public sealed class TAAPass : IDisposable
         _velocity.SetUniform("uPrevViewProj", _prevViewProj);
         Bind(TextureUnit.Texture0, depthTex);
         DrawFullscreen();
+    }
 
-        // ── resolve into the current history slot ──
+    private void RenderResolve(uint sceneColor, uint ssrTex, bool hasSsr)
+    {
         var write = _history[_write];
         var read  = _history[_write ^ 1];
 
@@ -118,14 +143,21 @@ public sealed class TAAPass : IDisposable
         Bind(TextureUnit.Texture2, _velocityTarget.ColorTextures[0]);
         Bind(TextureUnit.Texture3, hasSsr ? ssrTex : 0);
         DrawFullscreen();
+    }
+    
+    private void ValidateHistory(Matrix4x4 viewProj)
+    {
+        if (!_hasHistory)
+            _prevViewProj = viewProj;
+    }
+    
+    private void SwapHistoryBuffers(Matrix4x4 currentViewProj)
+    {
+        _output = _write;
+        _write ^= 1;
 
-        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-        _gl.Enable(EnableCap.DepthTest);
-
-        _output       = _write;
-        _write       ^= 1;
-        _prevViewProj = viewProj;
-        _hasHistory   = true;
+        _prevViewProj = currentViewProj;
+        _hasHistory = true;
     }
 
     private static float Halton(int index, int b)
@@ -151,6 +183,17 @@ public sealed class TAAPass : IDisposable
         _gl.BindVertexArray(_vao);
         _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
         _gl.BindVertexArray(0);
+    }
+
+    private void SetRenderState()
+    {
+        _gl.Disable(EnableCap.DepthTest);
+    }
+
+    private void ResetRenderState()
+    {
+        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        _gl.Enable(EnableCap.DepthTest);
     }
 
     public void Dispose()
