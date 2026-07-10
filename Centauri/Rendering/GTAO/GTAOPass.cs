@@ -16,6 +16,7 @@ using Targets;
 // a single AO factor the lit pass multiplies into the ambient/IBL term.
 public sealed class GTAOPass : IDisposable
 {
+    private const float Tolerance = 0.01f;
     private const int  NoiseDim   = 4;
     private const uint ResDivisor = 2;   // half-res
 
@@ -38,6 +39,11 @@ public sealed class GTAOPass : IDisposable
 
     private int _frame;
     private Matrix4x4 _prevViewProj;
+    // last-seen sampling parameters, so a mid-session change invalidates history instead of
+    // blending fresh, differently-sampled frames against stale ones from the old settings
+    private float _lastRadius;
+    private int   _lastSliceCount;
+    private int   _lastStepCount;
 
     public uint AoTexture => _history[_output].ColorTextures[0];
 
@@ -84,6 +90,17 @@ public sealed class GTAOPass : IDisposable
         
         var viewProj = camera.GetViewMatrix() * proj;
         Matrix4x4.Invert(viewProj, out var invViewProj);
+        
+        var sliceCount = Math.Max(1, _config.SliceCount);
+        var stepCount  = Math.Max(1, _config.StepCount);
+        if (Math.Abs(_config.Radius - _lastRadius) > Tolerance || sliceCount != _lastSliceCount || stepCount != _lastStepCount)
+        {
+            _hasHistory     = false;   // sampling pattern changed — old history no longer matches it
+            _lastRadius     = _config.Radius;
+            _lastSliceCount = sliceCount;
+            _lastStepCount  = stepCount;
+        }
+
 
         if (!_hasHistory)
             _prevViewProj = viewProj;
@@ -137,7 +154,6 @@ public sealed class GTAOPass : IDisposable
         _temporal.SetUniform("uDepth",   2);
         _temporal.SetUniform("uInvViewProj",  invViewProj);
         _temporal.SetUniform("uPrevViewProj", _prevViewProj);
-        _temporal.SetUniform("uTexel", new Vector2(1f / write.Width, 1f / write.Height));
         _temporal.SetUniform("uFeedback", _hasHistory ? _config.TemporalFeedback : 0f);
 
         Bind(TextureUnit.Texture0, _blurTarget.ColorTextures[0]);
