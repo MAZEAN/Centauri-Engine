@@ -7,7 +7,7 @@ using Graphics.Resources;
 using Utils.Misc;
 
 // Overlays a geometry-prepass buffer (view-space normals or linearized depth) over the
-// whole screen, so the prepass output can be eyeballed before SSAO/SSR consume it.
+// whole screen, so the prepass output can be eyeballed before GTAO/SSR consume it.
 // Draws straight to the backbuffer — call after the scene composite, before the UI.
 public sealed class BufferDebugView : IDisposable
 {

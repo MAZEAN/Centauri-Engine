@@ -86,7 +86,7 @@
     "contrast": 1.0,
     "saturation": 0.95
   },
-  "ssao": {
+  "gtao": {
     "enabled": true,
     "radius": 1.5,
     "power": 1.5,

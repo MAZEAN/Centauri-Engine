@@ -1,4 +1,4 @@
-namespace Centauri.Rendering.SSAO;
+namespace Centauri.Rendering.GTAO;
 
 using Silk.NET.OpenGL;
 using System.Numerics;
@@ -10,22 +10,18 @@ using Utils.Misc;
 using Targets;
 
 // GTAO: multi-slice horizon search against the prepass depth + view-space normals, then a 4x4
-// box blur to remove the noise pattern — see ssao.frag for the algorithm itself. Produces a
-// single AO factor the lit pass multiplies into the ambient/IBL term. Class/file/config names
-// stayed "SSAO" (the section key in config.json, the AppConfig property, everything downstream
-// that binds AoTexture) since from the rest of the engine's perspective it's the same
-// abstraction — an AO texture derived from depth+normal — only the technique producing it
-// changed, the same way TAA replaced MSAA under RenderConfig without a rename cascading
-// through every consumer.
-public sealed class SSAOPass : IDisposable
+// box blur to remove the noise pattern — see gtao.frag for the algorithm itself. Produces a
+// single AO factor the lit pass multiplies into the ambient/IBL term. Replaces the previous
+// hemisphere-kernel SSAO pass entirely (renamed throughout, not left coexisting).
+public sealed class GTAOPass : IDisposable
 {
     private const int NoiseDim    = 4;
     private const uint ResDivisor = 2;   // half-res
 
     private readonly GL _gl;
-    private readonly SSAOConfig _config;
+    private readonly GTAOConfig _config;
     
-    private readonly GLShader _ssao;
+    private readonly GLShader _gtao;
     private readonly GLShader _blur;
     private readonly uint _vao;     // empty VAO for attribute-less fullscreen draws
     private readonly uint _noise;
@@ -35,17 +31,17 @@ public sealed class SSAOPass : IDisposable
 
     public uint AoTexture => _blurTarget.ColorTextures[0];
 
-    public SSAOPass(GL gl, SSAOConfig config, uint width, uint height)
+    public GTAOPass(GL gl, GTAOConfig config, uint width, uint height)
     {
         _gl = gl;
         _config = config;
 
-        _ssao = new GLShader(gl,
+        _gtao = new GLShader(gl,
             PathResolver.Resolve("Shaders/Post/post.vert"),
-            PathResolver.Resolve("Shaders/SSAO/ssao.frag"));
+            PathResolver.Resolve("Shaders/GTAO/gtao.frag"));
         _blur = new GLShader(gl,
             PathResolver.Resolve("Shaders/Post/post.vert"),
-            PathResolver.Resolve("Shaders/SSAO/ssao_blur.frag"));
+            PathResolver.Resolve("Shaders/GTAO/gtao_blur.frag"));
         _aoTarget   = new RenderTarget(gl, width / ResDivisor, height / ResDivisor,
             [InternalFormat.Rgba16f], withDepth: false);
         _blurTarget = new RenderTarget(gl, width / ResDivisor, height / ResDivisor,
@@ -72,17 +68,17 @@ public sealed class SSAOPass : IDisposable
         _aoTarget.Bind();
         _aoTarget.Clear(1f, 1f, 1f, 1f);
 
-        _ssao.Use();
-        _ssao.SetUniform("uProjection",    proj);
-        _ssao.SetUniform("uInvProjection", invProj);
-        _ssao.SetUniform("uRadius",     _config.Radius);
-        _ssao.SetUniform("uSliceCount", Math.Max(1, _config.SliceCount));
-        _ssao.SetUniform("uStepCount",  Math.Max(1, _config.StepCount));
-        _ssao.SetUniform("uPower",      _config.Power);
+        _gtao.Use();
+        _gtao.SetUniform("uProjection",    proj);
+        _gtao.SetUniform("uInvProjection", invProj);
+        _gtao.SetUniform("uRadius",     _config.Radius);
+        _gtao.SetUniform("uSliceCount", Math.Max(1, _config.SliceCount));
+        _gtao.SetUniform("uStepCount",  Math.Max(1, _config.StepCount));
+        _gtao.SetUniform("uPower",      _config.Power);
 
-        _ssao.SetUniform("uDepth",  0);
-        _ssao.SetUniform("uNormal", 1);
-        _ssao.SetUniform("uNoise",  2);
+        _gtao.SetUniform("uDepth",  0);
+        _gtao.SetUniform("uNormal", 1);
+        _gtao.SetUniform("uNoise",  2);
         
         Bind(TextureUnit.Texture0, depthTex);
         Bind(TextureUnit.Texture1, normalTex);
@@ -93,7 +89,7 @@ public sealed class SSAOPass : IDisposable
         _blurTarget.Bind();
         
         _blur.Use();
-        _blur.SetUniform("uSsao", 0);
+        _blur.SetUniform("uGtao", 0);
         
         Bind(TextureUnit.Texture0, _aoTarget.ColorTextures[0]);
         DrawFullscreen();
@@ -142,7 +138,7 @@ public sealed class SSAOPass : IDisposable
 
     public void Dispose()
     {
-        _ssao.Dispose();
+        _gtao.Dispose();
         _blur.Dispose();
         _aoTarget.Dispose();
         _blurTarget.Dispose();

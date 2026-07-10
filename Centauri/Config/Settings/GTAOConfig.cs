@@ -2,7 +2,7 @@ namespace Centauri.Config;
 
 using System.Text.Json.Serialization;
 
-public class SSAOConfig : IJsonOnDeserialized
+public class GTAOConfig : IJsonOnDeserialized
 {
     [JsonPropertyName("enabled")]    public bool  Enabled    { get; set; } = true;
     [JsonPropertyName("radius")]     public float Radius     { get; set; } = 0.5f;
@@ -15,7 +15,7 @@ public class SSAOConfig : IJsonOnDeserialized
     [JsonIgnore] public int   AuthoredSliceCount { get; private set; }
     [JsonIgnore] public int   AuthoredStepCount  { get; private set; }
 
-    public SSAOConfig() => OnDeserialized();
+    public GTAOConfig() => OnDeserialized();
 
     public void OnDeserialized()
     {

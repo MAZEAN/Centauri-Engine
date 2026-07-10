@@ -20,8 +20,8 @@ using Helper;
 public readonly record struct RenderRequest(
     Scene Scene,
     float DeltaTime,
-    uint SsaoTexture,
-    bool SsaoActive,
+    uint GtaoTexture,
+    bool GtaoActive,
     CullingSystem Culling,
     Camera Camera,
     Matrix4x4 View,
@@ -58,7 +58,7 @@ public class MainRenderer : IDisposable
         Matrix4x4 View,
         Vector3 CameraPosition,
         float IblScale,
-        bool SsaoActive,
+        bool GtaoActive,
         CullingSystem Culling,
         Vector4 ClipPlane,
         bool CheapShading
@@ -85,10 +85,10 @@ public class MainRenderer : IDisposable
     }
 
     public void Render(Scene scene, float deltaTime, ref FrameStats stats,
-        uint ssaoTexture, bool ssaoActive, CullingSystem culling)
+        uint gtaoTexture, bool gtaoActive, CullingSystem culling)
     {
         var camera = scene.Cameras.Active;
-        Render(new RenderRequest(scene, deltaTime, ssaoTexture, ssaoActive, culling,
+        Render(new RenderRequest(scene, deltaTime, gtaoTexture, gtaoActive, culling,
             camera, camera.GetViewMatrix(), camera.Position), ref stats);
     }
 
@@ -101,12 +101,12 @@ public class MainRenderer : IDisposable
             request.View,
             request.Position,
             DaylightIblScale(request.Scene),
-            request.SsaoActive,
+            request.GtaoActive,
             request.Culling,
             request.ClipPlane,
             request.CheapShading
         );
-        BeginFrame(request.Scene, request.DeltaTime, ref stats, request.SsaoTexture, request.SsaoActive);
+        BeginFrame(request.Scene, request.DeltaTime, ref stats, request.GtaoTexture, request.GtaoActive);
 
         var batches = _batcher.GetBatches(request.Scene);
 
@@ -119,7 +119,7 @@ public class MainRenderer : IDisposable
         ResetSurfaceRenderState();
     }
 
-    private void BeginFrame(Scene scene, float deltaTime, ref FrameStats stats, uint ssaoTexture, bool ssaoActive)
+    private void BeginFrame(Scene scene, float deltaTime, ref FrameStats stats, uint gtaoTexture, bool gtaoActive)
     {
         _textures.Reset();
         ResetFrameStats(ref stats);
@@ -127,7 +127,7 @@ public class MainRenderer : IDisposable
         _activeShader = null;
         _twoSided = null;
         
-        BindSsao(ssaoTexture, ssaoActive);
+        BindGtao(gtaoTexture, gtaoActive);
         UploadLights(scene.Lighting);
         BindIbl(scene);
         BindShadows();
@@ -252,7 +252,7 @@ public class MainRenderer : IDisposable
         shader.SetUniform("uView",      context.View);
         shader.SetUniform("uCameraPos", context.CameraPosition);
         shader.SetUniform("uClipPlane", context.ClipPlane);
-        _uniforms.UploadGlobals(shader, context.Camera, _iblActive, context.IblScale, context.SsaoActive);
+        _uniforms.UploadGlobals(shader, context.Camera, _iblActive, context.IblScale, context.GtaoActive);
 
         _activeShader = shader;
         return shader;
@@ -304,7 +304,7 @@ public class MainRenderer : IDisposable
         _gl.BindTexture(TextureTarget.Texture2D, _ibl.BrdfLut);
     }
     
-    private void BindSsao(uint texture, bool active)
+    private void BindGtao(uint texture, bool active)
     {
         if (active)
         {

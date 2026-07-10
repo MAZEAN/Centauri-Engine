@@ -31,8 +31,8 @@ uniform float uProbeBoxFalloff;
 
 // same screen-space AO the lit pass multiplies its ambient (incl. IBL specular) by. The
 // resolve must apply the SAME attenuation or it over-subtracts skyboxSpec in AO'd areas.
-uniform sampler2D uSsaoMap;
-uniform int       uHasSSAO;
+uniform sampler2D uGtaoMap;
+uniform int       uHasGtao;
 
 uniform sampler2D uPlanarMap;
 uniform int       uHasPlanar;
@@ -147,10 +147,10 @@ void main()
     vec3 targetSpec = mix(fallbackSpec, ssrSpec, conf);
     targetSpec      = applyPlanar(targetSpec, worldPos, N, W, roughness);
 
-    // Match the lit pass's AO attenuation so the delta reconstructs targetSpec*ssao rather than
+    // Match the lit pass's AO attenuation so the delta reconstructs targetSpec*gtao rather than
     // over-subtracting the full skyboxSpec in AO'd areas.
-    float ssao  = uHasSSAO == 1 ? texture(uSsaoMap, vUv).r : 1.0;
-    vec3  delta = (targetSpec - skyboxSpec) * ssao;
+    float gtao  = uHasGtao == 1 ? texture(uGtaoMap, vUv).r : 1.0;
+    vec3  delta = (targetSpec - skyboxSpec) * gtao;
 
     FragColor = vec4(delta, 1.0);
 }

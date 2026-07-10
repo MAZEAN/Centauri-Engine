@@ -104,9 +104,9 @@ uniform int   uHasIBL;
 uniform float uMaxReflectionLod;
 uniform float uIblIntensity;
 
-// SSAO
-uniform sampler2D uSsaoMap;   // unit 9
-uniform int uHasSSAO;
+// GTAO
+uniform sampler2D uGtaoMap;   // unit 9
+uniform int uHasGtao;
 uniform int uFoliage;   // 1 = two-sided foliage: add leaf transmission, skip screen-space AO
 
 // Shadows
@@ -508,7 +508,7 @@ vec3 DirectLighting(vec3 N, vec3 V, vec3 albedo, float roughness, float metallic
     return Lo;
 }
 
-// image-based ambient (split-sum IBL) or a flat fallback, attenuated by AO / SSAO.
+// image-based ambient (split-sum IBL) or a flat fallback, attenuated by AO / GTAO.
 vec3 AmbientLighting(vec3 N, vec3 V, vec3 albedo, float roughness, float metallic, float ao)
 {
     vec3 F0 = mix(vec3(0.04), albedo, metallic);
@@ -529,10 +529,10 @@ vec3 AmbientLighting(vec3 N, vec3 V, vec3 albedo, float roughness, float metalli
         ambient = vec3(0.03) * mix(albedo, F0, metallic) * ao;   // fallback
     }
 
-    if (uHasSSAO == 1 && uFoliage == 0)
+    if (uHasGtao == 1 && uFoliage == 0)
     {
-        vec2 ssaoUv = (fClipPos.xy / fClipPos.w) * 0.5 + 0.5;
-        ambient *= texture(uSsaoMap, ssaoUv).r;
+        vec2 gtaoUv = (fClipPos.xy / fClipPos.w) * 0.5 + 0.5;
+        ambient *= texture(uGtaoMap, gtaoUv).r;
     }
 
     return ambient;

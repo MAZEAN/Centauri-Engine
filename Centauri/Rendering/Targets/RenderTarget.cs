@@ -6,7 +6,7 @@ using Graphics.Resources;
 
 // A reusable single-sample off-screen target: N float color textures plus an optional
 // sampleable depth texture. Unlike HDRFramebuffer (which is multisampled and bespoke for
-// the lit scene), this is what screen-space passes — the geometry prepass, SSAO, SSR —
+// the lit scene), this is what screen-space passes — the geometry prepass, GTAO, SSR —
 // render into and sample from. Recreated on resize.
 public sealed class RenderTarget : IDisposable
 {

@@ -13,7 +13,7 @@ using Culling;
 
 // Depth-only pass for the main forward view, drawn directly into the already-bound HDR
 // framebuffer's own (multisampled) depth attachment before MainRenderer's colored draw.
-// Unlike GeometryPrepass (a separate single-sample G-buffer for SSAO/SSR that only runs when
+// Unlike GeometryPrepass (a separate single-sample G-buffer for GTAO/SSR that only runs when
 // those are active), this always runs, purely so the expensive PBR shader gets hardware
 // early-Z rejection against overlapping/occluded geometry instead of shading every fragment
 // regardless of final visibility. The biggest win is where overdraw is worst: alpha-tested,

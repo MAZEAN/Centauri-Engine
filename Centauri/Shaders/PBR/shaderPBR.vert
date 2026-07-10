@@ -5,7 +5,7 @@ out vec3 fNormal;   // world space normal
 out vec3 fFragPos;  // world space position of this fragment
 out mat3 fTBN;      // tangent space to world space matrix
 out float fViewDepth;
-out vec4 fClipPos;  // clip-space position, for screen-space lookups (SSAO)
+out vec4 fClipPos;  // clip-space position, for screen-space lookups (GTAO)
 out vec3 fInstanceOrigin;  // this instance's world position (iModel[3].xyz) — foliage outward-normal reference
 
 // ─────────────────────────────────────────────────────────────────────────────

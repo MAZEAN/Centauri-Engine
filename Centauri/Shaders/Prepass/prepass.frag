@@ -9,7 +9,7 @@ layout (location = 0) out vec4 gNormal;   // view-space normal, encoded to [0,1]
 layout (location = 1) out vec4 gMaterial;
 
 uniform sampler2D uAlbedo;     // bound only for alpha-tested (foliage) materials
-uniform int       uAlphaTest;  // 1 = discard by albedo alpha so SSAO sees the leaf cutout
+uniform int       uAlphaTest;  // 1 = discard by albedo alpha so GTAO sees the leaf cutout
 
 uniform sampler2D uRoughnessMap;
 uniform sampler2D uMetallicMap;
@@ -23,7 +23,7 @@ uniform float uMetallicValue;
 void main()
 {
     // match the lit pass cutout so the prepass depth/normals follow the actual leaf shape,
-    // not the full quad — otherwise SSAO occludes from the transparent quad regions
+    // not the full quad — otherwise GTAO occludes from the transparent quad regions
     if (uAlphaTest == 1 && texture(uAlbedo, fUv).a < 0.5)
         discard;
 

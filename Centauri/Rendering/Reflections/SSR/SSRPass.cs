@@ -85,7 +85,7 @@ public sealed class SSRPass : IDisposable
         _resolve.SetUniform("uPrefilterMap", 4);
         _resolve.SetUniform("uBrdfLUT",      5);
         _resolve.SetUniform("uProbeMap",     6);
-        _resolve.SetUniform("uSsaoMap",      7);
+        _resolve.SetUniform("uGtaoMap",      7);
         _resolve.SetUniform("uPlanarMap",    8);
     }
     public void Resize(uint width, uint height)
@@ -96,7 +96,7 @@ public sealed class SSRPass : IDisposable
     }
 
     public void Render(uint sceneTex, in GBufferTextures gBuffer, Camera camera,
-        in IblResolveInputs ibl, uint ssaoTex, bool ssaoActive, in PlanarResolveInputs planar)
+        in IblResolveInputs ibl, uint gtaoTex, bool gtaoActive, in PlanarResolveInputs planar)
     {
         var proj = camera.GetProjectionMatrix();
         Matrix4x4.Invert(proj, out var invProj);
@@ -106,7 +106,7 @@ public sealed class SSRPass : IDisposable
 
         RenderMarch(sceneTex, gBuffer, proj, invProj, invView, planar);
         RenderBlur(gBuffer.Material);
-        RenderResolve(gBuffer, invProj, invView, ibl, ssaoTex, ssaoActive, planar);
+        RenderResolve(gBuffer, invProj, invView, ibl, gtaoTex, gtaoActive, planar);
 
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
 
@@ -159,7 +159,7 @@ public sealed class SSRPass : IDisposable
 
     // Blends the blurred SSR hits against the IBL/probe/planar fallbacks into the final reflection term.
     private void RenderResolve(in GBufferTextures gBuffer, Matrix4x4 invProj, Matrix4x4 invView,
-        in IblResolveInputs ibl, uint ssaoTex, bool ssaoActive, in PlanarResolveInputs planar)
+        in IblResolveInputs ibl, uint gtaoTex, bool gtaoActive, in PlanarResolveInputs planar)
     {
         _resolveTarget.Bind();
         _resolveTarget.Clear(0f, 0f, 0f, 0f);
@@ -180,7 +180,7 @@ public sealed class SSRPass : IDisposable
         _resolve.SetUniform("uProbeBoxMax",           ibl.ProbeBoxMax);
         _resolve.SetUniform("uProbeBoxFalloff",       ibl.ProbeBoxFalloff);
 
-        _resolve.SetUniform("uHasSSAO",  ssaoActive ? 1 : 0);
+        _resolve.SetUniform("uHasGtao",  gtaoActive ? 1 : 0);
 
         _resolve.SetUniform("uHasPlanar",        planar.Has ? 1 : 0);
         _resolve.SetUniform("uPlanarHeight",     planar.Height);
@@ -195,7 +195,7 @@ public sealed class SSRPass : IDisposable
         BindCube(TextureUnit.Texture4, ibl.PrefilterMap);
         Bind(TextureUnit.Texture5, ibl.BrdfLut);
         BindCube(TextureUnit.Texture6, ibl.ProbePrefilterMap);
-        Bind(TextureUnit.Texture7, ssaoTex);
+        Bind(TextureUnit.Texture7, gtaoTex);
         Bind(TextureUnit.Texture8, planar.Map);
 
         DrawFullscreen();

@@ -4,15 +4,15 @@ using Config;
 using World;
 using Common;
 
-public sealed class SSAOSection : ISection
+public sealed class GTAOSection : ISection
 {
-    private readonly SSAOConfig _config;
+    private readonly GTAOConfig _config;
 
-    public SSAOSection(SSAOConfig config) => _config = config;
+    public GTAOSection(GTAOConfig config) => _config = config;
 
     public void Draw(Scene scene)
     {
-        using var s = Widgets.Section("SSAO", startCollapsed: true);
+        using var s = Widgets.Section("GTAO", startCollapsed: true);
         if (!s.Open) return;
         
         Widgets.CheckRow("Enabled", _config.Enabled, v => _config.Enabled = v);

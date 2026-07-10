@@ -36,7 +36,7 @@ uniform float uPlanarHeight;
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-// reconstruct view-space position from stored depth (matches ssao.frag / CascadeBuilder)
+// reconstruct view-space position from stored depth (matches gtao.frag / CascadeBuilder)
 vec3 viewPos(vec2 uv)
 {
     float d   = texture(uDepth, uv).r;

@@ -25,7 +25,7 @@ public sealed class ShaderUniformBinder
     }
 
     public void UploadGlobals(GLShader shader, Camera camera, bool iblActive, float iblIntensityScale,
-        bool ssaoActive, bool cheapShading = false)
+        bool gtaoActive, bool cheapShading = false)
     {
         shader.SetUniform("uProjection", camera.GetProjectionMatrix());
         shader.SetUniform("uCheapShading", cheapShading ? 1 : 0);
@@ -34,7 +34,7 @@ public sealed class ShaderUniformBinder
 
         UploadTextureSlots(shader);
         UploadIbl(shader, iblActive, iblIntensityScale);
-        UploadSsao(shader, ssaoActive);
+        UploadGtao(shader, gtaoActive);
         UploadShadow(shader);
     }
 
@@ -57,10 +57,10 @@ public sealed class ShaderUniformBinder
         shader.SetUniform("uIblIntensity", _config.IBL.IblIntensity * iblIntensityScale);
     }
     
-    private static void UploadSsao(GLShader shader, bool ssaoActive)
+    private static void UploadGtao(GLShader shader, bool gtaoActive)
     {
-        shader.SetUniform("uSsaoMap", 9);
-        shader.SetUniform("uHasSSAO", ssaoActive ? 1 : 0);
+        shader.SetUniform("uGtaoMap", 9);
+        shader.SetUniform("uHasGtao", gtaoActive ? 1 : 0);
     }
 
     private void UploadShadow(GLShader shader)

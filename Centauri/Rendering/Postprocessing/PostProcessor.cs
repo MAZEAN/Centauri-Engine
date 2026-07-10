@@ -47,8 +47,8 @@ public readonly record struct CompositeRequest(
     bool SsrAvailable,
     bool TaaAvailable,
     IblResolveInputs Ibl,
-    uint SsaoTexture,
-    bool SsaoActive,
+    uint GtaoTexture,
+    bool GtaoActive,
     PlanarResolveInputs Planar,
     float DeltaTime
 );
@@ -129,7 +129,7 @@ public sealed class PostProcessor : IDisposable
         var ssrActive = request.SsrAvailable && _config.SSR.Enabled;
         if (ssrActive)
             _ssr.Render(sceneColor, request.GBuffer, request.Camera, request.Ibl,
-                request.SsaoTexture, request.SsaoActive, request.Planar);
+                request.GtaoTexture, request.GtaoActive, request.Planar);
 
         return ssrActive;
     }

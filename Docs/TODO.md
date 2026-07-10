@@ -16,7 +16,7 @@
 * [x] Temporal Anti-Aliasing (TAA)
 * [x] Screen Space Reflections (SSR) (with ray tracing or PBR Accumulation)
 * [x] Reflection Probes (maybe "Planar Reflections" for mirrors)
-* [ ] GTAO (Ground-Truth AO)
+* [x] GTAO (Ground-Truth AO)
 * [x] Contact-hardening / PCSS
 * [ ] Raytracing with BVH (only experimental, not real-time)
 * [ ] Physics engine integration (BEPUphysics2)

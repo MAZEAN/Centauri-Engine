@@ -16,7 +16,7 @@ using Targets;
 // adapted texture directly and computes its own exposure multiplier.
 //
 // The luminance value only ever needs the R channel, but RenderTarget always allocates
-// RGBA (see SSAOPass for the same convention) — G/B/A just go unused here.
+// RGBA (see GTAOPass for the same convention) — G/B/A just go unused here.
 public sealed class AutoExposurePass : IDisposable
 {
     private const int MipCount = 12;   // halves 12x — reaches 1x1 well before this at any real resolution

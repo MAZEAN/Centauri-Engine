@@ -18,7 +18,7 @@ using Prepass;
 using Shadows;
 using DebugView;
 using Profiling;
-using SSAO;
+using GTAO;
 using Culling;
 using Reflections.Probes;
 using Reflections.Planar;
@@ -27,7 +27,7 @@ internal sealed class RenderContext
 {
     public FrameStats Stats;
     
-    public bool SsaoActive;
+    public bool GtaoActive;
     public bool SsrActive;
     public bool TaaActive;
 
@@ -52,7 +52,7 @@ public class RenderingSystem : IDisposable
     private UISystem _ui = null!;
     private PostProcessor _post = null!;
     private GeometryPrepass _prepass = null!;
-    private SSAOPass _ssao = null!;
+    private GTAOPass _gtao = null!;
     private PlanarReflectionPass _planar = null!;
     private ZPrepass _zPrepass = null!;
     private CloudPass _clouds = null!;
@@ -99,7 +99,7 @@ public class RenderingSystem : IDisposable
         _post = new PostProcessor(_gl, hdr, _config, (uint)framebufferSize.X, (uint)framebufferSize.Y);
         _ui   = new UISystem(_gl, _config, window, input);
         _prepass = new GeometryPrepass(_gl, _config, (uint)framebufferSize.X, (uint)framebufferSize.Y, _instances);
-        _ssao    = new SSAOPass(_gl, _config.SSAO, (uint)framebufferSize.X, (uint)framebufferSize.Y);
+        _gtao    = new GTAOPass(_gl, _config.GTAO, (uint)framebufferSize.X, (uint)framebufferSize.Y);
         _planar  = new PlanarReflectionPass(_gl, _config.PlanarReflection, _mainRenderer, _skyboxRenderer,
             (uint)framebufferSize.X, (uint)framebufferSize.Y, (uint)_config.Window.Samples);
         _zPrepass = new ZPrepass(_gl, _config, _instances);
@@ -176,8 +176,8 @@ public class RenderingSystem : IDisposable
             SsrAvailable: _context.SsrActive,
             TaaAvailable: _context.TaaActive,
             Ibl:          iblInputs,
-            SsaoTexture:  _ssao.AoTexture,
-            SsaoActive:   _context.SsaoActive,
+            GtaoTexture:  _gtao.AoTexture,
+            GtaoActive:   _context.GtaoActive,
             Planar:       planarInputs,
             DeltaTime:    deltaTime
         );
@@ -264,7 +264,7 @@ public class RenderingSystem : IDisposable
             _gl.DepthMask(false);
         }
         using (_context.Profiler.Measure("Forward"))
-            _mainRenderer.Render(scene, deltaTime, ref _context.Stats, _ssao.AoTexture, _context.SsaoActive, _context.Culling);
+            _mainRenderer.Render(scene, deltaTime, ref _context.Stats, _gtao.AoTexture, _context.GtaoActive, _context.Culling);
         if (zPrepassEnabled)
         {
             _gl.DepthFunc(DepthFunction.Less);
@@ -294,26 +294,26 @@ public class RenderingSystem : IDisposable
         using (_context.Profiler.Measure("Shadows"))
             _shadows.Render(scene, _context.Culling, ref _context.Stats);
 
-        // SSAO (and the Normals/Depth/AO debug views) all need the prepass buffers
-        _context.SsaoActive = _config.SSAO.Enabled || _config.Debug.Shading == ShadingMode.AmbientOcclusion;
+        // GTAO (and the Normals/Depth/AO debug views) all need the prepass buffers
+        _context.GtaoActive = _config.GTAO.Enabled || _config.Debug.Shading == ShadingMode.AmbientOcclusion;
         _context.SsrActive  = _config.SSR.Enabled;
         _context.TaaActive  = _config.TAA.Enabled;
-        var needPrepass = _context.SsaoActive || _context.SsrActive || _context.TaaActive || _config.Debug.Shading != ShadingMode.Shaded;
+        var needPrepass = _context.GtaoActive || _context.SsrActive || _context.TaaActive || _config.Debug.Shading != ShadingMode.Shaded;
         
         if (needPrepass)
             using (_context.Profiler.Measure("Prepass"))
                 _prepass.Render(scene, _context.Culling);
 
-        if (_context.SsaoActive)
-            using (_context.Profiler.Measure("SSAO"))
-                _ssao.Render(_prepass.DepthTexture, _prepass.NormalTexture, scene.Cameras.Active);
+        if (_context.GtaoActive)
+            using (_context.Profiler.Measure("GTAO"))
+                _gtao.Render(_prepass.DepthTexture, _prepass.NormalTexture, scene.Cameras.Active);
     }
 
 
     private void RenderAfterPostComponents(Scene scene, float deltaTime)
     {
         _bufferDebug.Render(_config.Debug.Shading, _prepass.NormalTexture, _prepass.DepthTexture,
-            _ssao.AoTexture, _post.VelocityTexture, _config.Camera.Near, _config.Camera.Far);
+            _gtao.AoTexture, _post.VelocityTexture, _config.Camera.Near, _config.Camera.Far);
         
         _ui.Render(scene, in _context.Stats, _context.Profiler.Results);
     }
@@ -355,7 +355,7 @@ public class RenderingSystem : IDisposable
     {
         _post.Resize(width, height);
         _prepass.Resize(width, height);
-        _ssao.Resize(width, height);
+        _gtao.Resize(width, height);
         _clouds.Resize(width, height);
         _cloudInvViewport = new Vector2(1f / width, 1f / height);
     }
@@ -370,7 +370,7 @@ public class RenderingSystem : IDisposable
         _ui.Dispose();
         _post.Dispose();
         _prepass.Dispose();
-        _ssao.Dispose();
+        _gtao.Dispose();
         _clouds.Dispose();
         _zPrepass.Dispose();
         _bufferDebug.Dispose();

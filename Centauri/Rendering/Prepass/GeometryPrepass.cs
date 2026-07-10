@@ -13,7 +13,7 @@ using Helper;
 using Culling;
 
 // Renders view-space normals + depth + material (roughness/metallic) into single-sample
-// textures before the lit pass. These are the inputs the screen-space effects need: SSAO
+// textures before the lit pass. These are the inputs the screen-space effects need: GTAO
 // reads normals+depth, SSR additionally reads the material buffer to weight reflections.
 public sealed class GeometryPrepass : IDisposable
 {

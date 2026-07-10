@@ -42,7 +42,7 @@ public class PropertiesPanel
                 new SSRSection(config.SSR)
             ]),
             new SectionGroup("Post FX", ColorPalette.Purple, [
-                new SSAOSection(config.SSAO),
+                new GTAOSection(config.GTAO),
                 new TAASection(config.TAA),
                 new BloomSection(config.Bloom),
                 new AutoExposureSection(config.AutoExposure),
