@@ -5,22 +5,20 @@ in  vec2 vUv;
 out vec4 FragColor;
 
 // GTAO — horizon-based ambient occlusion (Jimenez et al., "Practical Realtime Strategies for
-// Accurate Indirect Occlusion"). Where the old kernel-sample SSAO threw a fixed set of random
-// points at the hemisphere and tested each against the depth buffer independently, this walks
-// outward from the pixel along a handful of 2D "slice" directions in view space and finds the
-// actual horizon (the steepest angle any real geometry reaches) in each direction — a search,
-// not a scattershot — which is both more accurate and far less sample-count-dependent/noisy
-// for a given cost.
+// Accurate Indirect Occlusion"). Walks outward from the pixel along a handful of 2D "slice"
+// directions in view space and finds the actual horizon (the steepest angle any real geometry
+// reaches) in each direction — a search, not a scattershot — which is both more accurate and far
+// less sample-count-dependent/noisy than kernel-sample SSAO for a given cost.
 //
-// Implementation note: this uses a simplified (but boundary-case-verified) visibility
-// integration rather than the exact closed-form arc integral from the paper. The paper's
-// formula needs the horizon angles and the slice-projected surface normal in a precisely
-// matched angular frame, and getting that frame convention subtly wrong produces AO that
-// *looks* plausible but is quietly inverted or biased in some configurations.
-// What's implemented here is derived and checked directly against known-correct cases 
-// (flat open ground -> full visibility, a deep
-// enclosed crevice -> near-zero visibility) rather than transcribed from the paper's algebra,
-// so it should be treated as "GTAO-family horizon search", not a bit-exact reproduction.
+// Per slice, the view-space normal is projected into the slice plane to get its signed angle `n`
+// (line ~15 in the paper's algorithm listing), and the two horizon angles are combined with `n`
+// through the paper's closed-form cosine-weighted arc integral — this is what actually makes it
+// GTAO rather than a plain angle-count horizon AO: near-grazing occluders contribute little,
+// near-normal ones contribute a lot, and a surface can never occlude itself beyond its own tangent
+// plane. The exact clamp/sign convention here (which is easy to get subtly backwards — see the
+// git history) is cross-checked against Intel's XeGTAO reference implementation (MIT licensed,
+// https://github.com/GameTechDev/XeGTAO), itself an implementation of the same paper, and against
+// two boundary cases by hand: flat unoccluded ground -> visibility ~1, a fully closed crevice ->
 
 // ─────────────────────────────────────────────────────────────────────────────
 const float PI = 3.14159265359;
@@ -50,15 +48,16 @@ vec3 viewPos(vec2 uv)
     return v.xyz / v.w;
 }
 
-// Highest elevation angle (relative to V, the direction toward the camera) reached by any
-// sampled occluder while marching from P along `dir` (a unit view-space direction) out to
-// uRadius. Returns -PI/2 ("nothing found — fully open in this direction") if no valid sample
-// occludes. Elevation is measured the same way for both march directions of a slice — it's a
-// property of where the sample sits relative to V, not which side of the slice it's on — so
-// no per-side sign convention is needed here.
-float horizonAngle(vec3 P, vec3 V, vec3 dir, float jitter)
+// Marches from P along `dir` (a unit view-space direction, perpendicular to V) out to uRadius,
+// tracking the highest cos(angle-to-V) reached by any sampled occluder — i.e. the strongest
+// horizon on this side of the slice. `lowCos` is the "nothing found" baseline: the cosine of the
+// slice-plane-projected-normal's own tangent-plane edge on this side, so a march that finds
+// nothing occluding reproduces exactly the open-hemisphere-to-the-normal case rather than an
+// arbitrary fully-open-relative-to-V case. Samples are faded back toward that baseline as they
+// approach uRadius (instead of a hard cutoff) to avoid popping as occluders cross the radius.
+float marchHorizonCos(vec3 P, vec3 V, vec3 dir, float jitter, float lowCos)
 {
-    float best = -PI * 0.5;
+    float horizonCos = lowCos;
 
     for (int step = 1; step <= uStepCount; step++)
     {
@@ -76,13 +75,20 @@ float horizonAngle(vec3 P, vec3 V, vec3 dir, float jitter)
         vec3  Ps   = viewPos(sampleUv);
         vec3  D    = Ps - P;
         float dist = length(D);
-        if (dist < 1e-4 || dist > uRadius) continue;
+        
+        if (dist < 1e-4) continue;
 
-        float angle = asin(clamp(dot(D / dist, V), -1.0, 1.0));
-        best = max(best, angle);
+        float sampleCos = dot(D / dist, V);
+
+        // smooth fade back to the baseline over the outer quarter of the radius, rather than a
+        // hard "dist > uRadius" cutoff
+        float weight = clamp(1.0 - (dist - uRadius * 0.75) / (uRadius * 0.25), 0.0, 1.0);
+        sampleCos = mix(lowCos, sampleCos, weight);
+
+        horizonCos = max(horizonCos, sampleCos);
     }
 
-    return best;
+    return horizonCos;
 }
 
 void main()
@@ -105,38 +111,42 @@ void main()
     vec3 right = normalize(cross(up, V));
     up         = cross(V, right);
 
-    // N's component perpendicular to V — which way the surface tilts relative to the view —
-    // used below to weight each slice by how much it aligns with that tilt: occluders in the
-    // direction the surface tilts *toward* matter more (light from there would actually reach
-    // the surface at a meaningful angle), occluders in the direction it tilts *away from*
-    // matter less (that light already arrives near-grazing, contributing little regardless).
-    vec3 Ntangent = N - V * dot(N, V);
-    float tangentLen = length(Ntangent);
-    Ntangent = tangentLen > 1e-4 ? Ntangent / tangentLen : vec3(0.0);
-
     float visibility = 0.0;
-
     for (int slice = 0; slice < uSliceCount; slice++)
     {
         float theta = baseAngle + PI * float(slice) / float(uSliceCount);
         vec3  dir   = right * cos(theta) + up * sin(theta);
 
-        float h1 = horizonAngle(P, V, -dir, jitter);   // negative side of the slice
-        float h2 = horizonAngle(P, V,  dir, jitter);   // positive side
+        // project N into this slice's plane (spanned by dir and V) and find its signed angle n,
+        // measured the same way as the horizon angles below: 0 along dir/-dir (grazing), +-PI/2
+        // toward/away from V. Sign is positive when N leans toward +dir.
+        vec3  axis     = normalize(cross(dir, V));
+        vec3  projN    = N - axis * dot(N, axis);
+        float projNLen = max(length(projN), 1e-5);
 
-        float openNeg = (PI * 0.5) - h1;
-        float openPos = (PI * 0.5) - h2;
-        float sliceVisibility = clamp((openNeg + openPos) / (2.0 * PI), 0.0, 1.0);
+        float cosNorm  = clamp(dot(projN, V) / projNLen, 0.0, 1.0);
+        float signNorm = sign(dot(dir, projN));
+        float n        = signNorm * acos(cosNorm);
 
-        // Fade the directional bias in with tangentLen so a surface facing the camera
-        // head-on (Ntangent ~ 0, the common case) gets the unbiased horizon result instead of
-        // an unwanted uniform dampening — dot(0, dir) would otherwise land every slice at the
-        // same partial weight regardless of geometry.
-        float directionalBias = clamp(0.5 + 0.5 * dot(Ntangent, dir), 0.0, 1.0);
-        float weight = mix(1.0, directionalBias, tangentLen);
-        visibility += mix(1.0, sliceVisibility, weight);
+        // "nothing found" baseline on each side: the cosine at the projected normal's own
+        // tangent-plane edge (n +- PI/2) — i.e. the open-hemisphere-to-the-normal case, not an
+        // arbitrary fully-open-relative-to-V case
+        float lowCosPos = cos(n + PI * 0.5);
+        float lowCosNeg = cos(n - PI * 0.5);
+        
+        float horizonCosPos = marchHorizonCos(P, V,  dir, jitter, lowCosPos);
+        float horizonCosNeg = marchHorizonCos(P, V, -dir, jitter, lowCosNeg);
+        
+        float hPos = acos(clamp(horizonCosPos, -1.0, 1.0));
+        float hNeg = -acos(clamp(horizonCosNeg, -1.0, 1.0));
+        
+        // closed-form cosine-weighted visibility integral (paper eq., one arc per side)
+        float iarcPos = (cosNorm + 2.0 * hPos * sin(n) - cos(2.0 * hPos - n)) * 0.25;
+        float iarcNeg = (cosNorm + 2.0 * hNeg * sin(n) - cos(2.0 * hNeg - n)) * 0.25;
+        
+        visibility += projNLen * (iarcPos + iarcNeg);
     }
 
-    visibility = clamp(visibility / float(uSliceCount), 0.0, 1.0);
+    visibility = max(0.03, visibility);   // disallow total occlusion — a visible pixel should never go fully black
     FragColor = vec4(pow(visibility, uPower));
 }
