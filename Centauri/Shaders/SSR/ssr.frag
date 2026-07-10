@@ -76,6 +76,7 @@ bool onPlanarReflector(vec3 P, vec3 N)
     vec3  wN    = normalize(mat3(uInvView) * N);
     float hMask = 1.0 - smoothstep(0.15, 0.35, abs(wPos.y - uPlanarHeight));
     float fMask = smoothstep(0.7, 0.95, wN.y);
+    
     return hMask * fMask > 0.5;
 }
 
@@ -169,7 +170,7 @@ float reflectionConfidence(vec2 hitUv, vec3 P, vec3 N, vec3 V, vec3 R, float rou
     // resolve pass's Fresnel term (correctly, physically) amplifies whatever SSR found, making a
     // bad self-intersecting hit stand out even more. Fade it out before it reaches that point.
     float NoV       = max(dot(N, -V), 0.0);
-    float grazeFade = smoothstep(0.0, 0.08, NoV);
+    float grazeFade = smoothstep(0.0, 0.2, NoV);
 
     return edgeFade * roughFade * distFade * silFade * backFade * grazeFade;
 }

@@ -33,5 +33,8 @@ public sealed class SSRSection : ISection
             0.01f, 0f, 1f, "%.2f", _config.AuthoredRoughnessCutoff);
         Widgets.DragRow("Silhouette Threshold", _config.SilhouetteThreshold, v => _config.SilhouetteThreshold = v,
             0.01f, 0.01f, 1f, "%.2f", _config.AuthoredSilhouetteThreshold);
+        Widgets.DragRow("Temporal Feedback", _config.TemporalFeedback,
+            v => _config.TemporalFeedback = Math.Clamp(v, 0f, 0.98f),
+            0.01f, 0f, 0.98f, "%.2f", _config.AuthoredTemporalFeedback);
     }
 }
