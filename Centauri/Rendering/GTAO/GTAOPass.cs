@@ -16,7 +16,7 @@ using Targets;
 // a single AO factor the lit pass multiplies into the ambient/IBL term.
 public sealed class GTAOPass : IDisposable
 {
-    private const int  NoiseDim    = 4;
+    private const int  NoiseDim   = 4;
     private const uint ResDivisor = 2;   // half-res
 
     private readonly GL _gl;
@@ -124,6 +124,7 @@ public sealed class GTAOPass : IDisposable
         
         Bind(TextureUnit.Texture0, _aoTarget.ColorTextures[0]);
         Bind(TextureUnit.Texture1, depthTex);
+        DrawFullscreen(); 
 
         // ── temporal accumulation ──
         var write = _history[_write];
