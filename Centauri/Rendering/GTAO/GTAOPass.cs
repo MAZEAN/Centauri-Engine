@@ -152,8 +152,9 @@ public sealed class GTAOPass : IDisposable
         _temporal.SetUniform("uCurrent", 0);
         _temporal.SetUniform("uHistory", 1);
         _temporal.SetUniform("uDepth",   2);
-        _temporal.SetUniform("uInvViewProj",  invViewProj);
-        _temporal.SetUniform("uPrevViewProj", _prevViewProj);
+        _temporal.SetUniform("uInvProjection", invProj);
+        _temporal.SetUniform("uInvViewProj",   invViewProj);
+        _temporal.SetUniform("uPrevViewProj",  _prevViewProj);
         _temporal.SetUniform("uFeedback", _hasHistory ? _config.TemporalFeedback : 0f);
 
         Bind(TextureUnit.Texture0, _blurTarget.ColorTextures[0]);

@@ -19,6 +19,7 @@ out vec4 FragColor;
 // git history) is cross-checked against Intel's XeGTAO reference implementation (MIT licensed,
 // https://github.com/GameTechDev/XeGTAO), itself an implementation of the same paper, and against
 // two boundary cases by hand: flat unoccluded ground -> visibility ~1, a fully closed crevice ->
+// visibility ~0.
 
 // ─────────────────────────────────────────────────────────────────────────────
 const float PI = 3.14159265359;
@@ -47,7 +48,7 @@ vec3 viewPos(vec2 uv)
     float d   = texture(uDepth, uv).r;
     vec4  ndc = vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
     vec4  v   = uInvProjection * ndc;
-    
+
     return v.xyz / v.w;
 }
 
@@ -78,7 +79,6 @@ float marchHorizonCos(vec3 P, vec3 V, vec3 dir, float jitter, float lowCos)
         vec3  Ps   = viewPos(sampleUv);
         vec3  D    = Ps - P;
         float dist = length(D);
-
         if (dist < uRadius * 0.01) continue;   // too close to be a meaningful occluder, not just precision noise
 
         float sampleCos = dot(D / dist, V);
@@ -96,9 +96,9 @@ float marchHorizonCos(vec3 P, vec3 V, vec3 dir, float jitter, float lowCos)
 
 void main()
 {
-    if (texture(uDepth, vUv).r >= 1.0) { 
+    if (texture(uDepth, vUv).r >= 1.0) {
         FragColor = vec4(1.0);
-        return; 
+        return;
     }   // background = lit
 
     vec3 P = viewPos(vUv);
@@ -118,6 +118,7 @@ void main()
     up         = cross(V, right);
 
     float visibility = 0.0;
+
     for (int slice = 0; slice < uSliceCount; slice++)
     {
         float theta = baseAngle + PI * float(slice) / float(uSliceCount);
@@ -139,13 +140,13 @@ void main()
         // arbitrary fully-open-relative-to-V case
         float lowCosPos = cos(n + PI * 0.5);
         float lowCosNeg = cos(n - PI * 0.5);
-        
+
         float horizonCosPos = marchHorizonCos(P, V,  dir, jitter, lowCosPos);
         float horizonCosNeg = marchHorizonCos(P, V, -dir, jitter, lowCosNeg);
-        
+
         float hPos = acos(clamp(horizonCosPos, -1.0, 1.0));
         float hNeg = -acos(clamp(horizonCosNeg, -1.0, 1.0));
-        
+
         // closed-form cosine-weighted visibility integral (paper eq., one arc per side)
         float iarcPos = (cosNorm + 2.0 * hPos * sin(n) - cos(2.0 * hPos - n)) * 0.25;
         float iarcNeg = (cosNorm + 2.0 * hNeg * sin(n) - cos(2.0 * hNeg - n)) * 0.25;
@@ -157,6 +158,7 @@ void main()
         visibility += sliceWeight * (iarcPos + iarcNeg);
     }
 
+    visibility = clamp(visibility / float(uSliceCount), 0.0, 1.0);
     visibility = max(0.03, visibility);   // disallow total occlusion — a visible pixel should never go fully black
     FragColor = vec4(pow(visibility, uPower));
 }
