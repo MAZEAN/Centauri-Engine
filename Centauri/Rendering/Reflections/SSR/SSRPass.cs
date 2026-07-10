@@ -28,9 +28,9 @@ public sealed class SSRPass : IDisposable
 
     private readonly GL _gl;
     private readonly SSRConfig _config;
-    
+
     private readonly uint _resDivisor;
-    
+
     private readonly GLShader _shader;
     private readonly GLShader _blur;
     private readonly GLShader _temporal;
@@ -41,7 +41,7 @@ public sealed class SSRPass : IDisposable
     private readonly RenderTarget _blurTarget;
     private readonly RenderTarget[] _history = new RenderTarget[2];   // each: [0]=color+confidence, [1]=view-Z
     private readonly RenderTarget _resolveTarget;
-    
+
     private int  _write;
     private int  _output;
     private bool _hasHistory;
@@ -57,14 +57,14 @@ public sealed class SSRPass : IDisposable
     private float _lastSilhouetteThreshold;
 
     public uint ReflectionTexture => _resolveTarget.ColorTextures[0];
-    
+
     public SSRPass(GL gl, SSRConfig config, uint width, uint height)
     {
         _gl = gl;
         _config = config;
-        
+
         _resDivisor = config.HalfResolution ? 2u : 1u;
-        
+
         _shader = new GLShader(gl,
             PathResolver.Resolve("Shaders/Post/post.vert"),
             PathResolver.Resolve("Shaders/SSR/ssr.frag"));
@@ -77,7 +77,7 @@ public sealed class SSRPass : IDisposable
         _resolve = new GLShader(gl,
             PathResolver.Resolve("Shaders/Post/post.vert"),
             PathResolver.Resolve("Shaders/SSR/ssr_resolve.frag"));
-        
+
         _target = new RenderTarget(gl, width / _resDivisor, height / _resDivisor,
             [InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Linear);
         _blurTarget = new RenderTarget(gl, width / _resDivisor, height / _resDivisor,
@@ -88,12 +88,12 @@ public sealed class SSRPass : IDisposable
             [InternalFormat.Rgba16f, InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Linear);
         _resolveTarget = new RenderTarget(gl, width / _resDivisor, height / _resDivisor,
             [InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Linear);
-        
+
         _vao = gl.GenVertexArray();
 
         BindConstantTextureSlots();
     }
-    
+
     private void BindConstantTextureSlots()
     {
         _shader.Use();
@@ -105,7 +105,7 @@ public sealed class SSRPass : IDisposable
         _blur.Use();
         _blur.SetUniform("uSsr",      0);
         _blur.SetUniform("uMaterial", 1);
-        
+
         _temporal.Use();
         _temporal.SetUniform("uCurrent",   0);
         _temporal.SetUniform("uHistory",   1);
@@ -139,7 +139,7 @@ public sealed class SSRPass : IDisposable
         var proj = camera.GetProjectionMatrix();
         Matrix4x4.Invert(proj, out var invProj);
         Matrix4x4.Invert(camera.GetViewMatrix(), out var invView);
-        
+
         var viewProj = camera.GetViewMatrix() * proj;
         Matrix4x4.Invert(viewProj, out var invViewProj);
 
@@ -172,6 +172,11 @@ public sealed class SSRPass : IDisposable
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
 
         ResetRenderState();
+
+        _output       = _write;
+        _write       ^= 1;
+        _prevViewProj = viewProj;
+        _hasHistory   = true;
     }
 
     // Ray-marches the depth buffer and samples the resolved scene to find each pixel's reflection hit.
@@ -217,7 +222,7 @@ public sealed class SSRPass : IDisposable
 
         DrawFullscreen();
     }
-    
+
     // Reprojects and blends the previous frame's resolved (color, confidence) using a stored
     // view-space Z to reject history that doesn't belong to the same surface (silhouette bleed,
     // disocclusion) — see ssr_temporal.frag.
@@ -289,13 +294,13 @@ public sealed class SSRPass : IDisposable
         _gl.ActiveTexture(unit);
         _gl.BindTexture(TextureTarget.Texture2D, tex);
     }
-    
+
     private void BindCube(TextureUnit unit, uint tex)
     {
         _gl.ActiveTexture(unit);
         _gl.BindTexture(TextureTarget.TextureCubeMap, tex);
     }
-    
+
     private void DrawFullscreen()
     {
         _gl.BindVertexArray(_vao);
@@ -321,9 +326,9 @@ public sealed class SSRPass : IDisposable
         _resolve.Dispose();
         _target.Dispose();
         _blurTarget.Dispose();
-        _resolveTarget.Dispose();
         _history[0].Dispose();
         _history[1].Dispose();
+        _resolveTarget.Dispose();
         _gl.DeleteVertexArray(_vao);
     }
 }
