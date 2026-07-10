@@ -27,5 +27,8 @@ public sealed class GTAOSection : ISection
         Widgets.DragRow("Steps per slice", _config.StepCount,
             v => _config.StepCount = Math.Clamp((int)MathF.Round(v), 1, 16),
             1f, 1f, 16f, "%.0f", _config.AuthoredStepCount);
+        Widgets.DragRow("Temporal feedback", _config.TemporalFeedback,
+            v => _config.TemporalFeedback = Math.Clamp(v, 0f, 0.98f),
+            0.01f, 0f, 0.98f, "%.2f", _config.AuthoredTemporalFeedback);
     }
 }

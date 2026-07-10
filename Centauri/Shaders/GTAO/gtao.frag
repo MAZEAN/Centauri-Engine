@@ -34,6 +34,9 @@ uniform float uRadius;
 uniform int   uSliceCount;
 uniform int   uStepCount;
 uniform float uPower;
+uniform int   uFrameIndex;   // rotates the per-pixel noise each frame so temporal accumulation
+// (see gtao_temporal.frag) gains angular/step coverage over time
+// instead of repeating the same fixed noise tile every frame
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -75,8 +78,8 @@ float marchHorizonCos(vec3 P, vec3 V, vec3 dir, float jitter, float lowCos)
         vec3  Ps   = viewPos(sampleUv);
         vec3  D    = Ps - P;
         float dist = length(D);
-        
-        if (dist < 1e-4) continue;
+
+        if (dist < uRadius * 0.01) continue;   // too close to be a meaningful occluder, not just precision noise
 
         float sampleCos = dot(D / dist, V);
 
@@ -103,8 +106,11 @@ void main()
     vec3 V = normalize(-P);
 
     vec3  rnd       = texture(uNoise, gl_FragCoord.xy / float(textureSize(uNoise, 0).x)).xyz;
-    float baseAngle = atan(rnd.y, rnd.x);
-    float jitter    = rnd.z;
+    // golden-angle rotation per frame: an irrational increment so the sampled slice
+    // orientations/step offsets never repeat over any short cycle of frames
+    float frameRot  = float(uFrameIndex) * 2.39996323;
+    float baseAngle = atan(rnd.y, rnd.x) + frameRot;
+    float jitter    = fract(rnd.z + float(uFrameIndex) * 0.6180339887);
 
     // orthonormal basis perpendicular to V, used to build each slice's marching direction
     vec3 up    = abs(V.y) < 0.999 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
@@ -143,8 +149,12 @@ void main()
         // closed-form cosine-weighted visibility integral (paper eq., one arc per side)
         float iarcPos = (cosNorm + 2.0 * hPos * sin(n) - cos(2.0 * hPos - n)) * 0.25;
         float iarcNeg = (cosNorm + 2.0 * hNeg * sin(n) - cos(2.0 * hNeg - n)) * 0.25;
-        
-        visibility += projNLen * (iarcPos + iarcNeg);
+
+        // nudge the multiplier toward 1 on near-perpendicular slices (projNLen -> 0): otherwise
+        // high-slope surfaces lose almost all contribution from slices that happen to catch the
+        // normal edge-on, producing visible overdarkening banding across the slope
+        float sliceWeight = mix(projNLen, 1.0, 0.05);
+        visibility += sliceWeight * (iarcPos + iarcNeg);
     }
 
     visibility = max(0.03, visibility);   // disallow total occlusion — a visible pixel should never go fully black

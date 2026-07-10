@@ -88,10 +88,10 @@
   },
   "gtao": {
     "enabled": true,
-    "radius": 1.5,
-    "power": 1.5,
-    "sliceCount": 2,
-    "stepCount": 4
+    "radius": 1.2,
+    "power": 1.2,
+    "sliceCount": 3,
+    "stepCount": 8
   },
   "bloom": {
     "enabled": true,
