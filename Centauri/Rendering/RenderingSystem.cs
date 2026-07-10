@@ -52,7 +52,7 @@ public class RenderingSystem : IDisposable
     private UISystem _ui = null!;
     private PostProcessor _post = null!;
     private GeometryPrepass _prepass = null!;
-    private SsaoPass _ssao = null!;
+    private SSAOPass _ssao = null!;
     private PlanarReflectionPass _planar = null!;
     private ZPrepass _zPrepass = null!;
     private CloudPass _clouds = null!;
@@ -99,7 +99,7 @@ public class RenderingSystem : IDisposable
         _post = new PostProcessor(_gl, hdr, _config, (uint)framebufferSize.X, (uint)framebufferSize.Y);
         _ui   = new UISystem(_gl, _config, window, input);
         _prepass = new GeometryPrepass(_gl, _config, (uint)framebufferSize.X, (uint)framebufferSize.Y, _instances);
-        _ssao    = new SsaoPass(_gl, _config.SSAO, (uint)framebufferSize.X, (uint)framebufferSize.Y);
+        _ssao    = new SSAOPass(_gl, _config.SSAO, (uint)framebufferSize.X, (uint)framebufferSize.Y);
         _planar  = new PlanarReflectionPass(_gl, _config.PlanarReflection, _mainRenderer, _skyboxRenderer,
             (uint)framebufferSize.X, (uint)framebufferSize.Y, (uint)_config.Window.Samples);
         _zPrepass = new ZPrepass(_gl, _config, _instances);

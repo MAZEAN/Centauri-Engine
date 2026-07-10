@@ -19,13 +19,13 @@ public sealed class SSAOSection : ISection
 
         Widgets.DragRow("Radius", _config.Radius, v => _config.Radius = v,
             0.01f, 0.05f, 5f, "%.2f", _config.AuthoredRadius);
-        Widgets.DragRow("Bias",   _config.Bias,   v => _config.Bias   = v,
-            0.001f, 0f, 0.2f, "%.3f", _config.AuthoredBias);
         Widgets.DragRow("Power",  _config.Power,  v => _config.Power  = v,
             0.05f, 0.1f, 8f, "%.2f", _config.AuthoredPower);
-
-        Widgets.DragRow("Samples", _config.SampleCount,
-            v => _config.SampleCount = Math.Clamp((int)MathF.Round(v), 1, 64),
-            1f, 1f, 64f, "%.0f", _config.AuthoredSampleCount);
+        Widgets.DragRow("Slices", _config.SliceCount,
+            v => _config.SliceCount = Math.Clamp((int)MathF.Round(v), 1, 8),
+            1f, 1f, 8f, "%.0f", _config.AuthoredSliceCount);
+        Widgets.DragRow("Steps per slice", _config.StepCount,
+            v => _config.StepCount = Math.Clamp((int)MathF.Round(v), 1, 16),
+            1f, 1f, 16f, "%.0f", _config.AuthoredStepCount);
     }
 }

@@ -89,9 +89,9 @@
   "ssao": {
     "enabled": true,
     "radius": 1.5,
-    "bias": 0.025,
     "power": 1.5,
-    "sampleCount": 24
+    "sliceCount": 2,
+    "stepCount": 4
   },
   "bloom": {
     "enabled": true,

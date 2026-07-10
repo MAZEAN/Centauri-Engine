@@ -1,7 +1,6 @@
 namespace Centauri.Rendering.SSAO;
 
 using Silk.NET.OpenGL;
-using System.Linq;
 using System.Numerics;
 
 using Config;
@@ -10,14 +9,17 @@ using Graphics.Resources;
 using Utils.Misc;
 using Targets;
 
-// Screen-space ambient occlusion: hemisphere-kernel sampling against the prepass depth +
-// view-space normals, then a 4x4 box blur to remove the noise pattern. Produces a single
-// AO factor the lit pass multiplies into the ambient/IBL term. Kernel is generated once;
-// the per-pixel rotation comes from a tiled 4x4 noise texture.
-public sealed class SsaoPass : IDisposable
+// GTAO: multi-slice horizon search against the prepass depth + view-space normals, then a 4x4
+// box blur to remove the noise pattern — see ssao.frag for the algorithm itself. Produces a
+// single AO factor the lit pass multiplies into the ambient/IBL term. Class/file/config names
+// stayed "SSAO" (the section key in config.json, the AppConfig property, everything downstream
+// that binds AoTexture) since from the rest of the engine's perspective it's the same
+// abstraction — an AO texture derived from depth+normal — only the technique producing it
+// changed, the same way TAA replaced MSAA under RenderConfig without a rename cascading
+// through every consumer.
+public sealed class SSAOPass : IDisposable
 {
-    private const int MaxKernel = 64;
-    private const int NoiseDim  = 4;
+    private const int NoiseDim    = 4;
     private const uint ResDivisor = 2;   // half-res
 
     private readonly GL _gl;
@@ -27,16 +29,13 @@ public sealed class SsaoPass : IDisposable
     private readonly GLShader _blur;
     private readonly uint _vao;     // empty VAO for attribute-less fullscreen draws
     private readonly uint _noise;
-    
-    private readonly Vector3[] _kernel = new Vector3[MaxKernel];
-    private readonly int[] _kernelLocations = new int[MaxKernel];
 
     private readonly RenderTarget _aoTarget;
     private readonly RenderTarget _blurTarget;
 
     public uint AoTexture => _blurTarget.ColorTextures[0];
 
-    public SsaoPass(GL gl, SSAOConfig config, uint width, uint height)
+    public SSAOPass(GL gl, SSAOConfig config, uint width, uint height)
     {
         _gl = gl;
         _config = config;
@@ -54,11 +53,6 @@ public sealed class SsaoPass : IDisposable
 
         _vao   = gl.GenVertexArray();
         _noise = CreateNoise();
-        
-        BuildKernel();
-        
-        for (var i = 0; i < MaxKernel; i++)
-            _kernelLocations[i] = _ssao.GetLocation($"uKernel[{i}]");
     }
 
     public void Resize(uint width, uint height)
@@ -81,12 +75,10 @@ public sealed class SsaoPass : IDisposable
         _ssao.Use();
         _ssao.SetUniform("uProjection",    proj);
         _ssao.SetUniform("uInvProjection", invProj);
-        _ssao.SetUniform("uKernelSize", Math.Clamp(_config.SampleCount, 1, MaxKernel));
-        _ssao.SetUniform("uRadius", _config.Radius);
-        _ssao.SetUniform("uBias",   _config.Bias);
-        _ssao.SetUniform("uPower",  _config.Power);
-        for (var i = 0; i < MaxKernel; i++)
-            _ssao.SetUniform(_kernelLocations[i], _kernel[i]);
+        _ssao.SetUniform("uRadius",     _config.Radius);
+        _ssao.SetUniform("uSliceCount", Math.Max(1, _config.SliceCount));
+        _ssao.SetUniform("uStepCount",  Math.Max(1, _config.StepCount));
+        _ssao.SetUniform("uPower",      _config.Power);
 
         _ssao.SetUniform("uDepth",  0);
         _ssao.SetUniform("uNormal", 1);
@@ -122,25 +114,11 @@ public sealed class SsaoPass : IDisposable
         _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
         _gl.BindVertexArray(0);
     }
-
-    private void BuildKernel()
-    {
-        var rng = new Random(1);
-        for (var i = 0; i < MaxKernel; i++)
-        {
-            var dir = Vector3.Normalize(new Vector3(
-                (float)(rng.NextDouble() * 2.0 - 1.0),
-                (float)(rng.NextDouble() * 2.0 - 1.0),
-                (float)rng.NextDouble()))             // +Z hemisphere (tangent space)
-                * (float)rng.NextDouble();
-
-            // cluster samples toward the origin so near occluders weigh more
-            var t     = i / (float)MaxKernel;
-            var scale = 0.1f + 0.9f * t * t;
-            _kernel[i] = dir * scale;
-        }
-    }
-
+    
+    // xy = per-pixel base rotation vector for the slice directions; z = a [0,1) jitter offset
+    // for the horizon march's step positions — both exist purely to break up the banding a
+    // fixed slice count/step spacing would otherwise show, diffused into a blur-able noise
+    // pattern the same way the old kernel-sample SSAO's rotation noise did.
     private unsafe uint CreateNoise()
     {
         var rng  = new Random(2);
@@ -149,7 +127,7 @@ public sealed class SsaoPass : IDisposable
         {
             data[i * 3 + 0] = (float)(rng.NextDouble() * 2.0 - 1.0);
             data[i * 3 + 1] = (float)(rng.NextDouble() * 2.0 - 1.0);
-            data[i * 3 + 2] = 0f;   // rotation about the normal only
+            data[i * 3 + 2] = (float)rng.NextDouble();
         }
 
         var tex = _gl.GenTexture();
