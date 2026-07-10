@@ -57,6 +57,7 @@
     {
       "name":     "Sphere5",
       "model":    "Sphere",
+      "material": "Onyx",
       "position": [0, 5, 0]
     },
     {

@@ -71,13 +71,13 @@ public sealed class EntityInspectorSection : ISection
             var index = i;   // capture for the edit closures
 
             ImGui.PushID(i);
-            if (e.Materials.Count > 1) 
-                ImGui.TextDisabled($"{mat.Name}");
-
+            
+            ImGui.TextDisabled($"{mat.Name}");
             Widgets.ColorRow4("Base Color", mat.Color, v => EditMaterial(e, scene, index, m => m.Color = v));
             Widgets.SliderRow("Roughness", mat.RoughnessScalar, v => EditMaterial(e, scene, index, m => m.RoughnessScalar = v), 0f, 1f, 0.5f);
             Widgets.SliderRow("Metallic",  mat.MetallicScalar,  v => EditMaterial(e, scene, index, m => m.MetallicScalar  = v), 0f, 1f, 0.1f);
             Widgets.SliderRow("Translucency", mat.Translucency, v => EditMaterial(e, scene, index, m => m.Translucency = v), 0f, 1f, 0f);
+            
             ImGui.PopID();
         }
     }
