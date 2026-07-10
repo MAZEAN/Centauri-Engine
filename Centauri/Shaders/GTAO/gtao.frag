@@ -16,9 +16,9 @@ out vec4 FragColor;
 // integration rather than the exact closed-form arc integral from the paper. The paper's
 // formula needs the horizon angles and the slice-projected surface normal in a precisely
 // matched angular frame, and getting that frame convention subtly wrong produces AO that
-// *looks* plausible but is quietly inverted or biased in some configurations — not something
-// that can be caught without a GPU to render it on. What's implemented here is derived and
-// checked directly against known-correct cases (flat open ground -> full visibility, a deep
+// *looks* plausible but is quietly inverted or biased in some configurations.
+// What's implemented here is derived and checked directly against known-correct cases 
+// (flat open ground -> full visibility, a deep
 // enclosed crevice -> near-zero visibility) rather than transcribed from the paper's algebra,
 // so it should be treated as "GTAO-family horizon search", not a bit-exact reproduction.
 

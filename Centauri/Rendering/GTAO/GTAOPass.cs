@@ -9,13 +9,13 @@ using Graphics.Resources;
 using Utils.Misc;
 using Targets;
 
-// GTAO: multi-slice horizon search against the prepass depth + view-space normals, then a 4x4
-// box blur to remove the noise pattern — see gtao.frag for the algorithm itself. Produces a
-// single AO factor the lit pass multiplies into the ambient/IBL term. Replaces the previous
+// GTAO: multi-slice horizon search against the prepass depth + view-space normals, then a
+// depth-aware 4x4 box blur to remove the noise pattern — see gtao.frag for the algorithm itself.
+// Produces a single AO factor the lit pass multiplies into the ambient/IBL term. Replaces the previous
 // hemisphere-kernel SSAO pass entirely (renamed throughout, not left coexisting).
 public sealed class GTAOPass : IDisposable
 {
-    private const int NoiseDim    = 4;
+    private const int  NoiseDim    = 4;
     private const uint ResDivisor = 2;   // half-res
 
     private readonly GL _gl;
@@ -90,8 +90,11 @@ public sealed class GTAOPass : IDisposable
         
         _blur.Use();
         _blur.SetUniform("uGtao", 0);
+        _blur.SetUniform("uDepth", 1);
+        _blur.SetUniform("uInvProjection", invProj);
         
         Bind(TextureUnit.Texture0, _aoTarget.ColorTextures[0]);
+        Bind(TextureUnit.Texture1, depthTex);
         DrawFullscreen();
 
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
