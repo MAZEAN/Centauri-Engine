@@ -100,7 +100,10 @@ public sealed class PostProcessor : IDisposable
     }
 
     public void BeginScene() => _hdr.Bind();
-    
+    // See HDRFramebuffer.TryBorrowDepth/ReleaseDepth — lets Forward reuse GeometryPrepass's
+    // depth for early-Z instead of RenderingSystem running a second depth-only pass.
+    public bool TryBorrowPrepassDepth(uint depthTexture) => _hdr.TryBorrowDepth(depthTexture);
+    public void ReleasePrepassDepth() => _hdr.ReleaseDepth();
     public Vector2 NextTaaJitter() => _taa.NextJitter(_width, _height);
     public uint VelocityTexture => _taa.VelocityTexture;   // TAA motion vectors, for the debug view
 

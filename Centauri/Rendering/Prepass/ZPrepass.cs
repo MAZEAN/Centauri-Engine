@@ -12,13 +12,17 @@ using Helper;
 using Culling;
 
 // Depth-only pass for the main forward view, drawn directly into the already-bound HDR
-// framebuffer's own (multisampled) depth attachment before MainRenderer's colored draw.
-// Unlike GeometryPrepass (a separate single-sample G-buffer for GTAO/SSR that only runs when
-// those are active), this always runs, purely so the expensive PBR shader gets hardware
-// early-Z rejection against overlapping/occluded geometry instead of shading every fragment
-// regardless of final visibility. The biggest win is where overdraw is worst: alpha-tested,
-// two-sided foliage viewed up close, where many leaf layers overlap on screen and Forward
-// previously paid full shading cost for every one of them.
+// framebuffer's own depth attachment before MainRenderer's colored draw, purely so the
+// expensive PBR shader gets hardware early-Z rejection against overlapping/occluded geometry
+// instead of shading every fragment regardless of final visibility. The biggest win is where
+// overdraw is worst: alpha-tested, two-sided foliage viewed up close, where many leaf layers
+// overlap on screen and Forward previously paid full shading cost for every one of them.
+//
+// Only actually runs when RenderingSystem couldn't instead borrow GeometryPrepass's own depth
+// for this purpose (see HDRFramebuffer.TryBorrowDepth) — i.e. when GTAO/SSR/TAA are all off
+// this frame (so Prepass didn't run), or the HDR target is genuinely multisampled. Either way,
+// Forward's early-Z benefit is the same; this is just the fallback source for the depth it
+// reuses.
 public sealed class ZPrepass : IDisposable
 {
     private readonly GL _gl;

@@ -13,8 +13,8 @@ public sealed class IBLBaker : IDisposable
 {
     private const float RebakeCosThreshold = 0.999f;  // ~2.5° of sun movement before re-baking
     private const float RebakeValueEpsilon = 0.01f;
-    private const float MinRebakeInterval  = 1.0f;    // seconds — hard floor regardless of sun speed
-    public const float FullIrradianceSampleDelta = 0.025f;
+    private const float MinRebakeInterval  = 0.5f;    // seconds — hard floor regardless of sun speed
+    private const float FullIrradianceSampleDelta = 0.025f;
     public const int   FullPrefilterSampleCount  = 1024;
     private const float ProceduralIrradianceSampleDelta = 0.1f;
     private const int   ProceduralPrefilterSampleCount  = 64;
@@ -117,7 +117,7 @@ public sealed class IBLBaker : IDisposable
                         || Vector3.Dot(sunDir, _proceduralSunDir) < RebakeCosThreshold
                         || MathF.Abs(turbidity - _proceduralTurbidity) > RebakeValueEpsilon
                         || MathF.Abs(intensity - _proceduralIntensity) > RebakeValueEpsilon
-                        || MathF.Abs(intensity - _proceduralIntensity) > RebakeValueEpsilon
+                        || cloudSpeed > 0f
                         || MathF.Abs(cloudCoverage - _proceduralCloudCoverage) > RebakeValueEpsilon
                         || MathF.Abs(cloudScale - _proceduralCloudScale) > RebakeValueEpsilon
                         || MathF.Abs(cloudShading - _proceduralCloudShading) > RebakeValueEpsilon;

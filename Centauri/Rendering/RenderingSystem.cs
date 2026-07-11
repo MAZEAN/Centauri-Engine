@@ -30,6 +30,7 @@ internal sealed class RenderContext
     public bool GtaoActive;
     public bool SsrActive;
     public bool TaaActive;
+    public bool PrepassRan;   // true when GeometryPrepass rendered a fresh, trustworthy depth this frame
 
     public CullingSystem Culling = null!;
     public GPUProfiler Profiler = null!;
@@ -246,15 +247,24 @@ public class RenderingSystem : IDisposable
         
         var zPrepassEnabled = _config.Debug.EnableZPrepass;
 
-        if (zPrepassEnabled)
+        // GeometryPrepass, when it ran this frame (GTAO/SSR/TAA active), already holds a full-
+        // resolution depth buffer for this same camera/scene, with the same alpha-cutout as the
+        // lit pass (see prepass.frag) — reusing it here saves ZPrepass's own full depth-only
+        // redraw of the same geometry. Only valid when the HDR target isn't actually
+        // multisampled (see HDRFramebuffer.TryBorrowDepth); otherwise (or when Prepass didn't
+        // run this frame) falls back to ZPrepass's own draw exactly as before.
+        var borrowedDepth = zPrepassEnabled && _context.PrepassRan && _post.TryBorrowPrepassDepth(_prepass.DepthTexture);
+
+        if (zPrepassEnabled && !borrowedDepth)
             using (_context.Profiler.Measure("ZPrepass"))
                 _zPrepass.Render(scene, scene.Cameras.Active, _context.Culling);
 
-        // Forward reuses the depth ZPrepass just wrote instead of its own fresh buffer: LEQUAL
-        // (not LESS) so the correctly-depth-matching visible surface still passes, no writes
-        // since the depth is already right. Lets hardware early-Z reject shading for anything
-        // ZPrepass already knows is hidden — the win scales with overdraw, biggest exactly where
-        // it hurts most (dense, close-up, overlapping alpha-tested foliage).
+        // Forward reuses the depth ZPrepass (or the borrowed Prepass depth) just wrote instead
+        // of its own fresh buffer: LEQUAL (not LESS) so the correctly-depth-matching visible
+        // surface still passes, no writes since the depth is already right. Lets hardware
+        // early-Z reject shading for anything already known to be hidden — the win scales with
+        // overdraw, biggest exactly where it hurts most (dense, close-up, overlapping
+        // alpha-tested foliage).
         // With EnableZPrepass off, Forward instead does a completely normal fresh depth
         // test/write (Less/true), exactly as it did before ZPrepass existed — a clean A/B
         // toggle for isolating bugs suspected to live in the depth-reuse mechanism itself.
@@ -263,13 +273,18 @@ public class RenderingSystem : IDisposable
             _gl.DepthFunc(DepthFunction.Lequal);
             _gl.DepthMask(false);
         }
+        
         using (_context.Profiler.Measure("Forward"))
             _mainRenderer.Render(scene, deltaTime, ref _context.Stats, _gtao.AoTexture, _context.GtaoActive, _context.Culling);
+        
         if (zPrepassEnabled)
         {
             _gl.DepthFunc(DepthFunction.Less);
             _gl.DepthMask(true);
         }
+        
+        if (borrowedDepth)
+            _post.ReleasePrepassDepth();
 
         using (_context.Profiler.Measure("Debug"))
         {
@@ -303,6 +318,8 @@ public class RenderingSystem : IDisposable
         if (needPrepass)
             using (_context.Profiler.Measure("Prepass"))
                 _prepass.Render(scene, _context.Culling);
+        
+        _context.PrepassRan = needPrepass;
 
         if (_context.GtaoActive)
             using (_context.Profiler.Measure("GTAO"))

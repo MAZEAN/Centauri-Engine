@@ -111,6 +111,32 @@ public sealed class HDRFramebuffer : IDisposable
         else
             _gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer, format, width, height);
     }
+    
+    // Redirects this framebuffer's depth attachment to an externally-owned depth texture (e.g.
+    // GeometryPrepass's, when it already rendered a trustworthy depth this frame with the same
+    // camera) instead of a second depth-only geometry pass. Only valid when this target isn't
+    // actually multisampled — an external single-sample texture can't satisfy a multisample
+    // attachment's matching-sample-count requirement, so callers must fall back to their own
+    // depth pass when this returns false. _msaaFbo must already be bound (via Bind()).
+    public bool TryBorrowDepth(uint externalDepthTexture)
+    {
+        if (_samples > 1) return false;
+
+        _gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment,
+            TextureTarget.Texture2D, externalDepthTexture, 0);
+        return true;
+    }
+
+    // Reattaches this framebuffer's own depth renderbuffer after a TryBorrowDepth() — must be
+    // called before this frame's Resolve()/before the next Bind(), so the borrowed texture (which
+    // outlives this call) isn't left referenced by an FBO that survives past its owner's lifetime.
+    public void ReleaseDepth()
+    {
+        if (_samples > 1) return;
+
+        _gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment,
+            RenderbufferTarget.Renderbuffer, _msaaDepth);
+    }
 
     private void CheckComplete(string which)
     {

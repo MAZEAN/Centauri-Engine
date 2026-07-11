@@ -15,6 +15,9 @@ using Culling;
 // Renders view-space normals + depth + material (roughness/metallic) into single-sample
 // textures before the lit pass. These are the inputs the screen-space effects need: GTAO
 // reads normals+depth, SSR additionally reads the material buffer to weight reflections.
+// The depth uses the exact same alpha-cutout as the lit pass (see prepass.frag), so it's also
+// trustworthy for Forward's own early-Z when RenderingSystem borrows it instead of running
+// ZPrepass's separate depth-only draw — see HDRFramebuffer.TryBorrowDepth.
 public sealed class GeometryPrepass : IDisposable
 {
     private readonly GL _gl;
@@ -73,6 +76,7 @@ public sealed class GeometryPrepass : IDisposable
         _shader.SetUniform("uAlbedo",       0);
         _shader.SetUniform("uRoughnessMap", 2);
         _shader.SetUniform("uMetallicMap",  3);
+        _shader.SetUniform("uFoliageAlphaCutoff", _config.Foliage.AlphaCutoff);
         ShaderUniformBinder.UploadWind(_shader, _config.Foliage);
     }
 
