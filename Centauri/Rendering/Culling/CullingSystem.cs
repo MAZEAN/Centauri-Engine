@@ -42,7 +42,7 @@ public sealed class CullingSystem
     // Same as above but against an arbitrary frustum instead of a Camera's own. A secondary view
     // that only needs a different frustum over the same scene (not a rebuilt grid) should use
     // UpdateUsing() against this system's Grid instead — see PlanarReflectionPass.
-    public void Update(Scene scene, Frustum frustum, bool enabled, float cellSize, float oversizeFactor)
+    private void Update(Scene scene, Frustum frustum, bool enabled, float cellSize, float oversizeFactor)
     {
         using var _ = Profiling.Tracy.Scope("CullingSystem.Update");
 
@@ -82,6 +82,7 @@ public sealed class CullingSystem
     {
         _enabled = enabled;
         _visible.Clear();
+        
         if (enabled)
             source.CullInto(frustum, _visible);
     }

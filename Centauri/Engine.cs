@@ -25,6 +25,8 @@ public class Engine : IWindowCallbacks
     private SceneLoader _sceneLoader = null!;
     private SimulationSystem _simulation = null!;
 
+    private int _frameCount;
+
     private const string ConfigPath = "Config/config.json";
 
     public void Run()
@@ -127,6 +129,13 @@ public class Engine : IWindowCallbacks
     public void OnRender(double deltaTime)
     {
         _renderingSystem.Render(_scene, (float)deltaTime);
+
+        if (HeadlessCapture.FrameLimit is { } limit && ++_frameCount >= limit)
+        {
+            var fb = _window.FramebufferSize;
+            HeadlessCapture.SaveFramebuffer(_gl, fb.X, fb.Y, HeadlessCapture.ScreenshotPath);
+            _window.Close();
+        }
     }
     
     public void OnResize(Vector2D<int> size)
