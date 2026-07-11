@@ -24,6 +24,7 @@
 * [ ] Terrain
 * [ ] Water simulation (Sea of Thieves algorithm)
 * [x] Complex foliage rendering
+* [ ] Displacement or Bump mapping
 
 ## Enhancements
 
