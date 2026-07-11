@@ -21,14 +21,20 @@ public sealed class ShadowMapper : IDisposable
     private readonly GL _gl;
     private readonly AppConfig _config;
     private readonly InstanceBuffer _instances;
-    
+    private readonly Profiling.GPUProfiler _profiler;
+
     private ShadowArray _maps;
     private readonly GLShader _depth;
     private readonly Frustum _cull = new();
     private readonly CascadeBuilder _cascadeBuilder;
     
-    private readonly Dictionary<Model, List<InstanceData>> _solid    = new();
-    private readonly Dictionary<Model, List<InstanceData>> _twoSided = new();
+    // Per-cascade caster buckets, filled by a cull+bucket pre-pass before any drawing starts —
+    // one fixed slot per possible cascade (MaxCascades), so this never resizes at runtime. This
+    // lets the actual draws below be reordered into two GPU-contiguous passes (all cascades'
+    // opaque casters, then all cascades' alpha-tested foliage casters) instead of interleaving
+    // the two per cascade, so each category gets its own GL_TIME_ELAPSED zone — see Render().
+    private readonly Dictionary<Model, List<InstanceData>>[] _solidByCascade;
+    private readonly Dictionary<Model, List<InstanceData>>[] _twoSidedByCascade;
     private readonly Dictionary<Model, IReadOnlyList<Material?>> _materials = new();
     private readonly HashSet<Entity> _cascadeVisible = new();
     
@@ -44,17 +50,26 @@ public sealed class ShadowMapper : IDisposable
 
     public Cascade[] Cascades { get; private set; } = [];
 
-    public ShadowMapper(GL gl, AppConfig config, InstanceBuffer instances)
+    public ShadowMapper(GL gl, AppConfig config, InstanceBuffer instances, Profiling.GPUProfiler profiler)
     {
         _gl = gl;
         _config = config;
         _instances = instances;
-        
+        _profiler = profiler;
+
         _cascadeBuilder = new CascadeBuilder(config);
         _maps = new ShadowArray(gl, config.Shadows.Size, config.Shadows.MaxCascades);
         _depth = new GLShader(gl,
             PathResolver.Resolve("Shaders/Shadow/depth.vert"),
             PathResolver.Resolve("Shaders/Shadow/depth.frag"));
+
+        _solidByCascade    = new Dictionary<Model, List<InstanceData>>[config.Shadows.MaxCascades];
+        _twoSidedByCascade = new Dictionary<Model, List<InstanceData>>[config.Shadows.MaxCascades];
+        for (var c = 0; c < config.Shadows.MaxCascades; c++)
+        {
+            _solidByCascade[c]    = new Dictionary<Model, List<InstanceData>>();
+            _twoSidedByCascade[c] = new Dictionary<Model, List<InstanceData>>();
+        }
     }
 
     public void Render(Scene scene, CullingSystem culling, ref FrameStats stats)
@@ -99,50 +114,78 @@ public sealed class ShadowMapper : IDisposable
         _depth.SetUniform("uAlbedo", 0);
         ShaderUniformBinder.UploadWind(_depth, _config.Foliage);
         
+        // Pass 1: cull + bucket every cascade up front. Pure CPU work (no GL state/draw calls),
+        // so doing it ahead of any drawing lets the two categories below run as two
+        // GPU-contiguous blocks instead of interleaving per cascade.
         var totalCasters = culling.EntityCount;
-        for (var c = 0; c < Cascades.Length; c++)
+        using (Profiling.Tracy.Scope("ShadowMapper.Cull"))
         {
-            _maps.BindLayer(c);
-            _depth.SetUniform("uLightMatrix", Cascades[c].Matrix);
-            
-            _cull.Update(Cascades[c].Matrix);
-            
-            _cascadeVisible.Clear();
-            culling.CullInto(_cull, _cascadeVisible);
-            stats.ShadowCulled += totalCasters - _cascadeVisible.Count;
+            for (var c = 0; c < Cascades.Length; c++)
+            {
+                _cull.Update(Cascades[c].Matrix);
 
-            BucketCasters(_cascadeVisible);
-            
+                _cascadeVisible.Clear();
+                culling.CullInto(_cull, _cascadeVisible);
+                stats.ShadowCulled += totalCasters - _cascadeVisible.Count;
+
+                BucketCasters(_cascadeVisible, _solidByCascade[c], _twoSidedByCascade[c]);
+            }
+        }
+
+        // Pass 2: opaque casters, all cascades back-to-back — isolates their GPU cost from
+        // foliage's in the profiler (see "ShadowsSolid"/"ShadowsFoliage" below). Depth-test
+        // ordering doesn't care whether solid or foliage writes a cascade's layer first, so
+        // this reorder (cascade-major -> category-major) doesn't change the rendered result.
+        using (_profiler.Measure("ShadowsSolid"))
+        using (Profiling.Tracy.Scope("ShadowMapper.Solid"))
+        {
             SetSolidRenderState();
-            DrawGroups(_solid, ref stats);
+            for (var c = 0; c < Cascades.Length; c++)
+            {
+                _maps.BindLayer(c, clear: true);
+                _depth.SetUniform("uLightMatrix", Cascades[c].Matrix);
+                DrawGroups(_solidByCascade[c], ref stats);
+            }
             ResetSolidRenderState();
-            
-            DrawGroups(_twoSided, ref stats);
+        }
+
+        // Pass 3: alpha-tested foliage casters, same idea. clear:false — the solid pass above
+        // already cleared and wrote into this same cascade layer this frame.
+        using (_profiler.Measure("ShadowsFoliage"))
+        using (Profiling.Tracy.Scope("ShadowMapper.Foliage"))
+        {
+            for (var c = 0; c < Cascades.Length; c++)
+            {
+                _maps.BindLayer(c, clear: false);
+                _depth.SetUniform("uLightMatrix", Cascades[c].Matrix);
+                DrawGroups(_twoSidedByCascade[c], ref stats);
+            }
         }
 
         ResetRenderState();
-        
+
         _maps.SyncRawDepth();
         Active = true;
 
         _cache.Record(key);   // these maps are valid until one of the key's inputs changes
     }
 
-    private void BucketCasters(HashSet<Entity> visible)
+    private void BucketCasters(HashSet<Entity> visible,
+        Dictionary<Model, List<InstanceData>> solid, Dictionary<Model, List<InstanceData>> twoSided)
     {
-        foreach (var list in _solid.Values)    
+        foreach (var list in solid.Values)
             list.Clear();
-        foreach (var list in _twoSided.Values) 
+        foreach (var list in twoSided.Values)
             list.Clear();
 
         foreach (var entity in visible)
         {
             if (entity.Model is not { } model) continue;
 
-            var groups = entity.AnyTwoSided ? _twoSided : _solid;
+            var groups = entity.AnyTwoSided ? twoSided : solid;
             if (!groups.TryGetValue(model, out var list))
                 groups[model] = list = new List<InstanceData>();
-            
+
             _materials[model] = entity.Materials;
             list.Add(new InstanceData(entity.Transform.WorldMatrix, entity.UvScale, entity.UvOffset));
         }

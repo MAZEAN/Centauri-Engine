@@ -69,14 +69,17 @@ public sealed class ShadowArray : IDisposable
         return tex;
     }
 
-    // attach one cascade layer of the compare texture and clear it
-    public void BindLayer(int layer)
+    // attach one cascade layer of the compare texture. clear: false when re-binding a layer a
+    // second time this frame (solid pass already cleared it) — the alpha-tested/foliage pass
+    // draws into what's already there instead of wiping it.
+    public void BindLayer(int layer, bool clear = true)
     {
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, _fbo);
         _gl.FramebufferTextureLayer(FramebufferTarget.Framebuffer,
             FramebufferAttachment.DepthAttachment, DepthTexture, 0, layer);
         _gl.Viewport(0, 0, Size, Size);
-        _gl.Clear(ClearBufferMask.DepthBufferBit);
+        if (clear)
+            _gl.Clear(ClearBufferMask.DepthBufferBit);
     }
     
     // duplicate the freshly-rendered compare texture into the raw one for PCSS's blocker

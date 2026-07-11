@@ -59,6 +59,17 @@ Binary: `/tmp/tracy-profiler/profiler/build/tracy-profiler` — move it wherever
   outright since no such ref exists. Pinning the commit keeps the viewer's protocol version
   matched to the vendored client either way.
 
+## 3.1 Move it
+```bash
+mkdir -p ~/.local/bin
+cp /tmp/tracy-profiler/profiler/build/tracy-profiler ~/.local/bin/
+
+grep -q '.local/bin' ~/.zshrc || echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+
+which tracy-profiler
+```
+
 ## 4. Use it
 
 ```bash

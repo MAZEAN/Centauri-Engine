@@ -79,10 +79,10 @@ public class RenderingSystem : IDisposable
         _instances = new InstanceBuffer(gl);
         _context.Culling   = new CullingSystem(_config.Culling.CellSize, _config.Culling.OversizeFactor);
         
-        _shadows = new ShadowMapper(gl, _config, _instances);
-        _ibl = new IBLBaker(gl, _config.IBL);
         _context.Profiler = new GPUProfiler(gl);
-        
+        _shadows = new ShadowMapper(gl, _config, _instances, _context.Profiler);
+        _ibl = new IBLBaker(gl, _config.IBL);
+
         _mainRenderer   = new MainRenderer(gl, config, _ibl, _shadows, _instances);
         _gridRenderer   = new GridRenderer(gl);
         _debugRenderer  = new DebugRenderer(gl, config);
@@ -307,8 +307,10 @@ public class RenderingSystem : IDisposable
 
         _context.Profiler.BeginFrame(_config.Debug.ShowGPUTimings);
 
-        using (_context.Profiler.Measure("Shadows"))
-            _shadows.Render(scene, _context.Culling, ref _context.Stats);
+        // ShadowMapper.Render() opens its own "ShadowsSolid"/"ShadowsFoliage" zones internally
+        // (GL_TIME_ELAPSED zones can't nest, so this can't also be wrapped in an outer Measure()
+        // here — see ShadowMapper and PostProcessor.Composite for the same pattern).
+        _shadows.Render(scene, _context.Culling, ref _context.Stats);
 
         // GTAO (and the Normals/Depth/AO debug views) all need the prepass buffers
         _context.GtaoActive = _config.GTAO.Enabled || _config.Debug.Shading == ShadingMode.AmbientOcclusion;
