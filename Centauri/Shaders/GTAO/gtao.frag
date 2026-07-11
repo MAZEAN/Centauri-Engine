@@ -41,15 +41,21 @@ uniform int   uFrameIndex;   // rotates the per-pixel noise each frame so tempor
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-// reconstruct view-space position from the stored depth (ndc.z = depth, [0,1] — matches
-// CascadeBuilder's frustum unprojection)
-vec3 viewPos(vec2 uv)
+// reconstruct view-space position from an already-sampled depth (ndc.z = depth, [0,1] — matches
+// CascadeBuilder's frustum unprojection). Split out from viewPos() so callers that already had
+// to fetch uDepth for another reason (e.g. the background test in marchHorizonCos below) don't
+// sample the same texel twice.
+vec3 viewPosFromDepth(vec2 uv, float d)
 {
-    float d   = texture(uDepth, uv).r;
     vec4  ndc = vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
     vec4  v   = uInvProjection * ndc;
 
     return v.xyz / v.w;
+}
+
+vec3 viewPos(vec2 uv)
+{
+    return viewPosFromDepth(uv, texture(uDepth, uv).r);
 }
 
 // Marches from P along `dir` (a unit view-space direction, perpendicular to V) out to uRadius,
@@ -76,7 +82,10 @@ float marchHorizonCos(vec3 P, vec3 V, vec3 dir, float jitter, float lowCos)
         if (sampleUv.x < 0.0 || sampleUv.x > 1.0 || sampleUv.y < 0.0 || sampleUv.y > 1.0) continue;
         if (texture(uDepth, sampleUv).r >= 1.0) continue;   // background — nothing to occlude with
 
-        vec3  Ps   = viewPos(sampleUv);
+        float sampleDepth = texture(uDepth, sampleUv).r;
+        if (sampleDepth >= 1.0) continue;   // background — nothing to occlude with
+
+        vec3  Ps   = viewPosFromDepth(sampleUv, sampleDepth);
         vec3  D    = Ps - P;
         float dist = length(D);
         if (dist < uRadius * 0.01) continue;   // too close to be a meaningful occluder, not just precision noise

@@ -31,7 +31,9 @@ public sealed class PlanarReflectionPass : IDisposable
     private readonly MainRenderer _main;
     private readonly SkyboxRenderer _skybox;
     
-    private readonly CullingSystem _mirrorCulling = new();   // culled against the mirrored camera's own frustum
+    // Holds the mirrored-frustum visible set; queries the main CullingSystem's grid rather than
+    // owning/rebuilding its own
+    private readonly CullingSystem _mirrorCulling = new();
     private readonly Frustum _mirrorFrustum = new();
     
     private readonly RenderTarget _target;
@@ -71,7 +73,7 @@ public sealed class PlanarReflectionPass : IDisposable
         AllocateMsaa();
     }
 
-    public void Render(Scene scene, float deltaTime, ref FrameStats stats)
+    public void Render(Scene scene, float deltaTime, CullingSystem mainCulling, ref FrameStats stats)
     {
         if (!_config.Enabled) return;
         
@@ -96,7 +98,7 @@ public sealed class PlanarReflectionPass : IDisposable
         // Cull against the mirrored view, not the main camera's — an entity outside the
         // reflected frustum can't appear in the reflection even if it's visible directly.
         _mirrorFrustum.Update(reflView * proj);
-        _mirrorCulling.Update(scene, _mirrorFrustum, enabled: true, cellSize: 16f, oversizeFactor: 8f);
+        _mirrorCulling.UpdateUsing(mainCulling, _mirrorFrustum, enabled: true);
         
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, _msaaFbo);
         _gl.Viewport(0, 0, _target.Width, _target.Height);

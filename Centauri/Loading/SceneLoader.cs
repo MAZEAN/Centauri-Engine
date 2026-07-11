@@ -41,7 +41,7 @@ public class SceneLoader
     // into this one before the caller sees it, so a scene can stay a thin index instead of one
     // file holding everything as content grows. Optional — a single-file scene with no
     // "include" behaves exactly as before.
-    private SceneDefinition LoadMerged(string path, HashSet<string> visiting)
+    private static SceneDefinition LoadMerged(string path, HashSet<string> visiting)
     {
         var fullPath = PathResolver.Resolve(path);
         if (!visiting.Add(fullPath))

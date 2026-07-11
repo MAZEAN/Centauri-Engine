@@ -39,9 +39,9 @@ public sealed class CullingSystem
         Update(scene, camera.Frustum, enabled, cellSize, oversizeFactor);
     }
     
-    // Same as above but against an arbitrary frustum instead of a Camera's own — lets a pass
-    // that renders from a derived view (e.g. a mirrored planar-reflection camera) cull against
-    // the frustum it's actually rendering with, instead of skipping culling altogether.
+    // Same as above but against an arbitrary frustum instead of a Camera's own. A secondary view
+    // that only needs a different frustum over the same scene (not a rebuilt grid) should use
+    // UpdateUsing() against this system's Grid instead — see PlanarReflectionPass.
     public void Update(Scene scene, Frustum frustum, bool enabled, float cellSize, float oversizeFactor)
     {
         using var _ = Profiling.Tracy.Scope("CullingSystem.Update");
@@ -72,4 +72,17 @@ public sealed class CullingSystem
     
     public void CullInto(Frustum frustum, HashSet<Entity> results) =>
         Grid.Cull(frustum, results, markVisited: false);
+    
+    // Populates this system's own visible set from another CullingSystem's already-built grid,
+    // instead of owning and rebuilding a duplicate one — for a secondary view (e.g. a mirrored
+    // planar-reflection camera) whose visible set differs only by frustum, not by scene content.
+    // Same CullInto() path ShadowMapper already uses for cascades, so the source's debug-overlay
+    // visited-cell stats (markVisited) are left untouched.
+    public void UpdateUsing(CullingSystem source, Frustum frustum, bool enabled)
+    {
+        _enabled = enabled;
+        _visible.Clear();
+        if (enabled)
+            source.CullInto(frustum, _visible);
+    }
 }

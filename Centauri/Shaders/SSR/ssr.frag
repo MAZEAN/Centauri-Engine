@@ -42,7 +42,20 @@ vec3 viewPos(vec2 uv)
     float d   = texture(uDepth, uv).r;
     vec4  ndc = vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
     vec4  v   = uInvProjection * ndc;
+    
     return v.xyz / v.w;
+}
+
+// view-space Z only. The march's hot loop (marchRay, silhouetteConfidence) never needs the
+// reconstructed x/y, just a depth compare — returning v.z/v.w directly instead of v.xyz/v.w
+// drops the unused x/y row dot-products from the matrix multiply.
+float viewZ(vec2 uv)
+{
+    float d   = texture(uDepth, uv).r;
+    vec4  ndc = vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
+    vec4  v   = uInvProjection * ndc;
+    
+    return v.z / v.w;
 }
 
 // view-space z (negative, in front of camera) of a point on the ray at screen fraction s,
@@ -57,10 +70,10 @@ float silhouetteConfidence(vec2 uv, float hitViewZ)
     float refDepth = max(abs(hitViewZ), 1e-3);
 
     float maxRelDiff = 0.0;
-    maxRelDiff = max(maxRelDiff, abs(viewPos(uv + vec2( uTexel.x, 0.0)).z - hitViewZ) / refDepth);
-    maxRelDiff = max(maxRelDiff, abs(viewPos(uv + vec2(-uTexel.x, 0.0)).z - hitViewZ) / refDepth);
-    maxRelDiff = max(maxRelDiff, abs(viewPos(uv + vec2(0.0,  uTexel.y)).z - hitViewZ) / refDepth);
-    maxRelDiff = max(maxRelDiff, abs(viewPos(uv + vec2(0.0, -uTexel.y)).z - hitViewZ) / refDepth);
+    maxRelDiff = max(maxRelDiff, abs(viewZ(uv + vec2( uTexel.x, 0.0)) - hitViewZ) / refDepth);
+    maxRelDiff = max(maxRelDiff, abs(viewZ(uv + vec2(-uTexel.x, 0.0)) - hitViewZ) / refDepth);
+    maxRelDiff = max(maxRelDiff, abs(viewZ(uv + vec2(0.0,  uTexel.y)) - hitViewZ) / refDepth);
+    maxRelDiff = max(maxRelDiff, abs(viewZ(uv + vec2(0.0, -uTexel.y)) - hitViewZ) / refDepth);
 
     return 1.0 - smoothstep(uSilhouetteThreshold * 0.5, uSilhouetteThreshold, maxRelDiff);
 }
@@ -103,7 +116,7 @@ bool marchRay(vec2 uvP, vec2 uvQ, float invWP, float invWQ, float rayLen, float 
         if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) break;
 
         float rayZ   = rayViewZ(invWP, invWQ, s);           // ray depth here (perspective-correct)
-        float sceneZ = viewPos(uv).z;                       // geometry depth here
+        float sceneZ = viewZ(uv);                            // geometry depth here
         float diff   = sceneZ - rayZ;                       // >0 → ray went behind a surface
 
         // A sign crossing (in-front → behind) IS the intersection. Accept it and refine to
@@ -124,8 +137,8 @@ bool marchRay(vec2 uvP, vec2 uvQ, float invWP, float invWQ, float rayLen, float 
                 muv        = mix(uvP, uvQ, midS);
                 float mz   = rayViewZ(invWP, invWQ, midS);
 
-                if (viewPos(muv).z - mz > 0.0) 
-                    hi = midS; 
+                if (viewZ(muv) - mz > 0.0)
+                    hi = midS;
                 else 
                     lo = midS;
                 
@@ -135,7 +148,7 @@ bool marchRay(vec2 uvP, vec2 uvQ, float invWP, float invWQ, float rayLen, float 
             // reject only if even the refined point is far behind the surface (ray passed
             // behind a thin object into empty space, rather than landing on it)
             float refS = (lo + hi) * 0.5;
-            if (viewPos(muv).z - rayViewZ(invWP, invWQ, refS) < uThickness)
+            if (viewZ(muv) - rayViewZ(invWP, invWQ, refS) < uThickness)
             {
                 hitUv = muv;
                 return true;

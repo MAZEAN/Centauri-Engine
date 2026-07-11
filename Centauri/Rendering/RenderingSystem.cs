@@ -151,7 +151,7 @@ public class RenderingSystem : IDisposable
         }
         
         using (_context.Profiler.Measure("Planar"))
-            _planar.Render(scene, deltaTime, ref _context.Stats);
+            _planar.Render(scene, deltaTime, _context.Culling, ref _context.Stats);
         
         _post.BeginScene();
         RenderCentralComponents(scene, deltaTime);
