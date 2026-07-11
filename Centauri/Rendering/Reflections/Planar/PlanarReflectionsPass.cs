@@ -163,19 +163,30 @@ public sealed class PlanarReflectionPass : IDisposable
 
         _msaaColor = _gl.GenRenderbuffer();
         _gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, _msaaColor);
-        _gl.RenderbufferStorageMultisample(RenderbufferTarget.Renderbuffer, _samples,
-            InternalFormat.Rgba16f, w, h);
+        AllocateRenderbufferStorage(InternalFormat.Rgba16f, w, h);
         _gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
             RenderbufferTarget.Renderbuffer, _msaaColor);
 
         _msaaDepth = _gl.GenRenderbuffer();
         _gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, _msaaDepth);
-        _gl.RenderbufferStorageMultisample(RenderbufferTarget.Renderbuffer, _samples,
-            InternalFormat.DepthComponent24, w, h);
+        AllocateRenderbufferStorage(InternalFormat.DepthComponent24, w, h);
         _gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment,
             RenderbufferTarget.Renderbuffer, _msaaDepth);
 
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+    }
+
+    // RenderbufferStorageMultisample(..., 1, ...) is not a reliable way to request "no MSAA" —
+    // on at least one real driver (Mesa llvmpipe) it silently allocates real multisampled
+    // storage instead of honoring the requested sample count (see HDRFramebuffer, which has the
+    // same pattern and hits the same issue). Only the plain, non-multisample entry point
+    // guarantees genuinely single-sample storage.
+    private void AllocateRenderbufferStorage(InternalFormat format, uint width, uint height)
+    {
+        if (_samples > 1)
+            _gl.RenderbufferStorageMultisample(RenderbufferTarget.Renderbuffer, _samples, format, width, height);
+        else
+            _gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer, format, width, height);
     }
 
     private void DestroyMsaa()

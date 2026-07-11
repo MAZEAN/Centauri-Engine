@@ -106,7 +106,12 @@ public sealed class CascadeBuilder
             center += p;
         center /= 8f;
 
+        // Quantize outward (never shrink — the box must still contain the slice) so texelSize
+        // below, and therefore the centerLS snap grid, only steps discretely instead of drifting
+        // continuously with the camera's exact distance/FOV each frame — without this the center
+        // snap alone doesn't stop shimmer, since the grid it's snapping to is itself unstable.
         var radius = ComputeRadius(corners, center);
+        radius = MathF.Ceiling(radius / RadiusSnap) * RadiusSnap;
 
         var up   = MathF.Abs(dir.Y) > UpThreshold ? Vector3.UnitZ : Vector3.UnitY;
         var view = Matrix4x4.CreateLookAt(center - dir * radius, center, up);

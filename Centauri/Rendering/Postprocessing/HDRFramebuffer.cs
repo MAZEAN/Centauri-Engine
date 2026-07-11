@@ -2,9 +2,10 @@ namespace Centauri.Rendering.Postprocessing;
 
 using Silk.NET.OpenGL;
 
-// Off-screen HDR target. Scene draws into a multisampled RGBA16F buffer (so MSAA
-// still works), then resolves into a single-sample RGBA16F texture the tonemap
-// pass samples. Recreated on resize.
+// Off-screen HDR target. Scene draws into an RGBA16F buffer — genuinely multisampled when
+// Window.Samples > 1, plain (non-multisample) storage otherwise, see AllocateRenderbufferStorage
+// — then resolves/copies into a single-sample RGBA16F texture the tonemap pass samples.
+// Recreated on resize.
 public sealed class HDRFramebuffer : IDisposable
 {
     private readonly GL   _gl;
@@ -39,7 +40,9 @@ public sealed class HDRFramebuffer : IDisposable
         _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
     }
 
-    // Resolve MSAA → single-sample texture; leaves default framebuffer bound.
+    // Resolve into the single-sample texture PostProcessor reads (a real multisample resolve
+    // when Window.Samples > 1, otherwise just a same-sample-count copy); leaves the default
+    // framebuffer bound.
     public void Resolve()
     {
         _gl.BindFramebuffer(FramebufferTarget.ReadFramebuffer, _msaaFbo);
@@ -61,15 +64,13 @@ public sealed class HDRFramebuffer : IDisposable
 
         _msaaColor = _gl.GenRenderbuffer();
         _gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, _msaaColor);
-        _gl.RenderbufferStorageMultisample(RenderbufferTarget.Renderbuffer, _samples,
-            InternalFormat.Rgba16f, _width, _height);
+        AllocateRenderbufferStorage(InternalFormat.Rgba16f, _width, _height);
         _gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
             RenderbufferTarget.Renderbuffer, _msaaColor);
 
         _msaaDepth = _gl.GenRenderbuffer();
         _gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, _msaaDepth);
-        _gl.RenderbufferStorageMultisample(RenderbufferTarget.Renderbuffer, _samples,
-            InternalFormat.DepthComponent24, _width, _height);
+        AllocateRenderbufferStorage(InternalFormat.DepthComponent24, _width, _height);
         _gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment,
             RenderbufferTarget.Renderbuffer, _msaaDepth);
         CheckComplete("MSAA");
@@ -95,6 +96,20 @@ public sealed class HDRFramebuffer : IDisposable
         CheckComplete("resolve");
 
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+    }
+
+    // RenderbufferStorageMultisample(..., 1, ...) is not a reliable way to request "no MSAA" —
+    // on at least one real driver (Mesa llvmpipe), asking for 1 sample silently allocates real
+    // multisampled storage instead (observed: reports GL_SAMPLES=4, not the requested 1), so the
+    // "TAA instead of MSAA" configuration (Window.Samples=1) would still pay full MSAA fill/
+    // bandwidth cost without anyone asking for it. The only way to *guarantee* a non-multisampled
+    // renderbuffer is to not call the multisample entry point at all.
+    private void AllocateRenderbufferStorage(InternalFormat format, uint width, uint height)
+    {
+        if (_samples > 1)
+            _gl.RenderbufferStorageMultisample(RenderbufferTarget.Renderbuffer, _samples, format, width, height);
+        else
+            _gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer, format, width, height);
     }
 
     private void CheckComplete(string which)

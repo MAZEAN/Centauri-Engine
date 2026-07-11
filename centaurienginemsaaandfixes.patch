@@ -1,0 +1,297 @@
+From 87c7f3575876ebe7c8f58f87d158ca76a487075f Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 11 Jul 2026 15:52:57 +0000
+Subject: [PATCH 1/3] Fix HDR and Planar render targets silently multisampling
+ at samples<=1
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+RenderbufferStorageMultisample(..., 1, ...) is not a reliable way to
+request "no MSAA": empirically verified (via a standalone FBO probe
+and confirmed on the real HDRFramebuffer/PlanarReflectionPass classes,
+both instrumented and headlessly run) that on Mesa llvmpipe, requesting
+1 sample silently allocates real 4-sample storage (GL_SAMPLES reports 4,
+not 1). Since Window.Samples is configured to 1 specifically because TAA
+(not MSAA) is the intended AA method, both the main forward target and
+the planar reflection target could have been paying an unintended
+multisampling tax.
+
+Fixed by only calling RenderbufferStorageMultisample when samples > 1;
+otherwise using the plain (non-multisample) RenderbufferStorage entry
+point, which is confirmed to give genuinely 0-sample storage.
+
+Verified: built clean, then instrumented both classes with a temporary
+GL_SAMPLES readback and ran the real engine headlessly with the live
+config (Window.Samples=1) — both now report GL_SAMPLES=0 (previously
+would have reported 4 per the isolated probe), with no crash and
+correct render output.
+---
+ .../Postprocessing/HDRFramebuffer.cs          | 31 ++++++++++++++-----
+ .../Planar/PlanarReflectionsPass.cs           | 19 +++++++++---
+ 2 files changed, 38 insertions(+), 12 deletions(-)
+
+diff --git a/Centauri/Rendering/Postprocessing/HDRFramebuffer.cs b/Centauri/Rendering/Postprocessing/HDRFramebuffer.cs
+index 081aada..dbc115c 100644
+--- a/Centauri/Rendering/Postprocessing/HDRFramebuffer.cs
++++ b/Centauri/Rendering/Postprocessing/HDRFramebuffer.cs
+@@ -2,9 +2,10 @@ namespace Centauri.Rendering.Postprocessing;
+ 
+ using Silk.NET.OpenGL;
+ 
+-// Off-screen HDR target. Scene draws into a multisampled RGBA16F buffer (so MSAA
+-// still works), then resolves into a single-sample RGBA16F texture the tonemap
+-// pass samples. Recreated on resize.
++// Off-screen HDR target. Scene draws into an RGBA16F buffer — genuinely multisampled when
++// Window.Samples > 1, plain (non-multisample) storage otherwise, see AllocateRenderbufferStorage
++// — then resolves/copies into a single-sample RGBA16F texture the tonemap pass samples.
++// Recreated on resize.
+ public sealed class HDRFramebuffer : IDisposable
+ {
+     private readonly GL   _gl;
+@@ -39,7 +40,9 @@ public sealed class HDRFramebuffer : IDisposable
+         _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+     }
+ 
+-    // Resolve MSAA → single-sample texture; leaves default framebuffer bound.
++    // Resolve into the single-sample texture PostProcessor reads (a real multisample resolve
++    // when Window.Samples > 1, otherwise just a same-sample-count copy); leaves the default
++    // framebuffer bound.
+     public void Resolve()
+     {
+         _gl.BindFramebuffer(FramebufferTarget.ReadFramebuffer, _msaaFbo);
+@@ -61,15 +64,13 @@ public sealed class HDRFramebuffer : IDisposable
+ 
+         _msaaColor = _gl.GenRenderbuffer();
+         _gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, _msaaColor);
+-        _gl.RenderbufferStorageMultisample(RenderbufferTarget.Renderbuffer, _samples,
+-            InternalFormat.Rgba16f, _width, _height);
++        AllocateRenderbufferStorage(InternalFormat.Rgba16f, _width, _height);
+         _gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
+             RenderbufferTarget.Renderbuffer, _msaaColor);
+ 
+         _msaaDepth = _gl.GenRenderbuffer();
+         _gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, _msaaDepth);
+-        _gl.RenderbufferStorageMultisample(RenderbufferTarget.Renderbuffer, _samples,
+-            InternalFormat.DepthComponent24, _width, _height);
++        AllocateRenderbufferStorage(InternalFormat.DepthComponent24, _width, _height);
+         _gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment,
+             RenderbufferTarget.Renderbuffer, _msaaDepth);
+         CheckComplete("MSAA");
+@@ -97,6 +98,20 @@ public sealed class HDRFramebuffer : IDisposable
+         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+     }
+ 
++    // RenderbufferStorageMultisample(..., 1, ...) is not a reliable way to request "no MSAA" —
++    // on at least one real driver (Mesa llvmpipe), asking for 1 sample silently allocates real
++    // multisampled storage instead (observed: reports GL_SAMPLES=4, not the requested 1), so the
++    // "TAA instead of MSAA" configuration (Window.Samples=1) would still pay full MSAA fill/
++    // bandwidth cost without anyone asking for it. The only way to *guarantee* a non-multisampled
++    // renderbuffer is to not call the multisample entry point at all.
++    private void AllocateRenderbufferStorage(InternalFormat format, uint width, uint height)
++    {
++        if (_samples > 1)
++            _gl.RenderbufferStorageMultisample(RenderbufferTarget.Renderbuffer, _samples, format, width, height);
++        else
++            _gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer, format, width, height);
++    }
++
+     private void CheckComplete(string which)
+     {
+         var status = _gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer);
+diff --git a/Centauri/Rendering/Reflections/Planar/PlanarReflectionsPass.cs b/Centauri/Rendering/Reflections/Planar/PlanarReflectionsPass.cs
+index 9e25f4d..c410816 100644
+--- a/Centauri/Rendering/Reflections/Planar/PlanarReflectionsPass.cs
++++ b/Centauri/Rendering/Reflections/Planar/PlanarReflectionsPass.cs
+@@ -163,21 +163,32 @@ public sealed class PlanarReflectionPass : IDisposable
+ 
+         _msaaColor = _gl.GenRenderbuffer();
+         _gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, _msaaColor);
+-        _gl.RenderbufferStorageMultisample(RenderbufferTarget.Renderbuffer, _samples,
+-            InternalFormat.Rgba16f, w, h);
++        AllocateRenderbufferStorage(InternalFormat.Rgba16f, w, h);
+         _gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
+             RenderbufferTarget.Renderbuffer, _msaaColor);
+ 
+         _msaaDepth = _gl.GenRenderbuffer();
+         _gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, _msaaDepth);
+-        _gl.RenderbufferStorageMultisample(RenderbufferTarget.Renderbuffer, _samples,
+-            InternalFormat.DepthComponent24, w, h);
++        AllocateRenderbufferStorage(InternalFormat.DepthComponent24, w, h);
+         _gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment,
+             RenderbufferTarget.Renderbuffer, _msaaDepth);
+ 
+         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+     }
+ 
++    // RenderbufferStorageMultisample(..., 1, ...) is not a reliable way to request "no MSAA" —
++    // on at least one real driver (Mesa llvmpipe) it silently allocates real multisampled
++    // storage instead of honoring the requested sample count (see HDRFramebuffer, which has the
++    // same pattern and hits the same issue). Only the plain, non-multisample entry point
++    // guarantees genuinely single-sample storage.
++    private void AllocateRenderbufferStorage(InternalFormat format, uint width, uint height)
++    {
++        if (_samples > 1)
++            _gl.RenderbufferStorageMultisample(RenderbufferTarget.Renderbuffer, _samples, format, width, height);
++        else
++            _gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer, format, width, height);
++    }
++
+     private void DestroyMsaa()
+     {
+         _gl.DeleteFramebuffer(_msaaFbo);
+-- 
+2.43.0
+
+
+From 30d014358d51041851a722fef33bc77b381ab1fc Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 11 Jul 2026 15:53:05 +0000
+Subject: [PATCH 2/3] Stop AutoExposurePass issuing redundant 1x1->1x1
+ downsample draws
+
+MipCount is fixed at 12, sized (per its own comment) to reach 1x1
+"well before this at any real resolution" -- but the downsample loop
+always ran all 12 iterations regardless. At a typical 1920x1080 the
+chain already reaches 1x1 by mip 9, so mips 10-11 were two redundant
+no-op draw calls every frame, forever (auto-exposure is enabled by
+default).
+
+Added _lastMip, computed once at construction/resize as the first mip
+whose size is already 1x1; Render()'s downsample loop and the final
+adapt step's input now stop there instead of always going to
+MipCount - 1.
+
+Verified: computed the expected _lastMip by hand for 1920x1080 and the
+actual 1280x720 headless test viewport, then confirmed via a temporary
+debug readback on the real running engine that the computed value
+matches exactly (9 at 1280x720). Screenshot before/after confirms
+identical tonemap/exposure output.
+---
+ .../Postprocessing/AutoExposurePass.cs        | 27 ++++++++++++++++---
+ 1 file changed, 24 insertions(+), 3 deletions(-)
+
+diff --git a/Centauri/Rendering/Postprocessing/AutoExposurePass.cs b/Centauri/Rendering/Postprocessing/AutoExposurePass.cs
+index 8f710ac..f052424 100644
+--- a/Centauri/Rendering/Postprocessing/AutoExposurePass.cs
++++ b/Centauri/Rendering/Postprocessing/AutoExposurePass.cs
+@@ -33,6 +33,13 @@ public sealed class AutoExposurePass : IDisposable
+     private readonly RenderTarget[] _mips = new RenderTarget[MipCount];
+     private readonly RenderTarget[] _adapted = new RenderTarget[2];   // ping-pong, 1x1
+ 
++    // Index of the first mip that's already 1x1 — the chain can't shrink further past this
++    // point, so downsampling into the remaining allocated-but-unreached mips (see MipCount's
++    // comment: 12 is sized to reach 1x1 "well before this at any real resolution", meaning some
++    // tail is expected to go unused) would just be a 1x1 -> 1x1 no-op draw call. Render() stops
++    // here instead of always issuing all MipCount-1 downsample draws.
++    private int _lastMip;
++
+     private int  _current;      // index into _adapted holding the latest adapted value
+     private bool _firstFrame = true;
+ 
+@@ -52,6 +59,7 @@ public sealed class AutoExposurePass : IDisposable
+             var (w, h) = MipSize(width, height, i);
+             _mips[i] = new RenderTarget(gl, w, h, [InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Linear);
+         }
++        _lastMip = ComputeLastMip(width, height);
+ 
+         _adapted[0] = new RenderTarget(gl, 1, 1, [InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Nearest);
+         _adapted[1] = new RenderTarget(gl, 1, 1, [InternalFormat.Rgba16f], withDepth: false, filter: GLEnum.Nearest);
+@@ -66,9 +74,22 @@ public sealed class AutoExposurePass : IDisposable
+             var (w, h) = MipSize(width, height, i);
+             _mips[i].Resize(w, h);
+         }
++        _lastMip = ComputeLastMip(width, height);
+         // _adapted stay 1x1 regardless of resize — nothing to do there.
+     }
+ 
++    // First index whose size is already 1x1 (clamped to MipCount - 1 so a pathologically tiny
++    // viewport that hits 1x1 before mip0 doesn't produce an out-of-range index).
++    private static int ComputeLastMip(uint width, uint height)
++    {
++        for (var i = 0; i < MipCount; i++)
++        {
++            var (w, h) = MipSize(width, height, i);
++            if (w == 1 && h == 1) return i;
++        }
++        return MipCount - 1;
++    }
++
+     // Reads the resolved HDR scene, leaves this frame's adapted luminance in AdaptedLuminanceTexture.
+     public void Render(uint hdrResolved, float deltaTime)
+     {
+@@ -82,10 +103,10 @@ public sealed class AutoExposurePass : IDisposable
+         Bind(TextureUnit.Texture0, hdrResolved);
+         DrawFullscreen();
+ 
+-        // ── downsample chain: mip[i-1] → mip[i], ending at 1x1 ──
++        // ── downsample chain: mip[i-1] → mip[i], ending at 1x1 (see _lastMip) ──
+         _down.Use();
+         _down.SetUniform("uSrc", 0);
+-        for (var i = 1; i < MipCount; i++)
++        for (var i = 1; i <= _lastMip; i++)
+         {
+             _mips[i].Bind();
+             SetTexel(_down, new Vector2(_mips[i - 1].Width, _mips[i - 1].Height));
+@@ -104,7 +125,7 @@ public sealed class AutoExposurePass : IDisposable
+         _adapt.SetUniform("uAdaptSpeed", _firstFrame ? 1000f : _config.AdaptSpeed);
+         _adapt.SetUniform("uDeltaTime",  deltaTime);
+ 
+-        Bind(TextureUnit.Texture0, _mips[MipCount - 1].ColorTextures[0]);
++        Bind(TextureUnit.Texture0, _mips[_lastMip].ColorTextures[0]);
+         Bind(TextureUnit.Texture1, _adapted[_current].ColorTextures[0]);
+         DrawFullscreen();
+ 
+-- 
+2.43.0
+
+
+From d8efa6ff1c41285eb96c87b8149f6f6bbd30e21d Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 11 Jul 2026 15:53:14 +0000
+Subject: [PATCH 3/3] Wire up CascadeBuilder's dead RadiusSnap shimmer guard
+
+RadiusSnap was declared with a clear intent ("quantize sphere radius to
+1/16 units (size-shimmer guard)") but was never actually applied
+anywhere in FitCascade. The cascade center gets snapped to texel-sized
+steps, but the texel size itself (radius * 2 / ShadowSize) was left
+unquantized -- so the snap grid it's snapping to was itself drifting
+continuously with the camera's exact frustum-slice radius each frame,
+which reintroduces the shimmer the center-snap was meant to prevent.
+
+Radius is now quantized outward (ceiling, never shrinking the box) to
+the nearest RadiusSnap before it's used to derive both the light's
+distance and the texel size.
+
+Verified: built clean, then ran the real engine headlessly with a
+directional-light test scene to confirm CascadeBuilder.Build() (now
+exercising the new snap) runs without exception and the sky/lighting
+still render correctly. No real occluding geometry was available to
+directly observe shimmer reduction (this sandbox's Assets/ are
+gitignored), so the shimmer-fix claim rests on the math matching the
+already-present, previously-unused comment's stated intent -- worth a
+visual check against real content before relying on it.
+---
+ Centauri/Rendering/Shadows/CascadeBuilder.cs | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/Centauri/Rendering/Shadows/CascadeBuilder.cs b/Centauri/Rendering/Shadows/CascadeBuilder.cs
+index 1495399..ea000b0 100644
+--- a/Centauri/Rendering/Shadows/CascadeBuilder.cs
++++ b/Centauri/Rendering/Shadows/CascadeBuilder.cs
+@@ -106,7 +106,12 @@ public sealed class CascadeBuilder
+             center += p;
+         center /= 8f;
+ 
++        // Quantize outward (never shrink — the box must still contain the slice) so texelSize
++        // below, and therefore the centerLS snap grid, only steps discretely instead of drifting
++        // continuously with the camera's exact distance/FOV each frame — without this the center
++        // snap alone doesn't stop shimmer, since the grid it's snapping to is itself unstable.
+         var radius = ComputeRadius(corners, center);
++        radius = MathF.Ceiling(radius / RadiusSnap) * RadiusSnap;
+ 
+         var up   = MathF.Abs(dir.Y) > UpThreshold ? Vector3.UnitZ : Vector3.UnitY;
+         var view = Matrix4x4.CreateLookAt(center - dir * radius, center, up);
+-- 
+2.43.0
+
