@@ -109,9 +109,14 @@ uniform sampler2D uGtaoMap;   // unit 9
 uniform int uHasGtao;
 uniform int uFoliage;   // 1 = two-sided foliage: add leaf transmission, skip screen-space AO
 
-// Shadows
-uniform sampler2DArrayShadow uShadowMap;    // unit 8 — hardware compare, free 2x2 PCF blend per tap
-uniform sampler2DArray       uShadowMapRaw; // unit 10 — same depth, uncompared: PCSS blocker search only
+// Shadows — two resolution tiers (see ShadowMapper): cascade 0 (near) always renders at full
+// config Size; every other cascade shares a lower-resolution "far" array (ShadowConfig.
+// FarCascadeScale), since they cover a much larger world-space area at the same physical
+// resolution already. uShadowMapFar's layer 0 is cascade 1, layer 1 is cascade 2, etc.
+uniform sampler2DArrayShadow uShadowMapNear;     // unit 8  — hardware compare, free 2x2 PCF blend per tap
+uniform sampler2DArray       uShadowMapNearRaw;  // unit 10 — same depth, uncompared: PCSS blocker search only
+uniform sampler2DArrayShadow uShadowMapFar;      // unit 11
+uniform sampler2DArray       uShadowMapFarRaw;   // unit 12
 layout(std140) uniform Shadows {
     mat4 uLightMatrices[MAX_CASCADES];
     vec4 uCascadeSplits;
@@ -175,10 +180,13 @@ mat2 InterleavedGradientRotation()
 
 // Average depth of samples closer to the light than `current`, searched over a
 // `radiusTexels` disk. Returns -1 when nothing in the window occludes the point, so the
-// caller can skip the PCF pass entirely (fully lit).
-float FindBlockerDepth(int c, vec2 uv, float current, float radiusTexels, float selfBias, mat2 rot)
+// caller can skip the PCF pass entirely (fully lit). `near`/`layer` select which resolution
+// tier and which layer within it — see the uShadowMapNear/Far comment above SampleCascade.
+float FindBlockerDepth(bool near, int layer, vec2 uv, float current, float radiusTexels, float selfBias, mat2 rot)
 {
-    vec2 texel = 1.0 / vec2(textureSize(uShadowMapRaw, 0).xy);
+    vec2 texel = near
+        ? 1.0 / vec2(textureSize(uShadowMapNearRaw, 0).xy)
+        : 1.0 / vec2(textureSize(uShadowMapFarRaw, 0).xy);
 
     float threshold = current - selfBias;
     float sum   = 0.0;
@@ -186,7 +194,9 @@ float FindBlockerDepth(int c, vec2 uv, float current, float radiusTexels, float 
     for (int i = 0; i < BLOCKER_TAPS; ++i)
     {
         vec2  offset = (rot * POISSON_DISK[i]) * radiusTexels * texel;
-        float z      = texture(uShadowMapRaw, vec3(uv + offset, float(c))).r;
+        float z      = near
+            ? texture(uShadowMapNearRaw, vec3(uv + offset, float(layer))).r
+            : texture(uShadowMapFarRaw,  vec3(uv + offset, float(layer))).r;
         if (z < threshold)
         {
             sum += z;
@@ -197,8 +207,15 @@ float FindBlockerDepth(int c, vec2 uv, float current, float radiusTexels, float 
     return count > 0 ? sum / float(count) : -1.0;
 }
 
+// `c` indexes the global per-cascade arrays (uLightMatrices/uTexelWorld/uDepthRangeWorld,
+// still one entry per cascade regardless of resolution tier). Cascade 0 samples the near
+// tier's single layer; every other cascade samples the far tier at layer (c - 1) — see the
+// uShadowMapNear/Far comment above.
 float SampleCascade(int c, vec3 N, vec3 L, bool allowPcss)
 {
+    bool near  = c == 0;
+    int  layer = near ? 0 : c - 1;
+
     float nOffset = uNormalBias * uTexelWorld[c];
     vec4 ls = uLightMatrices[c] * vec4(fFragPos + N * nOffset, 1.0);
     vec3 proj = ls.xyz / ls.w * 0.5 + 0.5;
@@ -215,7 +232,7 @@ float SampleCascade(int c, vec3 N, vec3 L, bool allowPcss)
     if (uPcss == 1 && uCheapShading == 0 && allowPcss)
     {
         float selfBias   = nOffset / max(uDepthRangeWorld[c], 1e-4);
-        float avgBlocker = FindBlockerDepth(c, proj.xy, current, uBlockerRadius, selfBias, rot);
+        float avgBlocker = FindBlockerDepth(near, layer, proj.xy, current, uBlockerRadius, selfBias, rot);
         if (avgBlocker >= 0.0)
         {
             // orthographic (directional/parallel) light: penumbra grows linearly with
@@ -226,14 +243,18 @@ float SampleCascade(int c, vec3 N, vec3 L, bool allowPcss)
         }
     }
 
-    vec2 texel = 1.0 / vec2(textureSize(uShadowMap, 0).xy);
+    vec2 texel = near
+        ? 1.0 / vec2(textureSize(uShadowMapNear, 0).xy)
+        : 1.0 / vec2(textureSize(uShadowMapFar, 0).xy);
 
     float lit = 0.0;
     for (int i = 0; i < POISSON_COUNT; ++i)
     {
         // vec4(uv.xy, layer, compareDepth) — GPU compares + 2x2 blends in one tap
         vec2 offset = (rot * POISSON_DISK[i]) * radius * texel;
-        lit += texture(uShadowMap, vec4(proj.xy + offset, float(c), current));
+        lit += near
+            ? texture(uShadowMapNear, vec4(proj.xy + offset, float(layer), current))
+            : texture(uShadowMapFar,  vec4(proj.xy + offset, float(layer), current));
     }
 
     return 1.0 - lit / float(POISSON_COUNT);

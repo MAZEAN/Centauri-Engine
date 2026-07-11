@@ -316,22 +316,28 @@ public class MainRenderer : IDisposable
     private void BindShadows()
     {
         if (!_shadows.Active) return;
-        
+
         _gl.ActiveTexture(TextureUnit.Texture8);
-        _gl.BindTexture(TextureTarget.Texture2DArray, _shadows.DepthTexture);
+        _gl.BindTexture(TextureTarget.Texture2DArray, _shadows.NearDepthTexture);
         _gl.ActiveTexture(TextureUnit.Texture10);
-        _gl.BindTexture(TextureTarget.Texture2DArray, _shadows.RawDepthTexture);
+        _gl.BindTexture(TextureTarget.Texture2DArray, _shadows.NearRawDepthTexture);
+        _gl.ActiveTexture(TextureUnit.Texture11);
+        _gl.BindTexture(TextureTarget.Texture2DArray, _shadows.FarDepthTexture);
+        _gl.ActiveTexture(TextureUnit.Texture12);
+        _gl.BindTexture(TextureTarget.Texture2DArray, _shadows.FarRawDepthTexture);
     }
-    
+
     private void UploadShadowData()
     {
         if (!_shadows.Active) return;
 
         var cascades = _shadows.Cascades;
-        float size   = _config.Shadows.Size;
+        // Each cascade's world texel size depends on the resolution it actually rendered at —
+        // the near/far tiers differ (see ShadowMapper.Resolution) — not the raw config Size,
+        // otherwise PCSS's penumbra-to-texel conversion is wrong for every far-tier cascade.
         for (var i = 0; i < cascades.Length; i++)
             _shadowBuffer.SetCascade(i, cascades[i].Matrix, cascades[i].SplitDepth,
-                cascades[i].Radius * 2f / size, cascades[i].DepthRange);
+                cascades[i].Radius * 2f / _shadows.Resolution(i), cascades[i].DepthRange);
 
         _shadowBuffer.Upload();
     }

@@ -23,7 +23,13 @@ public sealed class ShadowMapper : IDisposable
     private readonly InstanceBuffer _instances;
     private readonly Profiling.GPUProfiler _profiler;
 
-    private ShadowArray _maps;
+    // Two resolution tiers: cascade 0 (the near, tightest-fit slice) always renders at the full
+    // configured Size; every other cascade shares a lower-resolution array (FarCascadeScale) —
+    // they cover a much larger world-space area at the same physical resolution already, so
+    // their texel density is inherently lower, and matching the near cascade's resolution just
+    // spends fill-rate/memory on detail that was never there. See ShadowConfig.FarCascadeScale.
+    private ShadowArray _mapsNear;
+    private ShadowArray _mapsFar;
     private readonly GLShader _depth;
     private readonly Frustum _cull = new();
     private readonly CascadeBuilder _cascadeBuilder;
@@ -45,10 +51,17 @@ public sealed class ShadowMapper : IDisposable
     private readonly ShadowCache _cache = new();
 
     public bool Active { get; private set; }
-    public uint DepthTexture    => _maps.DepthTexture;
-    public uint RawDepthTexture => _maps.RawDepthTexture;
+    public uint NearDepthTexture    => _mapsNear.DepthTexture;
+    public uint NearRawDepthTexture => _mapsNear.RawDepthTexture;
+    public uint FarDepthTexture     => _mapsFar.DepthTexture;
+    public uint FarRawDepthTexture  => _mapsFar.RawDepthTexture;
 
     public Cascade[] Cascades { get; private set; } = [];
+
+    // Physical resolution the given cascade index actually rendered at — see the tier fields'
+    // comment. MainRenderer needs this (not the raw config Size) to compute each cascade's
+    // world-space texel size correctly for PCSS's penumbra-to-texel conversion.
+    public float Resolution(int cascade) => cascade == 0 ? _mapsNear.Size : _mapsFar.Size;
 
     public ShadowMapper(GL gl, AppConfig config, InstanceBuffer instances, Profiling.GPUProfiler profiler)
     {
@@ -58,7 +71,8 @@ public sealed class ShadowMapper : IDisposable
         _profiler = profiler;
 
         _cascadeBuilder = new CascadeBuilder(config);
-        _maps = new ShadowArray(gl, config.Shadows.Size, config.Shadows.MaxCascades);
+        _mapsNear = new ShadowArray(gl, config.Shadows.Size, 1);
+        _mapsFar  = new ShadowArray(gl, FarSize(config.Shadows), config.Shadows.MaxCascades - 1);
         _depth = new GLShader(gl,
             PathResolver.Resolve("Shaders/Shadow/depth.vert"),
             PathResolver.Resolve("Shaders/Shadow/depth.frag"));
@@ -72,6 +86,11 @@ public sealed class ShadowMapper : IDisposable
         }
     }
 
+    // Clamped so a very small scale (or scale=0) can't collapse the far tier to a degenerate
+    // 0-size texture; never larger than the near tier's own size.
+    private static uint FarSize(ShadowConfig s) =>
+        (uint)Math.Clamp(MathF.Round(s.Size * s.FarCascadeScale), 64f, s.Size);
+
     public void Render(Scene scene, CullingSystem culling, ref FrameStats stats)
     {
         using var _ = Profiling.Tracy.Scope("ShadowMapper.Render");
@@ -82,11 +101,18 @@ public sealed class ShadowMapper : IDisposable
         Active = false;
         if (!_config.Shadows.Enabled) return;
 
-        if (_maps.Size != _config.Shadows.Size)
+        var wantFarSize = FarSize(_config.Shadows);
+        if (_mapsNear.Size != _config.Shadows.Size)
         {
-            _maps.Dispose();
-            _maps = new ShadowArray(_gl, _config.Shadows.Size, _config.Shadows.MaxCascades);
+            _mapsNear.Dispose();
+            _mapsNear = new ShadowArray(_gl, _config.Shadows.Size, 1);
             _cache.Invalidate();   // fresh, empty maps — must redraw
+        }
+        if (_mapsFar.Size != wantFarSize)
+        {
+            _mapsFar.Dispose();
+            _mapsFar = new ShadowArray(_gl, wantFarSize, _config.Shadows.MaxCascades - 1);
+            _cache.Invalidate();
         }
 
         if (scene.Lighting.DirectionalLights.Count == 0) return;
@@ -142,7 +168,8 @@ public sealed class ShadowMapper : IDisposable
             SetSolidRenderState();
             for (var c = 0; c < Cascades.Length; c++)
             {
-                _maps.BindLayer(c, clear: true);
+                var (tier, layer) = TierFor(c);
+                tier.BindLayer(layer, clear: true);
                 _depth.SetUniform("uLightMatrix", Cascades[c].Matrix);
                 DrawGroups(_solidByCascade[c], ref stats);
             }
@@ -156,7 +183,8 @@ public sealed class ShadowMapper : IDisposable
         {
             for (var c = 0; c < Cascades.Length; c++)
             {
-                _maps.BindLayer(c, clear: false);
+                var (tier, layer) = TierFor(c);
+                tier.BindLayer(layer, clear: false);
                 _depth.SetUniform("uLightMatrix", Cascades[c].Matrix);
                 DrawGroups(_twoSidedByCascade[c], ref stats);
             }
@@ -164,11 +192,18 @@ public sealed class ShadowMapper : IDisposable
 
         ResetRenderState();
 
-        _maps.SyncRawDepth();
+        _mapsNear.SyncRawDepth();
+        if (Cascades.Length > 1)
+            _mapsFar.SyncRawDepth();
         Active = true;
 
         _cache.Record(key);   // these maps are valid until one of the key's inputs changes
     }
+
+    // Cascade 0 -> the near tier's single layer; every other cascade -> the far tier, at
+    // index (c - 1).
+    private (ShadowArray tier, int layer) TierFor(int c) =>
+        c == 0 ? (_mapsNear, 0) : (_mapsFar, c - 1);
 
     private void BucketCasters(HashSet<Entity> visible,
         Dictionary<Model, List<InstanceData>> solid, Dictionary<Model, List<InstanceData>> twoSided)
@@ -295,7 +330,8 @@ public sealed class ShadowMapper : IDisposable
 
     public void Dispose()
     {
-        _maps.Dispose();
+        _mapsNear.Dispose();
+        _mapsFar.Dispose();
         _depth.Dispose();
     }
 }

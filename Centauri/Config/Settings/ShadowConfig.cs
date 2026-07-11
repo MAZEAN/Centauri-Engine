@@ -14,7 +14,14 @@ public class ShadowConfig : IJsonOnDeserialized
     [JsonPropertyName("pcfRadius")]    public int   PcfRadius    { get; set; } = 2;
     [JsonPropertyName("cascadeCount")] public int   CascadeCount { get; set; } = 4;   // 2–4 typical
     [JsonPropertyName("splitLambda")]  public float SplitLambda  { get; set; } = 0.85f; // 0=uniform, 1=log
-    
+
+    // Resolution multiplier applied to every cascade after the first. Distant cascades cover a
+    // much larger world-space area than the near one at the same physical resolution, so their
+    // texel density is already far lower — rendering them at full size spends fill-rate/memory
+    // on detail that isn't there. 1 = no reduction (identical to the old single-resolution
+    // behavior); the near cascade (index 0) always renders at the full configured Size.
+    [JsonPropertyName("farCascadeScale")] public float FarCascadeScale { get; set; } = 0.5f;
+
     [JsonPropertyName("contactHardening")]    public bool  ContactHardening    { get; set; } = true;
     [JsonPropertyName("lightSize")]           public float LightSize           { get; set; } = 0.02f;  // tan(sun half-angle) — world penumbra growth per unit occluder distance
     [JsonPropertyName("blockerSearchRadius")] public float BlockerSearchRadius { get; set; } = 5f;      // texels
@@ -34,6 +41,7 @@ public class ShadowConfig : IJsonOnDeserialized
     [JsonIgnore] public int   AuthoredPcfRadius           { get; private set; }
     [JsonIgnore] public int   AuthoredCascadeCount        { get; private set; }
     [JsonIgnore] public float AuthoredSplitLambda         { get; private set; }
+    [JsonIgnore] public float AuthoredFarCascadeScale     { get; private set; }
     [JsonIgnore] public float AuthoredLightSize           { get; private set; }
     [JsonIgnore] public float AuthoredBlockerSearchRadius { get; private set; }
     [JsonIgnore] public float AuthoredMaxPenumbraRadius   { get; private set; }
@@ -50,6 +58,7 @@ public class ShadowConfig : IJsonOnDeserialized
         AuthoredPcfRadius           = PcfRadius;
         AuthoredCascadeCount        = CascadeCount;
         AuthoredSplitLambda         = SplitLambda;
+        AuthoredFarCascadeScale     = FarCascadeScale;
         AuthoredLightSize           = LightSize;
         AuthoredBlockerSearchRadius = BlockerSearchRadius;
         AuthoredMaxPenumbraRadius   = MaxPenumbraRadius;

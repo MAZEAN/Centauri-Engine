@@ -36,6 +36,9 @@ public sealed class ShadowSection : ISection
         if (Widgets.ComboRow("Map Size", ref sizeIndex, SizeLabels))
             _config.Size = sizeIndex >= 0 ? Sizes[sizeIndex] : _config.AuthoredSize;
 
+        Widgets.DragRow("Far Cascade Scale", _config.FarCascadeScale, v => _config.FarCascadeScale = v,
+            0.05f, 0.1f, 1f, "%.2f", _config.AuthoredFarCascadeScale);
+
         Widgets.DragRow("Cascades", _config.CascadeCount,
             v => _config.CascadeCount = Math.Clamp((int)MathF.Round(v), 1, _config.MaxCascades),
             1f, 1f, _config.MaxCascades, "%.0f", _config.AuthoredCascadeCount);
