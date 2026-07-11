@@ -29,8 +29,10 @@ uniform float uFoliageAlphaCutoff;
 
 uniform sampler2D uRoughnessMap;
 uniform sampler2D uMetallicMap;
+uniform sampler2D uAOMap;
 uniform int   uHasRoughness;
 uniform int   uHasMetallic;
+uniform int   uHasAO;
 uniform float uRoughnessValue;
 uniform float uMetallicValue;
 
@@ -58,5 +60,9 @@ void main()
 
     float roughness = uHasRoughness == 1 ? texture(uRoughnessMap, fUv).r : uRoughnessValue;
     float metallic  = uHasMetallic  == 1 ? texture(uMetallicMap,  fUv).r : uMetallicValue;
-    gMaterial = vec4(roughness, metallic, 0.0, 1.0);
+    // b = baked material AO (SSR's resolve needs this in screen space to match the same
+    // attenuation the lit pass applies — see ssr_resolve.frag). 1.0 (no occlusion) when the
+    // material has no AO map, same fallback shaderPBR.frag uses.
+    float ao = uHasAO == 1 ? texture(uAOMap, fUv).r : 1.0;
+    gMaterial = vec4(roughness, metallic, ao, 1.0);
 }

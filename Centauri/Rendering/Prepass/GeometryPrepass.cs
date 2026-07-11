@@ -74,6 +74,7 @@ public sealed class GeometryPrepass : IDisposable
         _shader.SetUniform("uView",       camera.GetViewMatrix());
         _shader.SetUniform("uProjection", camera.GetProjectionMatrix());
         _shader.SetUniform("uAlbedo",       0);
+        _shader.SetUniform("uAOMap",        1);
         _shader.SetUniform("uRoughnessMap", 2);
         _shader.SetUniform("uMetallicMap",  3);
         _shader.SetUniform("uFoliageAlphaCutoff", _config.Foliage.AlphaCutoff);
@@ -134,6 +135,7 @@ public sealed class GeometryPrepass : IDisposable
         {
             _shader.SetUniform("uHasRoughness",   0);
             _shader.SetUniform("uHasMetallic",    0);
+            _shader.SetUniform("uHasAO",          0);
             _shader.SetUniform("uRoughnessValue", 1.0f);
             _shader.SetUniform("uMetallicValue",  0.0f);
             return;
@@ -141,9 +143,12 @@ public sealed class GeometryPrepass : IDisposable
 
         _shader.SetUniform("uHasRoughness",   material.Roughness != null ? 1 : 0);
         _shader.SetUniform("uHasMetallic",    material.Metallic  != null ? 1 : 0);
+        _shader.SetUniform("uHasAO",          material.AO        != null ? 1 : 0);
         _shader.SetUniform("uRoughnessValue", material.RoughnessScalar);
         _shader.SetUniform("uMetallicValue",  material.MetallicScalar);
 
+        _gl.ActiveTexture(TextureUnit.Texture1);
+        _gl.BindTexture(TextureTarget.Texture2D, material.AO?.Handle ?? 0);
         _gl.ActiveTexture(TextureUnit.Texture2);
         _gl.BindTexture(TextureTarget.Texture2D, material.Roughness?.Handle ?? 0);
         _gl.ActiveTexture(TextureUnit.Texture3);

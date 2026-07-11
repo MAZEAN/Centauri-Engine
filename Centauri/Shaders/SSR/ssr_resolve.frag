@@ -58,11 +58,9 @@ vec3 FresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
 }
 
 // Local reflection-probe fallback, box-bounded: blends the probe's prefiltered specular over
-// the skybox where the fragment is inside the probe volume. Also reports the blended intensity.
-vec3 probeFallback(vec3 skyboxSpec, vec3 Rworld, vec3 worldPos, vec3 W, float roughness,
-                   out float fallbackIntensity)
+// the skybox where the fragment is inside the probe volume.
+vec3 probeFallback(vec3 skyboxSpec, vec3 Rworld, vec3 worldPos, vec3 W, float roughness)
 {
-    fallbackIntensity = uIblIntensity;
     if (uHasProbe != 1) return skyboxSpec;
 
     vec3  outsideVec  = max(uProbeBoxMin - worldPos, worldPos - uProbeBoxMax);
@@ -73,7 +71,6 @@ vec3 probeFallback(vec3 skyboxSpec, vec3 Rworld, vec3 worldPos, vec3 W, float ro
     vec3 preP      = textureLod(uProbeMap, Rworld, roughness * uProbeMaxReflectionLod).rgb;
     vec3 probeSpec = preP * W * uProbeIntensity;
 
-    fallbackIntensity = mix(uIblIntensity, uProbeIntensity, probeWeight);
     return mix(skyboxSpec, probeSpec, probeWeight);
 }
 
@@ -119,9 +116,10 @@ void main()
     float depth = texture(uDepth, vUv).r;
     if (depth >= 1.0) { FragColor = vec4(0.0); return; }   // background — no surface to reflect on
 
-    vec2  m         = texture(uMaterial, vUv).rg;
+    vec3  m         = texture(uMaterial, vUv).rgb;
     float roughness = m.r;
     float metallic  = m.g;
+    float materialAo = m.b;   // baked material AO map, written by GeometryPrepass — see prepass.frag
 
     vec3 P   = viewPos(vUv);
     vec3 N   = normalize(texture(uNormal, vUv).xyz * 2.0 - 1.0);   // view space
@@ -140,17 +138,24 @@ void main()
     if (uHasIBL == 1)
         skyboxSpec = textureLod(uPrefilterMap, Rworld, roughness * uMaxReflectionLod).rgb * W * uIblIntensity;
 
-    float fallbackIntensity;
-    vec3  fallbackSpec = probeFallback(skyboxSpec, Rworld, worldPos, W, roughness, fallbackIntensity);
+    vec3 fallbackSpec = probeFallback(skyboxSpec, Rworld, worldPos, W, roughness);
 
-    vec3 ssrSpec    = ssr.rgb * W * fallbackIntensity;
+    // Unlike skyboxSpec/probeSpec (synthetic environment maps whose brightness is an artist
+    // exposure knob, hence *uIblIntensity/*uProbeIntensity above), ssr.rgb is real scene radiance
+    // sampled off-screen — already physically correct, so it isn't scaled by either fallback's
+    // intensity control. SSRConfig.Intensity (baked into ssr.rgb upstream, see ssr.frag) is SSR's
+    // own, independent strength knob.
+    vec3 ssrSpec    = ssr.rgb * W;
     vec3 targetSpec = mix(fallbackSpec, ssrSpec, conf);
     targetSpec      = applyPlanar(targetSpec, worldPos, N, W, roughness);
 
-    // Match the lit pass's AO attenuation so the delta reconstructs targetSpec*gtao rather than
-    // over-subtracting the full skyboxSpec in AO'd areas.
+    // Match the lit pass's AO attenuation (screen-space GTAO *and* the material's own baked AO
+    // map) so the delta reconstructs targetSpec*ao*gtao rather than under-subtracting skyboxSpec
+    // in AO'd areas — the lit pass multiplies its ambient specular by both (see shaderPBR.frag's
+    // AmbientLighting), so skyboxSpec here must have the same attenuation baked in for the
+    // subtraction below to actually cancel what the lit pass already added.
     float gtao  = uHasGtao == 1 ? texture(uGtaoMap, vUv).r : 1.0;
-    vec3  delta = (targetSpec - skyboxSpec) * gtao;
+    vec3  delta = (targetSpec - skyboxSpec) * materialAo * gtao;
 
     FragColor = vec4(delta, 1.0);
 }

@@ -58,33 +58,36 @@ public sealed class PostProcessor : IDisposable
     private readonly GL _gl;
     private readonly HDRFramebuffer _hdr;
     private readonly AppConfig _config;
+    private readonly Profiling.GPUProfiler _profiler;
     private uint _width, _height;
-    
+
     private readonly SSRPass _ssr;
     private readonly TAAPass _taa;
-    
+
     private readonly GLShader _tonemap;
     private readonly BloomPass _bloom;
     private readonly AutoExposurePass _autoExposure;
     private readonly uint _emptyVao;   // core profile needs a bound VAO for attribute-less draws
 
-    public PostProcessor(GL gl, HDRFramebuffer hdr, AppConfig config, uint width, uint height)
+    public PostProcessor(GL gl, HDRFramebuffer hdr, AppConfig config, Profiling.GPUProfiler profiler,
+        uint width, uint height)
     {
         _gl = gl;
         _hdr = hdr;
         _config = config;
+        _profiler = profiler;
         _width = width;
         _height = height;
-        
+
         _tonemap = new GLShader(gl,
             PathResolver.Resolve("Shaders/Post/post.vert"),
             PathResolver.Resolve("Shaders/Post/post.frag"));
-        
+
         _bloom = new BloomPass(gl, _config.Bloom, width, height);
         _autoExposure = new AutoExposurePass(gl, _config.AutoExposure, width, height);
         _ssr = new SSRPass(gl, _config.SSR, width, height);
         _taa = new TAAPass(gl, _config.TAA, width, height);
-        
+
         _emptyVao = gl.GenVertexArray();
     }
 
@@ -107,25 +110,37 @@ public sealed class PostProcessor : IDisposable
     public Vector2 NextTaaJitter() => _taa.NextJitter(_width, _height);
     public uint VelocityTexture => _taa.VelocityTexture;   // TAA motion vectors, for the debug view
 
+    // GL_TIME_ELAPSED zones can't nest (see GPUProfiler), so this can't sit inside a single
+    // outer "Post" zone the way it used to — instead it opens its own sequential zones,
+    // breaking SSR (march + blur + temporal + resolve, the priciest single piece of Composite)
+    // out from everything else, which stays bucketed as "Post" same as before.
     public void Composite(in CompositeRequest request)
     {
         using var _ = Profiling.Tracy.Scope("PostProcessor.Composite");
 
-        _hdr.Resolve();
+        bool ssrActive, taaActive;
+        uint sceneColor;
 
-        var sceneColor = _hdr.ResolvedTexture;
+        using (_profiler.Measure("SSR"))
+        {
+            _hdr.Resolve();
+            sceneColor = _hdr.ResolvedTexture;
+            ssrActive  = RenderSsr(request, sceneColor);
+        }
 
-        var ssrActive = RenderSsr(request, sceneColor);
-        var taaActive = RenderTaa(request, ssrActive, ref sceneColor);
-        var ssrInTonemap = ssrActive && !taaActive;
-        
-        if (_config.AutoExposure.Enabled)
-            _autoExposure.Render(sceneColor, request.DeltaTime);
-        
-        if (_config.Bloom.Enabled)
-            _bloom.Render(sceneColor);
+        using (_profiler.Measure("Post"))
+        {
+            taaActive = RenderTaa(request, ssrActive, ref sceneColor);
+            var ssrInTonemap = ssrActive && !taaActive;
 
-        DrawTonemap(sceneColor, ssrInTonemap);
+            if (_config.AutoExposure.Enabled)
+                _autoExposure.Render(sceneColor, request.DeltaTime);
+
+            if (_config.Bloom.Enabled)
+                _bloom.Render(sceneColor);
+
+            DrawTonemap(sceneColor, ssrInTonemap);
+        }
     }
 
     // Returns whether SSR actually ran (request.SsrAvailable && config still enabled).

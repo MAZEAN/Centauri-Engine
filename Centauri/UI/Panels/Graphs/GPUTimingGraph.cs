@@ -22,7 +22,10 @@ internal sealed class GPUTimingGraph
     private const int   Capacity         = 200;    // samples retained
     private const float SampleIntervalMs = 50f;    // one plotted point per 50 ms
     private const float WindowSeconds    = Capacity * SampleIntervalMs / 1000f;
-    private const int   MaxZones         = 8;
+    // Matches GPUProfiler.MaxZones — a lower cap here would silently drop whichever real
+    // profiler zones exceed it from the legend (Slot() returns -1 past this many distinct
+    // names), even though GPUProfiler itself is still timing and reporting them correctly.
+    private const int   MaxZones         = 16;
     private const int   WarmupFrames     = 100;
     private const int   Divs = 5;
 

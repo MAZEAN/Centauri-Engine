@@ -97,7 +97,7 @@ public class RenderingSystem : IDisposable
             _gl, (uint)framebufferSize.X, (uint)framebufferSize.Y, (uint)_config.Window.Samples
         );
         
-        _post = new PostProcessor(_gl, hdr, _config, (uint)framebufferSize.X, (uint)framebufferSize.Y);
+        _post = new PostProcessor(_gl, hdr, _config, _context.Profiler, (uint)framebufferSize.X, (uint)framebufferSize.Y);
         _ui   = new UISystem(_gl, _config, window, input);
         _prepass = new GeometryPrepass(_gl, _config, (uint)framebufferSize.X, (uint)framebufferSize.Y, _instances);
         _gtao    = new GTAOPass(_gl, _config.GTAO, (uint)framebufferSize.X, (uint)framebufferSize.Y);
@@ -157,12 +157,13 @@ public class RenderingSystem : IDisposable
         _post.BeginScene();
         RenderCentralComponents(scene, deltaTime);
 
+        // Composite() opens its own "SSR"/"Post" zones internally (GL_TIME_ELAPSED zones can't
+        // nest, so this can't also be wrapped in an outer Measure() here — see PostProcessor).
         var compositeRequest = CreateCompositeRequest(scene, deltaTime);
-        using (_context.Profiler.Measure("Post"))
-            _post.Composite(in compositeRequest);
+        _post.Composite(in compositeRequest);
         
         RenderAfterPostComponents(scene, deltaTime);
-        
+
         Tracy.FrameMark();
     }
 
