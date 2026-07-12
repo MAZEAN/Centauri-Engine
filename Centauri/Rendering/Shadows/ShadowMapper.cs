@@ -126,7 +126,12 @@ public sealed class ShadowMapper : IDisposable
         // camera even on a frame where the GPU redraw below ends up skipped. Only the
         // (expensive) redraw itself is gated by whether the fit actually changed — see
         // ShadowCache.
-        Cascades = _cascadeBuilder.Build(camera, dir, sceneBounds, Cascades);
+        //
+        // resolutionOf tells the fit which physical resolution each cascade actually renders
+        // at (cascade 0 -> near tier's Size, everything else -> the shared far tier), so its
+        // texel-snap grid matches reality instead of always assuming cascade 0's resolution.
+        Cascades = _cascadeBuilder.Build(camera, dir, sceneBounds,
+            c => c == 0 ? _mapsNear.Size : _mapsFar.Size, Cascades);
 
         if (_cache.CanReuse(dir, scene.Revision, Cascades,
                 _sceneHasWind && _config.Foliage.WindAnimating,

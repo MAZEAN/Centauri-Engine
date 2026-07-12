@@ -23,6 +23,16 @@ public sealed class CascadeBuilder
     private const float ZEpsilon    = 1f;
     private const float ZSnap       = 1f;      // quantize ortho depth range to whole units (depth-precision guard)
 
+    // The X/Y stability snap grid is deliberately coarser than one render texel. Snapping to
+    // exactly a texel (the textbook formula) still re-snaps on almost every frame of continuous
+    // camera motion, since a texel is tiny relative to typical per-frame movement — it stops
+    // sub-texel shimmer but not frame-to-frame flicker. Widening the snap grid to a multiple of
+    // the texel fixes that without costing any resolution or blur: the render target size is
+    // untouched, only the box's position is quantized more coarsely. FitCascade compensates by
+    // growing the radius by one coarse step so the box can never clip content despite landing up
+    // to that much off the ideal center.
+    private const float StabilitySnapScale = 16f;
+
     private readonly AppConfig _config;
 
     public CascadeBuilder(AppConfig config) => _config = config;
@@ -31,7 +41,16 @@ public sealed class CascadeBuilder
 
     // Builds texel-snapped cascades for the given light direction. Reuses `reuse` when it's
     // already the right length so the steady state allocates nothing.
-    public Cascade[] Build(Camera camera, Vector3 dir, BoundingBox sceneBounds, Cascade[] reuse)
+    //
+    // `resolutionOf(index)` returns the physical resolution cascade `index` actually renders
+    // at — the texel-snap grid below needs to match that real resolution, not assume every
+    // cascade shares cascade 0's. Cascades other than 0 share one lower-resolution tier (see
+    // ShadowConfig.FarCascadeScale/ShadowMapper), so without this the snap grid is calibrated
+    // as if that tier were never actually smaller — silently discarding the stability its lower
+    // resolution should provide, since a coarser render target can tolerate the fitted box
+    // landing on the same texel across a wider range of camera positions.
+    public Cascade[] Build(Camera camera, Vector3 dir, BoundingBox sceneBounds,
+        Func<int, float> resolutionOf, Cascade[] reuse)
     {
         var n = CascadeCount;
         var cascades = reuse.Length == n ? reuse : new Cascade[n];
@@ -53,7 +72,7 @@ public sealed class CascadeBuilder
 
             SliceCorners(frustum, (prevSplit - near) * invRange, (split - near) * invRange, slice);
 
-            cascades[c] = FitCascade(slice, dir, split, sceneBounds);
+            cascades[c] = FitCascade(slice, dir, split, sceneBounds, resolutionOf(c));
             prevSplit = split;
         }
 
@@ -99,7 +118,8 @@ public sealed class CascadeBuilder
     }
 
     // fit a stable, texel-snapped ortho box around the slice (bounding-sphere method)
-    private Cascade FitCascade(ReadOnlySpan<Vector3> corners, Vector3 dir, float splitDepth, BoundingBox sceneBounds)
+    private Cascade FitCascade(ReadOnlySpan<Vector3> corners, Vector3 dir, float splitDepth,
+        BoundingBox sceneBounds, float resolution)
     {
         var center = Vector3.Zero;
         foreach (var p in corners)
@@ -134,10 +154,19 @@ public sealed class CascadeBuilder
         // frame they're measured against keeps moving underneath them.
         var view = Matrix4x4.CreateLookAt(Vector3.Zero, dir, up);
 
-        var texelSize = (radius * 2f) / _config.Shadows.Size;
+        // snapTexel is a coarse multiple of the real render texel — see StabilitySnapScale.
+        // Flooring to it can leave the box up to one snapTexel short of the ideal center, so the
+        // ortho bounds below use a padded boxRadius to guarantee the box still fully contains the
+        // slice. `radius` itself stays the true render radius: it's returned on the Cascade and
+        // feeds the shader's world-texel-size (Radius*2/resolution) for PCSS penumbra math, which
+        // must reflect the actual render target, not this padding.
+        var renderTexel = (radius * 2f) / resolution;
+        var snapTexel = renderTexel * StabilitySnapScale;
+        var boxRadius = radius + snapTexel;
+
         var centerLS = Vector3.Transform(center, view);
-        centerLS.X = MathF.Floor(centerLS.X / texelSize) * texelSize;
-        centerLS.Y = MathF.Floor(centerLS.Y / texelSize) * texelSize;
+        centerLS.X = MathF.Floor(centerLS.X / snapTexel) * snapTexel;
+        centerLS.Y = MathF.Floor(centerLS.Y / snapTexel) * snapTexel;
 
         float sliceMinZ = float.MaxValue, sliceMaxZ = float.MinValue;
         foreach (var p in corners)
@@ -159,8 +188,8 @@ public sealed class CascadeBuilder
         farZ  = MathF.Ceiling(farZ / ZSnap) * ZSnap;
 
         var proj = Matrix4x4.CreateOrthographicOffCenter(
-            centerLS.X - radius, centerLS.X + radius,
-            centerLS.Y - radius, centerLS.Y + radius,
+            centerLS.X - boxRadius, centerLS.X + boxRadius,
+            centerLS.Y - boxRadius, centerLS.Y + boxRadius,
             nearZ, farZ);
 
         return new Cascade
