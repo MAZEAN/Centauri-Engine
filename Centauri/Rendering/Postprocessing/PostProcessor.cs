@@ -123,24 +123,43 @@ public sealed class PostProcessor : IDisposable
 
         using (_profiler.Measure("SSR"))
         {
-            _hdr.Resolve();
+            using (Profiling.Tracy.Scope("PostProcessor.Composite.HdrResolve"))
+                _hdr.Resolve();
+
             sceneColor = _hdr.ResolvedTexture;
-            ssrActive  = RenderSsr(request, sceneColor);
+
+            using var __ = Profiling.Tracy.Scope("PostProcessor.Composite.SSR");
+            ssrActive = RenderSsr(request, sceneColor);
         }
 
         using (_profiler.Measure("Post"))
         {
-            taaActive = RenderTaa(request, ssrActive, ref sceneColor);
+            using var __ = Profiling.Tracy.Scope("PostProcessor.Composite.Post");
+
+            taaActive = TimedRenderTaa(request, ssrActive, ref sceneColor);
             var ssrInTonemap = ssrActive && !taaActive;
 
             if (_config.AutoExposure.Enabled)
+            {
+                using var ___ = Profiling.Tracy.Scope("PostProcessor.Composite.AutoExposure");
                 _autoExposure.Render(sceneColor, request.DeltaTime);
+            }
 
             if (_config.Bloom.Enabled)
+            {
+                using var ___ = Profiling.Tracy.Scope("PostProcessor.Composite.Bloom");
                 _bloom.Render(sceneColor);
+            }
 
-            DrawTonemap(sceneColor, ssrInTonemap);
+            using (Profiling.Tracy.Scope("PostProcessor.Composite.Tonemap"))
+                DrawTonemap(sceneColor, ssrInTonemap);
         }
+    }
+
+    private bool TimedRenderTaa(in CompositeRequest request, bool ssrActive, ref uint sceneColor)
+    {
+        using var _ = Profiling.Tracy.Scope("PostProcessor.Composite.TAA");
+        return RenderTaa(request, ssrActive, ref sceneColor);
     }
 
     // Returns whether SSR actually ran (request.SsrAvailable && config still enabled).
