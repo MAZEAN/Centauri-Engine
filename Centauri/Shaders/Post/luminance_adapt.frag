@@ -12,8 +12,9 @@ out vec4 FragColor;
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-uniform sampler2D uCurrent;    // this frame's fully-downsampled 1x1 log-luminance
+uniform sampler2D uCurrent;    // hardware-mipmapped log-luminance texture; uCurrentLod is its coarsest level
 uniform sampler2D uPrevious;   // last frame's adapted 1x1 log-luminance
+uniform float uCurrentLod;     // mip level that reduces uCurrent to ~1x1 (see AutoExposurePass)
 uniform float uDeltaTime;
 uniform float uAdaptSpeed;     // higher = adapts faster
 
@@ -21,7 +22,7 @@ uniform float uAdaptSpeed;     // higher = adapts faster
 
 void main()
 {
-    float target = texture(uCurrent, vec2(0.5)).r;
+    float target = textureLod(uCurrent, vec2(0.5), uCurrentLod).r;
     float prev   = texture(uPrevious, vec2(0.5)).r;
 
     // Second line of defense (see luminance_prefilter.frag): this value ping-pongs back into
