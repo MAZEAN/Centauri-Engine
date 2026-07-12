@@ -11,7 +11,7 @@ public sealed class SSRConfig : IJsonOnDeserialized
     [JsonPropertyName("maxSteps")]        public int   MaxSteps        { get; set; } = 48;     // linear march steps
     [JsonPropertyName("refineSteps")]     public int   RefineSteps     { get; set; } = 6;      // binary-search refinement
     [JsonPropertyName("roughnessCutoff")] public float RoughnessCutoff { get; set; } = 0.6f;   // fade SSR out above this
-    [JsonPropertyName("halfResolution")]  public bool  HalfResolution  { get; set; } = false;  // trade reflection sharpness for speed (applied at startup/resize)
+    [JsonPropertyName("halfResolution")]  public bool  HalfResolution  { get; set; } = true;  // trade reflection sharpness for speed (applied at startup/resize)
     [JsonPropertyName("silhouetteThreshold")] public float SilhouetteThreshold { get; set; } = 0.1f;
     [JsonPropertyName("temporalFeedback")] public float TemporalFeedback { get; set; } = 0.85f;
 
