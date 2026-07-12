@@ -59,7 +59,15 @@ public sealed class PostProcessor : IDisposable
     private readonly HDRFramebuffer _hdr;
     private readonly AppConfig _config;
     private readonly Profiling.GPUProfiler _profiler;
+
+    // The scene itself (HDR target, SSR, bloom, autoexposure, TAA) renders at `_width/_height` —
+    // AppConfig.Render.RenderScale times the window's actual framebuffer size. The final tonemap
+    // draw instead targets `_outputWidth/_outputHeight` (always the window's native size,
+    // unscaled): it samples the (possibly smaller) scene color texture through DrawTonemap's
+    // linear-filtered sampler into a full native-size viewport, so upscaling to the display falls
+    // out of that one draw for free — see RenderConfig.RenderScale.
     private uint _width, _height;
+    private uint _outputWidth, _outputHeight;
 
     private readonly SSRPass _ssr;
     private readonly TAAPass _taa;
@@ -70,7 +78,7 @@ public sealed class PostProcessor : IDisposable
     private readonly uint _emptyVao;   // core profile needs a bound VAO for attribute-less draws
 
     public PostProcessor(GL gl, HDRFramebuffer hdr, AppConfig config, Profiling.GPUProfiler profiler,
-        uint width, uint height)
+        uint width, uint height, uint outputWidth, uint outputHeight)
     {
         _gl = gl;
         _hdr = hdr;
@@ -78,6 +86,8 @@ public sealed class PostProcessor : IDisposable
         _profiler = profiler;
         _width = width;
         _height = height;
+        _outputWidth = outputWidth;
+        _outputHeight = outputHeight;
 
         _tonemap = new GLShader(gl,
             PathResolver.Resolve("Shaders/Post/post.vert"),
@@ -91,10 +101,12 @@ public sealed class PostProcessor : IDisposable
         _emptyVao = gl.GenVertexArray();
     }
 
-    public void Resize(uint width, uint height)
+    public void Resize(uint width, uint height, uint outputWidth, uint outputHeight)
     {
         _width = width;
         _height = height;
+        _outputWidth = outputWidth;
+        _outputHeight = outputHeight;
         _hdr.Resize(width, height);
         _bloom.Resize(width, height);
         _autoExposure.Resize(width, height);
@@ -186,10 +198,12 @@ public sealed class PostProcessor : IDisposable
     }
 
     private void DrawTonemap(uint sceneColor, bool ssrInTonemap)
-    {    
-        // back to the screen for the tonemap (bloom left its own mip FBOs bound)
+    {
+        // back to the screen for the tonemap (bloom left its own mip FBOs bound). Native output
+        // size, not the (possibly smaller) render size sceneColor/bloom/etc. were rendered at —
+        // BindScene's linear-filtered sample is what upscales them into this viewport.
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-        _gl.Viewport(0, 0, _width, _height);
+        _gl.Viewport(0, 0, _outputWidth, _outputHeight);
         
         SetRenderState();
 

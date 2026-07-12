@@ -62,11 +62,18 @@ public class RenderingSystem : IDisposable
     private Vector2 _cloudInvViewport;
 
     private readonly RenderContext _context = new();
-    
+
     private bool _probeBaked;
     private bool? _skyIsDay;
 
     private readonly FrameTimeTracker _frameTime = new();
+
+    // The window's actual (native, unscaled) framebuffer size, cached so a mid-session
+    // RenderConfig.RenderScale change (checked once per frame in Render()) can re-derive the
+    // scaled render size and re-run Resize() without needing the IWindow itself, which is only
+    // available transiently at InitializeComponents/OnResize time — see CheckRenderScale.
+    private uint _outputWidth, _outputHeight;
+    private float _lastRenderScale = 1f;
     
     public bool ImGuiWantsMouse    => _ui.WantsMouse;
     public bool ImGuiWantsKeyboard => _ui.WantsKeyboard;
@@ -93,20 +100,47 @@ public class RenderingSystem : IDisposable
     public void InitializeComponents(IWindow window, IInputContext input)
     {
         var framebufferSize = window.FramebufferSize;
-        var hdr = new HDRFramebuffer(
-            _gl, (uint)framebufferSize.X, (uint)framebufferSize.Y, (uint)_config.Window.Samples
-        );
-        
-        _post = new PostProcessor(_gl, hdr, _config, _context.Profiler, (uint)framebufferSize.X, (uint)framebufferSize.Y);
+        _outputWidth  = (uint)framebufferSize.X;
+        _outputHeight = (uint)framebufferSize.Y;
+        _lastRenderScale = _config.Render.RenderScale;
+        var (renderWidth, renderHeight) = ScaledSize(_outputWidth, _outputHeight);
+
+        var hdr = new HDRFramebuffer(_gl, renderWidth, renderHeight, (uint)_config.Window.Samples);
+
+        _post = new PostProcessor(_gl, hdr, _config, _context.Profiler,
+            renderWidth, renderHeight, _outputWidth, _outputHeight);
         _ui   = new UISystem(_gl, _config, window, input);
-        _prepass = new GeometryPrepass(_gl, _config, (uint)framebufferSize.X, (uint)framebufferSize.Y, _instances);
-        _gtao    = new GTAOPass(_gl, _config.GTAO, (uint)framebufferSize.X, (uint)framebufferSize.Y);
+        _prepass = new GeometryPrepass(_gl, _config, renderWidth, renderHeight, _instances);
+        _gtao    = new GTAOPass(_gl, _config.GTAO, renderWidth, renderHeight);
         _planar  = new PlanarReflectionPass(_gl, _config.PlanarReflection, _mainRenderer, _skyboxRenderer,
-            (uint)framebufferSize.X, (uint)framebufferSize.Y, (uint)_config.Window.Samples);
+            renderWidth, renderHeight, (uint)_config.Window.Samples);
         _zPrepass = new ZPrepass(_gl, _config, _instances);
-        _clouds  = new CloudPass(_gl, _config.Sky, _skyboxRenderer.Cube, (uint)framebufferSize.X, (uint)framebufferSize.Y);
-        _cloudInvViewport = new Vector2(1f / framebufferSize.X, 1f / framebufferSize.Y);
+        _clouds  = new CloudPass(_gl, _config.Sky, _skyboxRenderer.Cube, renderWidth, renderHeight);
+        _cloudInvViewport = new Vector2(1f / renderWidth, 1f / renderHeight);
         _bufferDebug = new BufferDebugView(_gl);
+    }
+
+    // AppConfig.Render.RenderScale times the window's real framebuffer size — see its own
+    // comment for why only the scene (not the final tonemap output) scales. Clamped so a
+    // pathological config value can't collapse a render target to 0 or upscale past native.
+    private (uint width, uint height) ScaledSize(uint outputWidth, uint outputHeight)
+    {
+        var scale = Math.Clamp(_config.Render.RenderScale, 0.1f, 1f);
+        return (
+            Math.Max(1u, (uint)MathF.Round(outputWidth  * scale)),
+            Math.Max(1u, (uint)MathF.Round(outputHeight * scale)));
+    }
+
+    // RenderScale is tunable at runtime via the UI, unlike the window size Resize() otherwise
+    // reacts to — checked once a frame so a mid-session change re-derives the scaled render size
+    // and re-runs the same resize path a real window resize would, without needing the IWindow
+    // itself (only available transiently at InitializeComponents/Engine.OnResize time).
+    private void CheckRenderScale()
+    {
+        if (_config.Render.RenderScale == _lastRenderScale) return;
+
+        _lastRenderScale = _config.Render.RenderScale;
+        Resize(_outputWidth, _outputHeight);
     }
     
     public void BakeEnvironments(Scene scene)
@@ -131,7 +165,8 @@ public class RenderingSystem : IDisposable
     {
         Tracy.Enabled = _config.Debug.TracyEnabled;
         using var frameZone = Tracy.Scope("Frame");
-        
+
+        CheckRenderScale();
         BeginFrame(scene);
         
         UpdateProceduralIbl(scene);
@@ -373,11 +408,20 @@ public class RenderingSystem : IDisposable
     
     public void Resize(uint width, uint height)
     {
-        _post.Resize(width, height);
-        _prepass.Resize(width, height);
-        _gtao.Resize(width, height);
-        _clouds.Resize(width, height);
-        _cloudInvViewport = new Vector2(1f / width, 1f / height);
+        _outputWidth  = width;
+        _outputHeight = height;
+        var (renderWidth, renderHeight) = ScaledSize(width, height);
+
+        _post.Resize(renderWidth, renderHeight, _outputWidth, _outputHeight);
+        _prepass.Resize(renderWidth, renderHeight);
+        _gtao.Resize(renderWidth, renderHeight);
+        // Not resized before this fix: PlanarReflectionPass's own target — and therefore its
+        // reflection resolution/aspect — stayed pinned to whatever InitializeComponents saw at
+        // startup, silently mismatched from the window after any real resize (RenderScale
+        // exposed this by making window resize and render-scale changes share this same path).
+        _planar.Resize(renderWidth, renderHeight);
+        _clouds.Resize(renderWidth, renderHeight);
+        _cloudInvViewport = new Vector2(1f / renderWidth, 1f / renderHeight);
     }
 
     public void Dispose()

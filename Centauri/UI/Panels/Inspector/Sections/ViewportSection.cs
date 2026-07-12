@@ -6,15 +6,22 @@ using Common;
 
 public sealed class ViewportSection : ISection
 {
-    private readonly DebugConfig _config;
+    private readonly DebugConfig  _config;
+    private readonly RenderConfig _render;
 
-    public ViewportSection(DebugConfig config) => _config = config;
+    public ViewportSection(DebugConfig config, RenderConfig render)
+    {
+        _config = config;
+        _render = render;
+    }
 
     public void Draw(Scene scene)
     {
         using var s = Widgets.Section("Viewport", startCollapsed: true);
         if (!s.Open) return;
 
+        Widgets.DragRow("Render Scale", _render.RenderScale, v => _render.RenderScale = v,
+            0.05f, 0.1f, 1f, "%.2f", 1f);
         Widgets.CheckRow("Grid",            _config.ShowGrid,          v => _config.ShowGrid          = v);
         Widgets.CheckRow("Skybox",          _config.ShowSkybox,        v => _config.ShowSkybox        = v);
         Widgets.CheckRow("Stats Overlay",   _config.ShowStatsOverlay,  v => _config.ShowStatsOverlay  = v);

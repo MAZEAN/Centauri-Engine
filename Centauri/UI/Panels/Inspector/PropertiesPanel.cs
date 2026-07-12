@@ -50,7 +50,7 @@ public class PropertiesPanel
             ]),
             new SectionGroup("Scene", ColorPalette.Amber, [
                 new CullingSection(config),
-                new ViewportSection(config.Debug),
+                new ViewportSection(config.Debug, config.Render),
                 new TracySection(config.Debug)
             ])
         ];

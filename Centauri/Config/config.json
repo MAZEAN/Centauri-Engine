@@ -23,7 +23,8 @@
     "modelCacheSize": 64,
     "shaderCacheSize": 32,
     "scenePath": "Loading/scene.json",
-    "defaultShader": "Shaders/PBR/shaderPBR"
+    "defaultShader": "Shaders/PBR/shaderPBR",
+    "renderScale": 1.0
   },
   "imGui": {
     "font": "Assets/Fonts/IosevkaCharon-Regular.ttf",

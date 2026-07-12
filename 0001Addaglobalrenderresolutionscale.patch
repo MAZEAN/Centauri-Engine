@@ -1,0 +1,318 @@
+From 07062ead916601fd125dd8f570ef959b01f90383 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 12 Jul 2026 23:22:46 +0000
+Subject: [PATCH] Add a global render-resolution scale
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Profiling on a weak iGPU (Iris Xe) showed Forward and Prepass
+dominating frame time despite trivial geometry (13 draw calls, ~2M
+vertices) — the cost is per-fragment shading at native resolution, not
+draw-call/batching overhead. GTAO/SSR/planar were already partly
+scaled down, but the two biggest passes (Forward, Prepass) and
+everything else in the scene chain (HDR target, bloom, autoexposure,
+TAA) still ran at full native resolution with no way to trade
+sharpness for fill-rate.
+
+Adds RenderConfig.RenderScale (default 1, identical to today's
+behavior): the HDR target, prepass, GTAO, SSR, bloom, autoexposure,
+TAA, clouds, and planar reflections all render at this fraction of the
+window's real framebuffer size. Only the final tonemap draw stays
+pinned to native resolution — it already samples the scene through a
+linear-filtered sampler into a full-size viewport (see HDRFramebuffer/
+BloomPass/SSRPass/TAAPass, all already linear-filtered), so upscaling
+a smaller render falls out of that existing draw for free; no
+dedicated upscale pass was needed. Tunable at runtime via the new
+"Render Scale" slider in the Viewport inspector section
+(RenderingSystem.CheckRenderScale re-derives and re-applies the scaled
+size once a frame when it changes).
+
+Incidental fix: RenderingSystem.Resize never called
+PlanarReflectionPass.Resize, so its target silently stayed pinned to
+whatever size InitializeComponents saw at startup after any real
+window resize — this surfaced because RenderScale changes now share
+the same Resize() path a window resize takes.
+
+Verified with headless renders at scale=1 (matches prior output) and
+scale=0.5 (renders correctly, upscales cleanly via existing linear
+filtering, no corruption/crashes/incomplete-framebuffer errors).
+Absolute frame-time numbers from this environment's software
+rasterizer aren't representative of a real GPU's fill-rate-bound
+behavior, so the actual speedup needs measuring on real hardware.
+---
+ Centauri/Config/Settings/RenderConfig.cs      | 12 +++
+ Centauri/Config/config.json                   |  3 +-
+ .../Rendering/Postprocessing/PostProcessor.cs | 24 ++++--
+ Centauri/Rendering/RenderingSystem.cs         | 78 +++++++++++++++----
+ .../UI/Panels/Inspector/PropertiesPanel.cs    |  2 +-
+ .../Inspector/Sections/ViewportSection.cs     | 11 ++-
+ 6 files changed, 104 insertions(+), 26 deletions(-)
+
+diff --git a/Centauri/Config/Settings/RenderConfig.cs b/Centauri/Config/Settings/RenderConfig.cs
+index b2fb02e..fcb13f2 100644
+--- a/Centauri/Config/Settings/RenderConfig.cs
++++ b/Centauri/Config/Settings/RenderConfig.cs
+@@ -10,4 +10,16 @@ public class RenderConfig
+     [JsonPropertyName("shaderCacheSize")]  public int    ShaderCacheSize  { get; init; } = 32;
+     [JsonPropertyName("scenePath")]        public string ScenePath        { get; init; } = "Loading/scene.json";
+     [JsonPropertyName("defaultShader")]    public string DefaultShader    { get; init; } = "Shaders/shaderPBR";
++
++    // Fraction of the window's framebuffer resolution the scene (HDR target, prepass, GTAO,
++    // SSR, bloom/autoexposure/TAA) actually renders at — everything downstream of the lit pass
++    // scales together so their textures stay dimensionally consistent (GTAO/SSR sample the
++    // prepass G-buffer by UV, not absolute pixel count, so this only requires them to share the
++    // same base resolution, not any particular one). Only the final tonemap draw stays pinned to
++    // the window's native resolution: it already samples the (possibly smaller) scene color
++    // texture through a linear-filtered sampler into a full-size viewport, so upscaling falls
++    // out of that draw for free — no dedicated upscale pass needed. 1 = full native resolution,
++    // identical to the old unscaled behavior; below 1 trades sharpness for fill-rate, the
++    // standard lever for catching up a fill-bound frame on a weak GPU.
++    [JsonPropertyName("renderScale")]      public float  RenderScale      { get; set; } = 1f;
+ }
+diff --git a/Centauri/Config/config.json b/Centauri/Config/config.json
+index 4eb49a5..8531bda 100644
+--- a/Centauri/Config/config.json
++++ b/Centauri/Config/config.json
+@@ -23,7 +23,8 @@
+     "modelCacheSize": 64,
+     "shaderCacheSize": 32,
+     "scenePath": "Loading/scene.json",
+-    "defaultShader": "Shaders/PBR/shaderPBR"
++    "defaultShader": "Shaders/PBR/shaderPBR",
++    "renderScale": 1.0
+   },
+   "imGui": {
+     "font": "Assets/Fonts/IosevkaCharon-Regular.ttf",
+diff --git a/Centauri/Rendering/Postprocessing/PostProcessor.cs b/Centauri/Rendering/Postprocessing/PostProcessor.cs
+index 9fa57ac..b4c86a3 100644
+--- a/Centauri/Rendering/Postprocessing/PostProcessor.cs
++++ b/Centauri/Rendering/Postprocessing/PostProcessor.cs
+@@ -59,7 +59,15 @@ public sealed class PostProcessor : IDisposable
+     private readonly HDRFramebuffer _hdr;
+     private readonly AppConfig _config;
+     private readonly Profiling.GPUProfiler _profiler;
++
++    // The scene itself (HDR target, SSR, bloom, autoexposure, TAA) renders at `_width/_height` —
++    // AppConfig.Render.RenderScale times the window's actual framebuffer size. The final tonemap
++    // draw instead targets `_outputWidth/_outputHeight` (always the window's native size,
++    // unscaled): it samples the (possibly smaller) scene color texture through DrawTonemap's
++    // linear-filtered sampler into a full native-size viewport, so upscaling to the display falls
++    // out of that one draw for free — see RenderConfig.RenderScale.
+     private uint _width, _height;
++    private uint _outputWidth, _outputHeight;
+ 
+     private readonly SSRPass _ssr;
+     private readonly TAAPass _taa;
+@@ -70,7 +78,7 @@ public sealed class PostProcessor : IDisposable
+     private readonly uint _emptyVao;   // core profile needs a bound VAO for attribute-less draws
+ 
+     public PostProcessor(GL gl, HDRFramebuffer hdr, AppConfig config, Profiling.GPUProfiler profiler,
+-        uint width, uint height)
++        uint width, uint height, uint outputWidth, uint outputHeight)
+     {
+         _gl = gl;
+         _hdr = hdr;
+@@ -78,6 +86,8 @@ public sealed class PostProcessor : IDisposable
+         _profiler = profiler;
+         _width = width;
+         _height = height;
++        _outputWidth = outputWidth;
++        _outputHeight = outputHeight;
+ 
+         _tonemap = new GLShader(gl,
+             PathResolver.Resolve("Shaders/Post/post.vert"),
+@@ -91,10 +101,12 @@ public sealed class PostProcessor : IDisposable
+         _emptyVao = gl.GenVertexArray();
+     }
+ 
+-    public void Resize(uint width, uint height)
++    public void Resize(uint width, uint height, uint outputWidth, uint outputHeight)
+     {
+         _width = width;
+         _height = height;
++        _outputWidth = outputWidth;
++        _outputHeight = outputHeight;
+         _hdr.Resize(width, height);
+         _bloom.Resize(width, height);
+         _autoExposure.Resize(width, height);
+@@ -186,10 +198,12 @@ public sealed class PostProcessor : IDisposable
+     }
+ 
+     private void DrawTonemap(uint sceneColor, bool ssrInTonemap)
+-    {    
+-        // back to the screen for the tonemap (bloom left its own mip FBOs bound)
++    {
++        // back to the screen for the tonemap (bloom left its own mip FBOs bound). Native output
++        // size, not the (possibly smaller) render size sceneColor/bloom/etc. were rendered at —
++        // BindScene's linear-filtered sample is what upscales them into this viewport.
+         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+-        _gl.Viewport(0, 0, _width, _height);
++        _gl.Viewport(0, 0, _outputWidth, _outputHeight);
+         
+         SetRenderState();
+ 
+diff --git a/Centauri/Rendering/RenderingSystem.cs b/Centauri/Rendering/RenderingSystem.cs
+index a7ffb81..06f784d 100644
+--- a/Centauri/Rendering/RenderingSystem.cs
++++ b/Centauri/Rendering/RenderingSystem.cs
+@@ -62,11 +62,18 @@ public class RenderingSystem : IDisposable
+     private Vector2 _cloudInvViewport;
+ 
+     private readonly RenderContext _context = new();
+-    
++
+     private bool _probeBaked;
+     private bool? _skyIsDay;
+ 
+     private readonly FrameTimeTracker _frameTime = new();
++
++    // The window's actual (native, unscaled) framebuffer size, cached so a mid-session
++    // RenderConfig.RenderScale change (checked once per frame in Render()) can re-derive the
++    // scaled render size and re-run Resize() without needing the IWindow itself, which is only
++    // available transiently at InitializeComponents/OnResize time — see CheckRenderScale.
++    private uint _outputWidth, _outputHeight;
++    private float _lastRenderScale = 1f;
+     
+     public bool ImGuiWantsMouse    => _ui.WantsMouse;
+     public bool ImGuiWantsKeyboard => _ui.WantsKeyboard;
+@@ -93,21 +100,48 @@ public class RenderingSystem : IDisposable
+     public void InitializeComponents(IWindow window, IInputContext input)
+     {
+         var framebufferSize = window.FramebufferSize;
+-        var hdr = new HDRFramebuffer(
+-            _gl, (uint)framebufferSize.X, (uint)framebufferSize.Y, (uint)_config.Window.Samples
+-        );
+-        
+-        _post = new PostProcessor(_gl, hdr, _config, _context.Profiler, (uint)framebufferSize.X, (uint)framebufferSize.Y);
++        _outputWidth  = (uint)framebufferSize.X;
++        _outputHeight = (uint)framebufferSize.Y;
++        _lastRenderScale = _config.Render.RenderScale;
++        var (renderWidth, renderHeight) = ScaledSize(_outputWidth, _outputHeight);
++
++        var hdr = new HDRFramebuffer(_gl, renderWidth, renderHeight, (uint)_config.Window.Samples);
++
++        _post = new PostProcessor(_gl, hdr, _config, _context.Profiler,
++            renderWidth, renderHeight, _outputWidth, _outputHeight);
+         _ui   = new UISystem(_gl, _config, window, input);
+-        _prepass = new GeometryPrepass(_gl, _config, (uint)framebufferSize.X, (uint)framebufferSize.Y, _instances);
+-        _gtao    = new GTAOPass(_gl, _config.GTAO, (uint)framebufferSize.X, (uint)framebufferSize.Y);
++        _prepass = new GeometryPrepass(_gl, _config, renderWidth, renderHeight, _instances);
++        _gtao    = new GTAOPass(_gl, _config.GTAO, renderWidth, renderHeight);
+         _planar  = new PlanarReflectionPass(_gl, _config.PlanarReflection, _mainRenderer, _skyboxRenderer,
+-            (uint)framebufferSize.X, (uint)framebufferSize.Y, (uint)_config.Window.Samples);
++            renderWidth, renderHeight, (uint)_config.Window.Samples);
+         _zPrepass = new ZPrepass(_gl, _config, _instances);
+-        _clouds  = new CloudPass(_gl, _config.Sky, _skyboxRenderer.Cube, (uint)framebufferSize.X, (uint)framebufferSize.Y);
+-        _cloudInvViewport = new Vector2(1f / framebufferSize.X, 1f / framebufferSize.Y);
++        _clouds  = new CloudPass(_gl, _config.Sky, _skyboxRenderer.Cube, renderWidth, renderHeight);
++        _cloudInvViewport = new Vector2(1f / renderWidth, 1f / renderHeight);
+         _bufferDebug = new BufferDebugView(_gl);
+     }
++
++    // AppConfig.Render.RenderScale times the window's real framebuffer size — see its own
++    // comment for why only the scene (not the final tonemap output) scales. Clamped so a
++    // pathological config value can't collapse a render target to 0 or upscale past native.
++    private (uint width, uint height) ScaledSize(uint outputWidth, uint outputHeight)
++    {
++        var scale = Math.Clamp(_config.Render.RenderScale, 0.1f, 1f);
++        return (
++            Math.Max(1u, (uint)MathF.Round(outputWidth  * scale)),
++            Math.Max(1u, (uint)MathF.Round(outputHeight * scale)));
++    }
++
++    // RenderScale is tunable at runtime via the UI, unlike the window size Resize() otherwise
++    // reacts to — checked once a frame so a mid-session change re-derives the scaled render size
++    // and re-runs the same resize path a real window resize would, without needing the IWindow
++    // itself (only available transiently at InitializeComponents/Engine.OnResize time).
++    private void CheckRenderScale()
++    {
++        if (_config.Render.RenderScale == _lastRenderScale) return;
++
++        _lastRenderScale = _config.Render.RenderScale;
++        Resize(_outputWidth, _outputHeight);
++    }
+     
+     public void BakeEnvironments(Scene scene)
+     {
+@@ -131,7 +165,8 @@ public class RenderingSystem : IDisposable
+     {
+         Tracy.Enabled = _config.Debug.TracyEnabled;
+         using var frameZone = Tracy.Scope("Frame");
+-        
++
++        CheckRenderScale();
+         BeginFrame(scene);
+         
+         UpdateProceduralIbl(scene);
+@@ -373,11 +408,20 @@ public class RenderingSystem : IDisposable
+     
+     public void Resize(uint width, uint height)
+     {
+-        _post.Resize(width, height);
+-        _prepass.Resize(width, height);
+-        _gtao.Resize(width, height);
+-        _clouds.Resize(width, height);
+-        _cloudInvViewport = new Vector2(1f / width, 1f / height);
++        _outputWidth  = width;
++        _outputHeight = height;
++        var (renderWidth, renderHeight) = ScaledSize(width, height);
++
++        _post.Resize(renderWidth, renderHeight, _outputWidth, _outputHeight);
++        _prepass.Resize(renderWidth, renderHeight);
++        _gtao.Resize(renderWidth, renderHeight);
++        // Not resized before this fix: PlanarReflectionPass's own target — and therefore its
++        // reflection resolution/aspect — stayed pinned to whatever InitializeComponents saw at
++        // startup, silently mismatched from the window after any real resize (RenderScale
++        // exposed this by making window resize and render-scale changes share this same path).
++        _planar.Resize(renderWidth, renderHeight);
++        _clouds.Resize(renderWidth, renderHeight);
++        _cloudInvViewport = new Vector2(1f / renderWidth, 1f / renderHeight);
+     }
+ 
+     public void Dispose()
+diff --git a/Centauri/UI/Panels/Inspector/PropertiesPanel.cs b/Centauri/UI/Panels/Inspector/PropertiesPanel.cs
+index 2533d7c..bc7666d 100644
+--- a/Centauri/UI/Panels/Inspector/PropertiesPanel.cs
++++ b/Centauri/UI/Panels/Inspector/PropertiesPanel.cs
+@@ -50,7 +50,7 @@ public class PropertiesPanel
+             ]),
+             new SectionGroup("Scene", ColorPalette.Amber, [
+                 new CullingSection(config),
+-                new ViewportSection(config.Debug),
++                new ViewportSection(config.Debug, config.Render),
+                 new TracySection(config.Debug)
+             ])
+         ];
+diff --git a/Centauri/UI/Panels/Inspector/Sections/ViewportSection.cs b/Centauri/UI/Panels/Inspector/Sections/ViewportSection.cs
+index 33be5c6..a6a8f7b 100644
+--- a/Centauri/UI/Panels/Inspector/Sections/ViewportSection.cs
++++ b/Centauri/UI/Panels/Inspector/Sections/ViewportSection.cs
+@@ -6,15 +6,22 @@ using Common;
+ 
+ public sealed class ViewportSection : ISection
+ {
+-    private readonly DebugConfig _config;
++    private readonly DebugConfig  _config;
++    private readonly RenderConfig _render;
+ 
+-    public ViewportSection(DebugConfig config) => _config = config;
++    public ViewportSection(DebugConfig config, RenderConfig render)
++    {
++        _config = config;
++        _render = render;
++    }
+ 
+     public void Draw(Scene scene)
+     {
+         using var s = Widgets.Section("Viewport", startCollapsed: true);
+         if (!s.Open) return;
+ 
++        Widgets.DragRow("Render Scale", _render.RenderScale, v => _render.RenderScale = v,
++            0.05f, 0.1f, 1f, "%.2f", 1f);
+         Widgets.CheckRow("Grid",            _config.ShowGrid,          v => _config.ShowGrid          = v);
+         Widgets.CheckRow("Skybox",          _config.ShowSkybox,        v => _config.ShowSkybox        = v);
+         Widgets.CheckRow("Stats Overlay",   _config.ShowStatsOverlay,  v => _config.ShowStatsOverlay  = v);
+-- 
+2.43.0
+
