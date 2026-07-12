@@ -121,23 +121,26 @@ public sealed class ShadowMapper : IDisposable
         var camera      = scene.Cameras.Active;
         var sceneBounds = SceneBounds(scene);   // also refreshes _sceneHasWind (revision-gated)
 
-        var s   = _config.Shadows;
-        var key = new ShadowCacheKey(dir, camera.GetViewMatrix() * camera.GetProjectionMatrix(),
-            scene.Revision, s.CascadeCount, s.Distance, s.SplitLambda);
-
-        if (_cache.CanReuse(key, _sceneHasWind && _config.Foliage.WindAnimating, _config.Shadows.WindThrottleMs / 1000f))
-        {
-            Active = true;   // last frame's depth maps + Cascades are still valid
-            return;
-        }
-
+        // Always refit — pure CPU math, no GL calls — so Cascades (read every frame by
+        // MainRenderer.UploadShadowData for the lit shader's UBO) is exact for the current
+        // camera even on a frame where the GPU redraw below ends up skipped. Only the
+        // (expensive) redraw itself is gated by whether the fit actually changed — see
+        // ShadowCache.
         Cascades = _cascadeBuilder.Build(camera, dir, sceneBounds, Cascades);
 
+        if (_cache.CanReuse(dir, scene.Revision, Cascades,
+                _sceneHasWind && _config.Foliage.WindAnimating,
+                _config.Shadows.WindThrottleMs / 1000f))
+        {
+            Active = true;   // last frame's depth maps are still valid for this exact fit
+            return;
+        }
 
         SetRenderState();
         _depth.Use();
         
         _depth.SetUniform("uAlbedo", 0);
+        _depth.SetUniform("uFoliageAlphaCutoff", _config.Foliage.AlphaCutoff);
         ShaderUniformBinder.UploadWind(_depth, _config.Foliage);
         
         // Pass 1: cull + bucket every cascade up front. Pure CPU work (no GL state/draw calls),
@@ -197,7 +200,7 @@ public sealed class ShadowMapper : IDisposable
             _mapsFar.SyncRawDepth();
         Active = true;
 
-        _cache.Record(key);   // these maps are valid until one of the key's inputs changes
+        _cache.Record(dir, scene.Revision, Cascades);   // valid until the fit or scene changes
     }
 
     // Cascade 0 -> the near tier's single layer; every other cascade -> the far tier, at

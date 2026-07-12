@@ -4,61 +4,36 @@ using System.Numerics;
 
 using Utils.Misc;
 
-// Everything that shapes the cascade depth maps. Two equal keys mean last frame's maps are
-// still valid, so the whole shadow render can be skipped. Value equality over the sun
-// direction, the camera (cascades fit its frustum), the scene revision and the cascade-fit
-// config — the sampling-side params (bias, pcf) don't change the stored depth, so they're out.
-internal readonly struct ShadowCacheKey : IEquatable<ShadowCacheKey>
-{
-    private const float Tolerance = 0.01f;
-    
-    private readonly Vector3   _sunDir;
-    private readonly Matrix4x4 _viewProj;
-    private readonly int       _revision;
-    private readonly int       _cascadeCount;
-    private readonly float     _distance;
-    private readonly float     _splitLambda;
-
-    public ShadowCacheKey(Vector3 sunDir, Matrix4x4 viewProj, int revision,
-                          int cascadeCount, float distance, float splitLambda)
-    {
-        _sunDir       = sunDir;
-        _viewProj     = viewProj;
-        _revision     = revision;
-        _cascadeCount = cascadeCount;
-        _distance     = distance;
-        _splitLambda  = splitLambda;
-    }
-
-    public bool Equals(ShadowCacheKey o) =>
-        _sunDir       == o._sunDir       &&
-        _viewProj     == o._viewProj     &&
-        _revision     == o._revision     &&
-        _cascadeCount == o._cascadeCount &&
-        Math.Abs(_distance - o._distance) < Tolerance &&
-        Math.Abs(_splitLambda - o._splitLambda) < Tolerance;
-
-    public override bool Equals(object? o) => o is ShadowCacheKey k && Equals(k);
-    public override int GetHashCode() =>
-        HashCode.Combine(_sunDir, _viewProj, _revision, _cascadeCount, _distance, _splitLambda);
-}
-
-// Tracks the key the current depth maps were rendered for. The maps may be reused when the
-// incoming key matches, and either nothing is animating the casters this frame, or it is but
-// we're still inside the animating-caster throttle window (see CanReuse) — wind sway is slow
-// and PCSS already softens edges, so redrawing the full cascade set every single frame just to
-// track a few pixels of foliage motion is wasted GPU time; lagging a fraction of a second behind
-// the animation is imperceptible. Throttling is time- rather than frame-based so the same
-// setting gives the same real-world lag regardless of framerate.
+// Tracks the fitted cascades the current depth maps were actually rendered for. Comparing the
+// FITTED result (post texel/radius/Z snapping — see CascadeBuilder) rather than the raw camera
+// view*projection matrix matters: CascadeBuilder's radius/Z snapping already collapses many
+// nearby camera positions onto the exact same fitted cascade, but the raw camera matrix changes
+// on every single frame the camera moves at all, however slightly. Keying on the raw matrix
+// threw away those free cache hits — literally every frame of camera motion forced a full
+// cascade redraw even when the fitted result (and therefore the correct rendered depth) would
+// have been bit-identical to last frame's.
+//
+// The maps may be reused when the incoming cascades match, and either nothing is animating the
+// casters this frame, or it is but we're still inside the animating-caster throttle window (see
+// CanReuse) — wind sway is slow and PCSS already softens edges, so redrawing the full cascade
+// set every single frame just to track a few pixels of foliage motion is wasted GPU time;
+// lagging a fraction of a second behind the animation is imperceptible. Throttling is time- not
+// frame-based so the same setting gives the same real-world lag regardless of framerate.
 internal sealed class ShadowCache
 {
-    private ShadowCacheKey _key;
-    private bool           _valid;
-    private float          _lastRenderTime;
+    private const float Tolerance = 0.001f;
+    
+    private Vector3   _sunDir;
+    private int       _revision;
+    private Cascade[] _cascades = [];
+    private bool      _valid;
+    private float     _lastRenderTime;
 
-    public bool CanReuse(in ShadowCacheKey key, bool castersAnimating, float animatingThrottleSeconds)
+    // `cascades` is the caller's live, in-place-mutated array (see CascadeBuilder.Build) — only
+    // ever read here, never stored directly (see Record).
+    public bool CanReuse(Vector3 sunDir, int revision, Cascade[] cascades, bool castersAnimating, float animatingThrottleSeconds)
     {
-        if (!_valid || !key.Equals(_key))
+        if (!_valid || sunDir != _sunDir || revision != _revision || !CascadesEqual(cascades, _cascades))
             return false;
         if (!castersAnimating)
             return true;   // static scene — nothing to catch up on regardless
@@ -67,12 +42,29 @@ internal sealed class ShadowCache
         return true;   // reuse a still-recent render while only wind is moving
     }
 
-    public void Record(in ShadowCacheKey key)
+    // Snapshots `cascades` (Clone — the caller's array is mutated in place next frame, so a
+    // plain reference would silently "update" this record to next frame's values too).
+    public void Record(Vector3 sunDir, int revision, Cascade[] cascades)
     {
-        _key            = key;
+        _sunDir         = sunDir;
+        _revision       = revision;
+        _cascades       = (Cascade[])cascades.Clone();
         _valid          = true;
         _lastRenderTime = Time.Now;
     }
 
     public void Invalidate() => _valid = false;
+
+    // Matrix fully determines what gets rendered/sampled; SplitDepth is compared too since it
+    // drives cascade selection in the lit shader and is otherwise free to check.
+    private static bool CascadesEqual(Cascade[] a, Cascade[] b)
+    {
+        if (a.Length != b.Length) return false;
+
+        for (var i = 0; i < a.Length; i++)
+            if (a[i].Matrix != b[i].Matrix || Math.Abs(a[i].SplitDepth - b[i].SplitDepth) > Tolerance)
+                return false;
+
+        return true;
+    }
 }

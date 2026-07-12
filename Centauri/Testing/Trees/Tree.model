@@ -1,0 +1,4 @@
+{
+  "path":      "Assets/Objects/Trees/Tree.glb",
+  "materials": ["Bark", "LeavesCommon"]
+}
