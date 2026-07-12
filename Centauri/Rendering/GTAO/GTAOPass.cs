@@ -85,6 +85,8 @@ public sealed class GTAOPass : IDisposable
 
     public void Render(uint depthTex, uint normalTex, Camera camera)
     {
+        using var _ = Profiling.Tracy.Scope("GTAOPass.Render");
+
         var proj = camera.GetProjectionMatrix();
         Matrix4x4.Invert(proj, out var invProj);
 

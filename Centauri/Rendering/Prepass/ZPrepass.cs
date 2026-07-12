@@ -51,6 +51,8 @@ public sealed class ZPrepass : IDisposable
     // benefit from the depth this writes, then restore Less/true afterward.
     public void Render(Scene scene, Camera camera, CullingSystem culling)
     {
+        using var _ = Profiling.Tracy.Scope("ZPrepass.Render");
+
         BeginPass(camera);
 
         foreach (var batch in _batcher.GetBatches(scene))

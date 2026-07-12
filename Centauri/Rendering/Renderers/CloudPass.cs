@@ -49,6 +49,8 @@ public sealed class CloudPass : IDisposable
 
     public void Render(Scene scene, Matrix4x4 view, Matrix4x4 projection)
     {
+        using var _ = Profiling.Tracy.Scope("CloudPass.Render");
+
         Active = _config.Clouds && _config.CloudCoverage > 0f;
         if (!Active) return;
 

@@ -53,6 +53,8 @@ public sealed class GeometryPrepass : IDisposable
 
     public void Render(Scene scene, CullingSystem culling)
     {
+        using var _ = Profiling.Tracy.Scope("GeometryPrepass.Render");
+
         BeginPass(scene);
 
         foreach (var batch in _batcher.GetBatches(scene))

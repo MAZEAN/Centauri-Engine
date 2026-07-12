@@ -21,7 +21,7 @@
 * [ ] Raytracing with BVH (only experimental, not real-time)
 * [ ] Physics engine integration (BEPUphysics2)
 * [ ] Basis for game
-* [ ] Terrain
+* [ ] Terrain (technique unclear, maybe https://github.com/xandergos/terrain-diffusion/tree/master)
 * [ ] Water simulation (Sea of Thieves algorithm)
 * [x] Complex foliage rendering
 * [ ] Displacement or Bump mapping
