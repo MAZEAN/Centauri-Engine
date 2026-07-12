@@ -47,6 +47,8 @@ public sealed class ShadowSection : ISection
         
         Widgets.DragRow("Wind Throttle", _config.WindThrottleMs, v => _config.WindThrottleMs = v,
             5f, 0f, 250f, "%.0f", _config.AuthoredWindThrottleMs);
+        Widgets.DragRow("Light Throttle", _config.LightThrottleMs, v => _config.LightThrottleMs = v,
+            5f, 0f, 250f, "%.0f", _config.AuthoredLightThrottleMs);
         
         Widgets.CheckRow("Contact Hardening", _config.ContactHardening, v => _config.ContactHardening = v);
         Widgets.DragRow("Light Size", _config.LightSize, v => _config.LightSize = v,

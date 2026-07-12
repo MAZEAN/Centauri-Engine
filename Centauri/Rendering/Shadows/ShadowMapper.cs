@@ -47,7 +47,14 @@ public sealed class ShadowMapper : IDisposable
     private int         _boundsRevision = -1;
     private BoundingBox _cachedSceneBounds;
     private bool        _sceneHasWind;
-    
+
+    // Last frame's camera view/projection — lets Render() tell whether THIS frame's cache miss
+    // is purely light-driven (camera unchanged) before allowing ShadowCache.CanReuseStaleFit to
+    // substitute a stale fit; a moved camera always forces an immediate, exact redraw instead, so
+    // camera motion never gets any extra latency from the light throttle.
+    private Matrix4x4? _lastCameraView;
+    private Matrix4x4? _lastCameraProj;
+
     private readonly ShadowCache _cache = new();
 
     public bool Active { get; private set; }
@@ -121,6 +128,18 @@ public sealed class ShadowMapper : IDisposable
         var camera      = scene.Cameras.Active;
         var sceneBounds = SceneBounds(scene);   // also refreshes _sceneHasWind (revision-gated)
 
+        // Camera view/proj this frame, compared against last frame's below — a moved camera must
+        // never be allowed the stale-fit reuse path (CanReuseStaleFit), only the light throttle.
+        // Raw (unjittered) projection, same reasoning as GetFrustumCorners below: TAA's per-frame
+        // jitter would otherwise make this comparison fail every frame regardless of whether the
+        // camera actually moved, since it's baked into GetProjectionMatrix() but isn't a real
+        // camera change.
+        var view = camera.GetViewMatrix();
+        var proj = camera.GetProjectionMatrixRaw();
+        var cameraStatic = _lastCameraView == view && _lastCameraProj == proj;
+        _lastCameraView = view;
+        _lastCameraProj = proj;
+
         // Always refit — pure CPU math, no GL calls — so Cascades (read every frame by
         // MainRenderer.UploadShadowData for the lit shader's UBO) is exact for the current
         // camera even on a frame where the GPU redraw below ends up skipped. Only the
@@ -133,7 +152,7 @@ public sealed class ShadowMapper : IDisposable
         Cascades = _cascadeBuilder.Build(camera, dir, sceneBounds,
             c => c == 0 ? _mapsNear.Size : _mapsFar.Size, Cascades);
 
-        if (_cache.CanReuse(dir, scene.Revision, Cascades,
+        if (_cache.CanReuse(scene.Revision, Cascades,
                 _sceneHasWind && _config.Foliage.WindAnimating,
                 _config.Shadows.WindThrottleMs / 1000f))
         {
@@ -141,9 +160,27 @@ public sealed class ShadowMapper : IDisposable
             return;
         }
 
+        // The fresh fit above didn't match what's rendered — normally that means an immediate
+        // redraw. But if only the light rotated (camera and scene both unchanged) and we're still
+        // inside the light throttle window, reuse anyway: substituting CachedCascades (not the
+        // fresh fit just computed) keeps the sampling matrix consistent with the un-redrawn
+        // texture — using the fresh fit here instead would sample last frame's depth content with
+        // this frame's different light matrix, a real misalignment, not mere lag. See
+        // ShadowCache.CanReuseStaleFit.
+        if (_cache.CanReuseStaleFit(scene.Revision, cameraStatic, _config.Shadows.LightThrottleMs / 1000f))
+        {
+            // Clone, don't alias: next frame's Build() call mutates its `reuse` array (this
+            // field) in place. Pointing Cascades straight at ShadowCache's own array would let
+            // that in-place mutation silently corrupt the cache's stored record the moment this
+            // reused fit gets refit again, without ever going through Record().
+            Cascades = (Cascade[])_cache.CachedCascades.Clone();
+            Active = true;
+            return;
+        }
+
         SetRenderState();
         _depth.Use();
-        
+
         _depth.SetUniform("uAlbedo", 0);
         _depth.SetUniform("uFoliageAlphaCutoff", _config.Foliage.AlphaCutoff);
         ShaderUniformBinder.UploadWind(_depth, _config.Foliage);
@@ -205,7 +242,7 @@ public sealed class ShadowMapper : IDisposable
             _mapsFar.SyncRawDepth();
         Active = true;
 
-        _cache.Record(dir, scene.Revision, Cascades);   // valid until the fit or scene changes
+        _cache.Record(scene.Revision, Cascades);   // valid until the fit or scene changes
     }
 
     // Cascade 0 -> the near tier's single layer; every other cascade -> the far tier, at

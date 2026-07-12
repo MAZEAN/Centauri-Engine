@@ -79,10 +79,17 @@ public sealed class CascadeBuilder
         return cascades;
     }
 
-    // world-space corners of the camera's full frustum, unprojected from NDC
+    // world-space corners of the camera's full frustum, unprojected from NDC. Uses the RAW
+    // (unjittered) projection — TAA's per-frame sub-pixel jitter (see Camera.JitterNdc) is a
+    // display-only technique with no bearing on which world-space slice the shadow needs to
+    // cover, so using the jittered matrix here would wobble the fitted cascades every single
+    // frame purely from jitter, even with a genuinely static camera and light — exactly the kind
+    // of continuous, imperceptible-per-frame change the texel/Z snap and ShadowCache are meant to
+    // collapse, except jitter offers no such fixed grid to collapse onto since it's not a
+    // translation within one.
     private static void GetFrustumCorners(Camera camera, Span<Vector3> corners)
     {
-        Matrix4x4.Invert(camera.GetViewMatrix() * camera.GetProjectionMatrix(), out var invVP);
+        Matrix4x4.Invert(camera.GetViewMatrix() * camera.GetProjectionMatrixRaw(), out var invVP);
 
         var k = 0;
         for (var x = 0; x < 2; x++)

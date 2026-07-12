@@ -79,7 +79,8 @@
     "lightSize": 0.0075,
     "blockerSearchRadius": 9.0,
     "maxPenumbraRadius": 11.0,
-    "windThrottleMs": 50.0
+    "windThrottleMs": 50.0,
+    "lightThrottleMs": 50.0
   },
   "grading": {
     "exposure": 1.0,

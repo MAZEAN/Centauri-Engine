@@ -32,6 +32,14 @@ public class ShadowConfig : IJsonOnDeserialized
     // duration regardless of framerate. 0 disables throttling (always redraw while animating).
     [JsonPropertyName("windThrottleMs")]      public float WindThrottleMs { get; set; } = 50f;
 
+    // Same idea as WindThrottleMs, but for when the light direction itself is slowly drifting
+    // (e.g. a day/night cycle) while the camera stays still — CascadeBuilder's texel/Z snapping
+    // can't absorb a rotating light frame the way it absorbs camera translation (rotating the
+    // frame's own axes moves every point non-uniformly, unlike sliding within a fixed frame), so
+    // without this the fit — and therefore the full cascade redraw — changes every single frame
+    // the light rotates at all, however slowly. See ShadowCache.CanReuseStaleFit.
+    [JsonPropertyName("lightThrottleMs")]     public float LightThrottleMs { get; set; } = 50f;
+
     [JsonIgnore] public bool DebugCascades { get; set; }
 
     [JsonIgnore] public uint  AuthoredSize                { get; private set; }
@@ -46,6 +54,7 @@ public class ShadowConfig : IJsonOnDeserialized
     [JsonIgnore] public float AuthoredBlockerSearchRadius { get; private set; }
     [JsonIgnore] public float AuthoredMaxPenumbraRadius   { get; private set; }
     [JsonIgnore] public float AuthoredWindThrottleMs      { get; private set; }
+    [JsonIgnore] public float AuthoredLightThrottleMs     { get; private set; }
 
     public ShadowConfig() => OnDeserialized();
 
@@ -63,5 +72,6 @@ public class ShadowConfig : IJsonOnDeserialized
         AuthoredBlockerSearchRadius = BlockerSearchRadius;
         AuthoredMaxPenumbraRadius   = MaxPenumbraRadius;
         AuthoredWindThrottleMs      = WindThrottleMs;
+        AuthoredLightThrottleMs     = LightThrottleMs;
     }
 }
