@@ -113,12 +113,29 @@ public sealed class CascadeBuilder
         var radius = ComputeRadius(corners, center);
         radius = MathF.Ceiling(radius / RadiusSnap) * RadiusSnap;
 
-        var up   = MathF.Abs(dir.Y) > UpThreshold ? Vector3.UnitZ : Vector3.UnitY;
-        var view = Matrix4x4.CreateLookAt(center - dir * radius, center, up);
+        var up = MathF.Abs(dir.Y) > UpThreshold ? Vector3.UnitZ : Vector3.UnitY;
+
+        // Build the light's view from a FIXED point (world origin), not re-targeted at `center`
+        // each frame — that was the actual bug in the old texel snap. Re-targeting at center
+        // makes center transform to ~(0,0,-radius) in its own view by definition (X/Y ~0 from
+        // floating-point rounding alone, regardless of where center is in the world), so
+        // flooring that was a no-op; and even correcting just the X/Y bounds by a delta still
+        // left the view's own translation (eye = center - dir*radius) tracking center's raw,
+        // un-snapped position, which — because that translation shifts the world-to-view-space
+        // mapping along the light's own depth axis, i.e. the very axis nearZ/farZ are measured
+        // against, even though "shifting along the view's own forward axis doesn't change X/Y"
+        // — silently reintroduced continuous drift into every downstream Z value, and therefore
+        // into the final Matrix, on every single frame of camera motion however small.
+        //
+        // With a fixed-origin view, every quantity below (centerRef, sliceMinZ/MaxZ, casterMaxZ)
+        // is measured against the SAME stable frame every frame, so texel-snapping X/Y and
+        // whole-unit-snapping near/far actually collapse nearby camera positions onto identical
+        // matrices, instead of merely producing numbers that individually look stable while the
+        // frame they're measured against keeps moving underneath them.
+        var view = Matrix4x4.CreateLookAt(Vector3.Zero, dir, up);
 
         var texelSize = (radius * 2f) / _config.Shadows.Size;
-        var centerLS  = Vector3.Transform(center, view);
-
+        var centerLS = Vector3.Transform(center, view);
         centerLS.X = MathF.Floor(centerLS.X / texelSize) * texelSize;
         centerLS.Y = MathF.Floor(centerLS.Y / texelSize) * texelSize;
 
