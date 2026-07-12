@@ -74,6 +74,7 @@
     "pcfRadius": 2,
     "cascadeCount": 4,
     "splitLambda": 0.85,
+    "farCascadeScale": 0.9,
     "contactHardening": true,
     "lightSize": 0.0075,
     "blockerSearchRadius": 9.0,

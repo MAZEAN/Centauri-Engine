@@ -9,3 +9,7 @@
 - [Sketchfab Assets] (https://sketchfab.com/)
 - [Itch.io Assets] (https://itch.io/)
 - [CGBookcase Assets] (https://www.cgbookcase.com/)
+- [sharetextures] (https://www.sharetextures.com/)
+- [TextureCan] (https://www.texturecan.com/)
+- [3DTexel] (https://3dtexel.com/)
+- [3D Assets Search Engine] (https://3dassets.one/)

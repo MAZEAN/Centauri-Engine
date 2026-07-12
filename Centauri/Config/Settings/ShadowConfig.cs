@@ -20,7 +20,7 @@ public class ShadowConfig : IJsonOnDeserialized
     // texel density is already far lower — rendering them at full size spends fill-rate/memory
     // on detail that isn't there. 1 = no reduction (identical to the old single-resolution
     // behavior); the near cascade (index 0) always renders at the full configured Size.
-    [JsonPropertyName("farCascadeScale")] public float FarCascadeScale { get; set; } = 0.5f;
+    [JsonPropertyName("farCascadeScale")] public float FarCascadeScale { get; set; } = 0.9f;
 
     [JsonPropertyName("contactHardening")]    public bool  ContactHardening    { get; set; } = true;
     [JsonPropertyName("lightSize")]           public float LightSize           { get; set; } = 0.02f;  // tan(sun half-angle) — world penumbra growth per unit occluder distance
