@@ -22,6 +22,16 @@ const float SHADOW_FADE = 0.1;   // fraction of the shadow distance over which s
 const int   BLOCKER_TAPS = 8;   // subset of POISSON_DISK — cheaper than the full PCF tap count
 const float FOLIAGE_FRESNEL_ATTEN = 0.05;
 
+// GGX's NDF denominator (NdotH²(a²-1)+1) hits exactly 0 at roughness 0 whenever H lands exactly
+// on N (a straight-on specular peak) — a² is 0 there too, so NDF is a literal 0/0 = NaN, not just
+// a sharp highlight. SpecularAARoughness widens roughness based on screen-space normal variance,
+// but that variance can itself be ~0 (a flat-shaded/low-poly facet, or a sphere's silhouette
+// center), so it isn't a guaranteed floor on its own. That single NaN pixel then spreads across
+// the whole frame over time via TAA's history blending and bloom's blur — a growing white blob,
+// not a one-frame glitch. Applied once, right after SpecularAARoughness, as the actual minimum
+// roughness used anywhere downstream.
+const float MIN_ROUGHNESS = 0.02;
+
 const int  POISSON_COUNT = 16;
 const vec2 POISSON_DISK[16] = vec2[](
         vec2(-0.94201624, -0.39906216), vec2( 0.94558609, -0.76890725),
@@ -587,7 +597,7 @@ void main()
         discard;
 
     vec3 N    = SurfaceNormal();
-    roughness = SpecularAARoughness(roughness, N);
+    roughness = max(SpecularAARoughness(roughness, N), MIN_ROUGHNESS);
     vec3 V    = normalize(uCameraPos - fFragPos);
 
     vec3 Lo      = DirectLighting(N, V, albedo, roughness, metallic);
