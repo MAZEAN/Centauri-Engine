@@ -128,6 +128,18 @@ internal static class Widgets
         return changed;
     }
 
+    // Single packed row (ImGui.DragFloat2), unlike Vec3Rows' three separate axis lines — right
+    // for a pair that's always edited together and doesn't need per-axis reset (UV scale/offset
+    // have no "Authored" baseline to reset to, unlike Transform).
+    public static void Vec2Row(string label, Vector2 v, Action<Vector2> set, float speed, string fmt = "%.3f")
+    {
+        RowLabel(label);
+
+        var id = "##" + label;
+        if (ImGui.DragFloat2(id, ref v, speed, 0f, 0f, fmt))
+            set(v);
+    }
+
     public static void DragRow(string label, float v, Action<float> set, float speed, float min, float max, string fmt = "%.3f", float? reset = null)
     {
         RowLabel(label);

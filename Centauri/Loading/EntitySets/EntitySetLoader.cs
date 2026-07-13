@@ -150,6 +150,17 @@ public class EntitySetLoader
         for (var i = 0; i < entity.Materials.Count; i++)
             entity.SetMaterial(i, material);
 
+        // ShaderBatcher.GetBatches caches its groupings by Scene.Revision — without this, a
+        // swapped material never actually renders: the entity is still drawn against whichever
+        // Batch it was grouped into before the swap, and DrawMesh shades from that Batch's own
+        // captured Materials snapshot, not from re-reading entity.Materials each frame. Scalar
+        // property edits (EditMaterial below) don't need this because MakeMaterialUnique already
+        // calls it once, the first time a shared material is cloned — after that, further edits
+        // mutate the same (now-unique) instance in place, which the stale Batch snapshot already
+        // points at too. A full reference swap to a *different* Material has no such shared
+        // instance to fall back on, so every call needs its own rebuild.
+        _scene.MarkDirty();
+
         if (!_sources.TryGetValue(entity, out var source)) return;
 
         source.Material  = materialId;
@@ -199,8 +210,8 @@ public class EntitySetLoader
             Position  = [t.Position.X, t.Position.Y, t.Position.Z],
             Scale     = [t.Scale.X, t.Scale.Y, t.Scale.Z],
             Rotation  = [t.EulerAngles.X, t.EulerAngles.Y, t.EulerAngles.Z],
-            UvScale   = source.UvScale,
-            UvOffset  = source.UvOffset,
+            UvScale   = [entity.UvScale.X, entity.UvScale.Y],
+            UvOffset  = [entity.UvOffset.X, entity.UvOffset.Y],
             Enabled   = entity.Enabled,
             Light     = entity.Light is { } l ? ToDefinition(l) : null,
             Components = source.Components,

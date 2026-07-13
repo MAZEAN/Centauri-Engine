@@ -113,7 +113,7 @@ public class ResourceSystem : IDisposable
     // *is* the resource) each .model file points at the actual geometry file via "path" and
     // can carry reusable defaults (default material binding, default triplanar override) for
     // every entity that places it, so a repeated placement doesn't need to repeat them.
-    private (Dictionary<string, string>, Dictionary<string, ModelDefinition>) BuildModelRegistry()
+    private static (Dictionary<string, string>, Dictionary<string, ModelDefinition>) BuildModelRegistry()
     {
         var registry    = new Dictionary<string, string>();
         var definitions  = new Dictionary<string, ModelDefinition>();

@@ -89,6 +89,8 @@ public sealed class EntityInspectorSection : ISection
         if (!s.Open) return;
 
         DrawMaterialPicker(e);
+        Widgets.Vec2Row("UV Scale",  e.UvScale,  v => e.UvScale  = v, 0.01f);
+        Widgets.Vec2Row("UV Offset", e.UvOffset, v => e.UvOffset = v, 0.01f);
         ImGui.Spacing();
 
         for (var i = 0; i < e.Materials.Count; i++)
@@ -103,6 +105,12 @@ public sealed class EntityInspectorSection : ISection
             Widgets.SliderRow("Roughness", mat.RoughnessScalar, v => EditMaterial(e, scene, index, m => m.RoughnessScalar = v), 0f, 1f, 0.5f);
             Widgets.SliderRow("Metallic",  mat.MetallicScalar,  v => EditMaterial(e, scene, index, m => m.MetallicScalar  = v), 0f, 1f, 0.1f);
             Widgets.SliderRow("Translucency", mat.Translucency, v => EditMaterial(e, scene, index, m => m.Translucency = v), 0f, 1f, 0f);
+            Widgets.CheckRow("Two-Sided", mat.TwoSided, v => EditMaterial(e, scene, index, m => m.TwoSided = v));
+            Widgets.CheckRow("Wind",      mat.Wind,     v => EditMaterial(e, scene, index, m => m.Wind     = v));
+            Widgets.CheckRow("Triplanar", mat.Triplanar, v => EditMaterial(e, scene, index, m => m.Triplanar = v));
+            if (mat.Triplanar)
+                Widgets.DragRow("Triplanar Scale", mat.TriplanarScale,
+                    v => EditMaterial(e, scene, index, m => m.TriplanarScale = v), 0.05f, 0.01f, 100f, "%.2f m", 1f);
 
             ImGui.PopID();
         }
@@ -110,17 +118,15 @@ public sealed class EntityInspectorSection : ISection
 
     // Reassigns every mesh slot to a different material asset at once — see
     // EntitySetLoader.SetMaterial for why this is uniform rather than per-slot. The per-slot
-    // scalar rows below still work afterward, now tweaking whichever material was just applied.
+    // rows below still work afterward, now tweaking whichever material was just applied. Applies
+    // immediately on selection (same as the Light Type combo below), not behind a separate
+    // confirm step.
     private void DrawMaterialPicker(Entity e)
     {
         var materialIds = _materialIds ??= _resourceSystem.MaterialIds.ToArray();
         if (materialIds.Length == 0) return;
 
-        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X * 0.6f);
-        ImGui.Combo("##changeMaterial", ref _selectedMaterial, materialIds, materialIds.Length);
-
-        ImGui.SameLine();
-        if (ImGui.Button("Apply"))
+        if (Widgets.ComboRow("Material", ref _selectedMaterial, materialIds))
             _entitySetLoader.SetMaterial(e, materialIds[_selectedMaterial]);
     }
 
