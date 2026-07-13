@@ -24,16 +24,28 @@ public class Scene
     
     public void MarkDirty() => Revision++;
 
+    // CullingSystem's SpatialGrid buckets entities by world position at whatever Revision it
+    // last rebuilt against — without this, moving an entity (inspector drag, or a runtime
+    // CreateEntity() placement moved away from its spawn point) leaves it registered under its
+    // *old* cell forever, since add/remove were the only things that bumped Revision. Once that
+    // stale cell falls outside the frustum, Cull()'s coarse per-cell test skips the entity before
+    // ever reaching its own (always up to date) bounds check — it silently vanishes despite
+    // actually being in view. No currently-shipped Component mutates Transform every frame
+    // (SunOrbit/DayNightCycle only touch Light), so this stays sparse/user-driven in practice;
+    // if that ever changes, a component driving Transform every frame would force a full grid
+    // rebuild every frame too — worth revisiting then, not preemptively here.
     public void AddEntity(Entity entity)
     {
         _entities.Add(entity);
+        entity.Transform.OnChanged += MarkDirty;
         Revision++;
     }
 
     public void RemoveEntity(Entity entity)
     {
+        entity.Transform.OnChanged -= MarkDirty;
         _entities.Remove(entity);
-        if (Selected == entity) 
+        if (Selected == entity)
             Selected = null;   // keep selection valid
         Revision++;
     }
