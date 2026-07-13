@@ -1,0 +1,33 @@
+{
+  "entities": [
+    {
+      "name": "Floor",
+      "model": "Cube",
+      "material": "ChessTiles",
+      "position": [
+        0,
+        -2,
+        0
+      ],
+      "scale": [
+        100,
+        1,
+        100
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "uvScale": [
+        10,
+        10
+      ],
+      "uvOffset": [
+        0,
+        0
+      ],
+      "enabled": true
+    }
+  ]
+}

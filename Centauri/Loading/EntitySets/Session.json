@@ -1,0 +1,60 @@
+{
+  "entities": [
+    {
+      "name": "Birch",
+      "model": "Birch",
+      "position": [
+        0,
+        -1.5,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "uvScale": [
+        1,
+        1
+      ],
+      "uvOffset": [
+        0,
+        0
+      ],
+      "enabled": true
+    },
+    {
+      "name": "Tree",
+      "model": "Tree",
+      "position": [
+        -6.5,
+        -1.5,
+        0
+      ],
+      "scale": [
+        1.5,
+        1.5,
+        1.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "uvScale": [
+        1,
+        1
+      ],
+      "uvOffset": [
+        0,
+        0
+      ],
+      "enabled": true
+    }
+  ]
+}
