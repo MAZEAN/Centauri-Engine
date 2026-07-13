@@ -91,6 +91,18 @@ public sealed class EntityInspectorSection : ISection
         DrawMaterialPicker(e);
         Widgets.Vec2Row("UV Scale",  e.UvScale,  v => e.UvScale  = v, 0.01f);
         Widgets.Vec2Row("UV Offset", e.UvOffset, v => e.UvOffset = v, 0.01f);
+
+        // UvScale/UvOffset only affect texture-sampled shading (fUv in the fragment shader) — a
+        // material with no bound texture maps has nothing for them to tile/shift, so dragging
+        // these does nothing visible even though it's working correctly. Flag that explicitly
+        // instead of leaving it looking broken.
+        if (!HasAnyTexture(e))
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, ImGui.GetStyle().Colors[(int)ImGuiCol.TextDisabled]);
+            ImGui.TextWrapped("No texture maps bound - UV mapping has no visible effect.");
+            ImGui.PopStyleColor();
+        }
+
         ImGui.Spacing();
 
         for (var i = 0; i < e.Materials.Count; i++)
@@ -140,6 +152,18 @@ public sealed class EntityInspectorSection : ISection
 
         var idx = Array.IndexOf(materialIds, materialId);
         if (idx >= 0) _selectedMaterial = idx;
+    }
+
+    // AO isn't checked here — ResourceSystem.LoadMaterial always assigns it a fallback
+    // DefaultTexture when the .mat file doesn't set one, so it's never actually null (unlike
+    // the other maps), and would defeat this check for every untextured material.
+    private static bool HasAnyTexture(Entity e)
+    {
+        foreach (var mat in e.Materials)
+            if (mat is { Albedo: not null } or { Normal: not null } or { Roughness: not null }
+                     or { Metallic: not null })
+                return true;
+        return false;
     }
 
     private static void DrawLight(Entity e)
