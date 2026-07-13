@@ -7,13 +7,14 @@ using Rendering;
 using Utils.Misc;
 using World;
 
-// Loads zero or more EntitySetDefinition files (AppConfig's Render.EntitySetPaths) into the
-// scene, and can write them back out. Each file
-// keeps its own identity end to end: every live Entity remembers both the EntityDefinition it
-// was built from and which file that came from (_sources / _fileOf), so Save() always has an
-// unambiguous, correct destination for it — including entities added at runtime via
-// CreateEntity(), which are attributed to Render.DefaultEntitySetPath until saved once, at
-// which point that file starts existing on disk like any other set.
+// Loads zero or more EntitySetDefinition files (AppConfig's Render.EntitySetPaths, plus
+// Render.DefaultEntitySetPath if it exists — see EffectivePaths) into the scene, and can write
+// them back out. Each file keeps its own identity end to end: every live Entity remembers both
+// the EntityDefinition it was built from and which file that came from (_sources / _fileOf), so
+// Save() always has an unambiguous, correct destination for it — including entities added at
+// runtime via CreateEntity(), which are attributed to Render.DefaultEntitySetPath until saved
+// once, at which point that file starts existing on disk like any other set and (from then on)
+// loads automatically too, without needing to be added to EntitySetPaths by hand.
 public class EntitySetLoader
 {
     private readonly ResourceSystem _resourceSystem;
@@ -32,12 +33,15 @@ public class EntitySetLoader
         _factory = new EntityFactory(resourceSystem);
     }
 
-    // Loads every configured entity set (Render.EntitySetPaths), in order. An empty list is
-    // valid and expected — the default is an empty scene (environment only); entity content is
-    // opt-in via config, or added live via CreateEntity().
+    // Loads every configured entity set (Render.EntitySetPaths), in order, plus
+    // Render.DefaultEntitySetPath if it exists on disk and isn't already one of them — entities
+    // created live (CreateEntity) save there, and without this they'd be written correctly but
+    // never loaded back, since nothing added that path to EntitySetPaths for them. An empty
+    // effective list is valid and expected — the default is an empty scene (environment only);
+    // entity content is opt-in via config, or added live via CreateEntity().
     public void LoadAll()
     {
-        var paths = _config.Render.EntitySetPaths;
+        var paths = EffectivePaths();
         if (paths.Count == 0) return;
 
         var definitions = paths.Select(p => (path: p, def: LoadDefinition(p))).ToList();
@@ -47,6 +51,17 @@ public class EntitySetLoader
         foreach (var (path, def) in definitions)
             foreach (var e in def.Entities)
                 AddFromDefinition(e, path);
+    }
+
+    private List<string> EffectivePaths()
+    {
+        var paths = new List<string>(_config.Render.EntitySetPaths);
+
+        var defaultPath = _config.Render.DefaultEntitySetPath;
+        if (!paths.Contains(defaultPath) && File.Exists(PathResolver.Resolve(defaultPath)))
+            paths.Add(defaultPath);
+
+        return paths;
     }
 
     private static EntitySetDefinition LoadDefinition(string path)
