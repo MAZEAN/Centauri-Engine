@@ -42,18 +42,25 @@ public sealed class UISystem : IDisposable
 
     public void Render(Scene scene, in FrameStats stats, IReadOnlyList<GpuTiming> gpuTimings)
     {
+        using var _ = Tracy.Scope("UISystem.Render");
+
         if (_config.Debug.ShowStatsOverlay)
-            _statsOverlay.Render(scene, stats, gpuTimings);
-        
-        _toolbar.Render();
+            using (Tracy.Scope("UISystem.Render.StatsOverlay"))
+                _statsOverlay.Render(scene, stats, gpuTimings);
+
+        using (Tracy.Scope("UISystem.Render.Toolbar"))
+            _toolbar.Render();
 
         if (_config.Input.Mode == ViewMode.Edit)
         {
-            _outliner.Render(scene);
-            _properties.Render(scene);
+            using (Tracy.Scope("UISystem.Render.Outliner"))
+                _outliner.Render(scene);
+            using (Tracy.Scope("UISystem.Render.Properties"))
+                _properties.Render(scene);
         }
 
-        _imGui.Render();
+        using (Tracy.Scope("UISystem.Render.ImGuiFlush"))
+            _imGui.Render();
     }
 
     public void Dispose() => _imGui.Dispose();

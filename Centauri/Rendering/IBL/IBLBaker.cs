@@ -124,6 +124,8 @@ public sealed class IBLBaker : IDisposable
 
         if (!needsBake || Time.Now - _lastProceduralBakeTime < MinRebakeInterval) return;
 
+        using var _ = Profiling.Tracy.Scope("IBLBaker.UpdateProcedural.Rebake");
+
         _gl.Disable(EnableCap.CullFace);
         try
         {

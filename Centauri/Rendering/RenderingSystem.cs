@@ -377,6 +377,8 @@ public class RenderingSystem : IDisposable
     
     private void UpdateProceduralIbl(Scene scene)
     {
+        using var _ = Tracy.Scope("RenderingSystem.UpdateProceduralIbl");
+
         if (!_config.Sky.Procedural || scene.Lighting.DirectionalLights.Count == 0 || !DayNightCycle.IsDay(scene)) return;
 
 

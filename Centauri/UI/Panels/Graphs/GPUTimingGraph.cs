@@ -42,6 +42,14 @@ internal sealed class GPUTimingGraph
 
     private readonly float[,] _samples = new float[Capacity, MaxZones];   // per-interval, per-zone ms
     private readonly string[] _names   = new string[MaxZones];
+    
+    // Scratch buffers for Draw()'s stacked-band fill, reused across frames to avoid per-frame
+    // allocation. _baseline holds the running per-column top-of-stack as zones are layered;
+    // _polyScratch holds one zone's outline (top edge left→right, then bottom edge right→left)
+    // for a single AddConvexPolyFilled call instead of (count-1) AddQuadFilled calls per zone.
+    private readonly float[] _baseline = new float[Capacity];
+    private readonly Vector2[] _polyScratch = new Vector2[Capacity * 2];
+    
     private int _zoneCount;
     private int _head;     // next write slot
     private int _count;    // valid samples (≤ Capacity)
@@ -182,33 +190,38 @@ internal sealed class GPUTimingGraph
         }
 
         // ── stacked bands ───────────────────────────────────────────────────────
+        // One filled polygon per zone (outline: top edge left→right, bottom edge right→left)
+        // instead of one quad per column per zone — same geometry, but _zoneCount draw-list
+        // calls instead of (count-1)*_zoneCount (up to ~1600/frame at full history + 8 zones).
         if (_count >= 2)
         {
-            for (var i = 0; i < _count - 1; i++)
+            Array.Clear(_baseline, 0, _count);
+
+            for (var z = 0; z < _zoneCount; z++)
             {
-                var ia = (_head - _count + i     + Capacity) % Capacity;   // chronological
-                var ib = (_head - _count + i + 1 + Capacity) % Capacity;
-                var xa = p0.X + w * (i       / (float)(_count - 1));
-                var xb = p0.X + w * ((i + 1) / (float)(_count - 1));
+                var c   = Palette[z % Palette.Length];
+                var col = ImGui.GetColorU32(new Vector4(c.X, c.Y, c.Z, 0.65f));
 
-                float baseA = 0f, baseB = 0f;
-                for (var z = 0; z < _zoneCount; z++)
+                var n = 0;
+                for (var i = 0; i < _count; i++)
                 {
-                    var topA = baseA + _samples[ia, z];
-                    var topB = baseB + _samples[ib, z];
+                    var idx = (_head - _count + i + Capacity) % Capacity;
+                    var x   = p0.X + w * (i / (float)(_count - 1));
+                    var top = _baseline[i] + _samples[idx, z];
+                    _polyScratch[n++] = new Vector2(x, Y(p1.Y, h, top, yMax));
+                }
+                
+                for (var i = _count - 1; i >= 0; i--)
+                {
+                    var x = p0.X + w * (i / (float)(_count - 1));
+                    _polyScratch[n++] = new Vector2(x, Y(p1.Y, h, _baseline[i], yMax));
+                }
 
-                    var c   = Palette[z % Palette.Length];
-                    var col = ImGui.GetColorU32(new Vector4(c.X, c.Y, c.Z, 0.65f));
-
-                    dl.AddQuadFilled(
-                        new Vector2(xa, Y(p1.Y, h, baseA, yMax)),
-                        new Vector2(xa, Y(p1.Y, h, topA,  yMax)),
-                        new Vector2(xb, Y(p1.Y, h, topB,  yMax)),
-                        new Vector2(xb, Y(p1.Y, h, baseB, yMax)),
-                        col);
-
-                    baseA = topA;
-                    baseB = topB;
+                dl.AddConvexPolyFilled(ref _polyScratch[0], n, col);
+                for (var i = 0; i < _count; i++)
+                {
+                    var idx = (_head - _count + i + Capacity) % Capacity;
+                    _baseline[i] += _samples[idx, z];
                 }
             }
         }

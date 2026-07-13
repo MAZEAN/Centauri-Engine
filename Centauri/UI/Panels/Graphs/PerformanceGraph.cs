@@ -20,6 +20,8 @@ internal sealed class PerformanceGraph
     private static readonly string WindowLabel = $"-{WindowSeconds:0}s";
 
     private readonly float[] _samples = new float[Capacity];
+    private readonly Vector2[] _polyScratch = new Vector2[Capacity];
+    
     private int _head;
     private int _count;
     
@@ -112,18 +114,20 @@ internal sealed class PerformanceGraph
         }
 
         // ── series ────────────────────────────────────────────────────────────
+        // Single AddPolyline call instead of (count-1) AddLine calls — same geometry, far
+        // fewer draw-list submissions (this graph redraws every frame while its underlying
+        // samples only change once per SampleIntervalMs).
         if (_count >= 2)
         {
-            var prev = Vector2.Zero;
             for (var i = 0; i < _count; i++)
             {
                 var idx = (_head - _count + i + Capacity) % Capacity;  // chronological
                 var x = p0.X + w * (i / (float)(_count - 1));
                 var y = p1.Y - h * MathF.Min(_samples[idx] / yMax, 1f);
-                var cur = new Vector2(x, y);
-                if (i > 0) dl.AddLine(prev, cur, line, 1.5f);
-                prev = cur;
+                
+                _polyScratch[i] = new Vector2(x, y);
             }
+            dl.AddPolyline(ref _polyScratch[0], _count, line, ImDrawFlags.None, 1.5f);
         }
 
         // ── X labels + current value ───────────────────────────────────────────
