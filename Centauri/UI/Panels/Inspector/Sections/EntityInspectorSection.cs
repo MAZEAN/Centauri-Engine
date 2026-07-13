@@ -100,7 +100,7 @@ public sealed class EntityInspectorSection : ISection
 
             ImGui.PushID(i);
 
-            ImGui.TextDisabled($"{mat.Name}");
+            SyncSelectedMaterial(e);
             Widgets.ColorRow4("Base Color", mat.Color, v => EditMaterial(e, scene, index, m => m.Color = v));
             Widgets.SliderRow("Roughness", mat.RoughnessScalar, v => EditMaterial(e, scene, index, m => m.RoughnessScalar = v), 0f, 1f, 0.5f);
             Widgets.SliderRow("Metallic",  mat.MetallicScalar,  v => EditMaterial(e, scene, index, m => m.MetallicScalar  = v), 0f, 1f, 0.1f);
@@ -128,6 +128,18 @@ public sealed class EntityInspectorSection : ISection
 
         if (Widgets.ComboRow("Material", ref _selectedMaterial, materialIds))
             _entitySetLoader.SetMaterial(e, materialIds[_selectedMaterial]);
+    }
+
+    // Keeps _selectedMaterial pointed at whatever's actually authored on the entity, rather than
+    // whatever was last picked in a *different* entity's combo — otherwise switching selection
+    // shows index 0 (or the previous entity's index) until the user re-picks something.
+    private void SyncSelectedMaterial(Entity e)
+    {
+        var materialIds = _materialIds ??= _resourceSystem.MaterialIds.ToArray();
+        if (_entitySetLoader.GetMaterialId(e) is not { } materialId) return;
+
+        var idx = Array.IndexOf(materialIds, materialId);
+        if (idx >= 0) _selectedMaterial = idx;
     }
 
     private static void DrawLight(Entity e)

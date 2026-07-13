@@ -167,6 +167,13 @@ public class EntitySetLoader
         source.Materials = null;
     }
 
+    // The material id currently authored for this entity (kept in sync by SetMaterial above) —
+    // lets the inspector's material picker default to the entity's actual current selection
+    // instead of always starting at index 0. Null for untracked entities (e.g. the environment's
+    // own "sun") or ones with no single-id binding (multi-slot "materials", never set here).
+    public string? GetMaterialId(Entity entity) =>
+        _sources.TryGetValue(entity, out var source) ? source.Material : null;
+
     // Removes an entity the editor created/loaded — drops its save tracking too, so a deleted
     // entity doesn't reappear on the next Save() of whichever file it belonged to.
     public void DeleteEntity(Entity entity)
