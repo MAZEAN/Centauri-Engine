@@ -106,8 +106,22 @@ public class Entity : IDisposable
         _materials[index]    = _materials[index]!.Clone();
         _ownsMaterial[index] = true;
         _anyTwoSided         = null;
-        
+
         return true;
+    }
+
+    // Swaps a mesh slot to a different material asset entirely — distinct from
+    // MakeMaterialUnique, which clones the *current* material so its scalar properties can be
+    // tweaked without affecting other entities sharing it. This replaces the reference outright,
+    // so the slot goes back to sharing the cache-owned Material (not a per-entity clone) until/
+    // unless it's edited again.
+    public void SetMaterial(int index, Material material)
+    {
+        if ((uint)index >= (uint)_materials.Length) return;
+
+        _materials[index]    = material;
+        _ownsMaterial[index] = false;
+        _anyTwoSided         = null;
     }
 
     public BoundingBox GetWorldBounds()

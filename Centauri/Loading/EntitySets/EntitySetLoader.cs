@@ -137,6 +137,25 @@ public class EntitySetLoader
         return entity;
     }
 
+    // Reassigns every mesh slot on the entity to the given material id — a uniform "change
+    // material" rather than per-slot (an entity with multiple distinct materials per mesh can't
+    // have a single id round-trip each slot's own id independently; the schema only knows a
+    // material *asset's* id/path, not which id an already-resolved Material came from — see
+    // ToDefinition). Updates the tracked source so Save() persists the new binding as a plain
+    // "material" (clearing any prior multi-slot "materials" binding, since that's no longer what
+    // the live entity reflects) instead of silently reverting to the old material next load.
+    public void SetMaterial(Entity entity, string materialId)
+    {
+        var material = _resourceSystem.GetMaterial(materialId);
+        for (var i = 0; i < entity.Materials.Count; i++)
+            entity.SetMaterial(i, material);
+
+        if (!_sources.TryGetValue(entity, out var source)) return;
+
+        source.Material  = materialId;
+        source.Materials = null;
+    }
+
     // Removes an entity the editor created/loaded — drops its save tracking too, so a deleted
     // entity doesn't reappear on the next Save() of whichever file it belonged to.
     public void DeleteEntity(Entity entity)

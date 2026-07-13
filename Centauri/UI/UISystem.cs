@@ -35,7 +35,7 @@ public sealed class UISystem : IDisposable
         _imGui        = new ImGuiManager(gl, config.ImGui, window, input);
 
         _statsOverlay = new StatsOverlay(_imGui.Font, config);
-        _properties    = new PropertiesPanel(_imGui.Font, _config);
+        _properties    = new PropertiesPanel(_imGui.Font, _config, resourceSystem, entitySetLoader);
         _outliner = new HierarchyPanel(_imGui.Font, resourceSystem, entitySetLoader);
         _toolbar = new ViewportToolbar(_imGui.Font, config);
     }

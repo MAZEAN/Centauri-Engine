@@ -6,6 +6,8 @@ using System.Numerics;
 using World;
 using Common;
 using Graphics.Resources.Materials;
+using Rendering;
+using Loading;
 
 // The selected-entity inspector: name/enabled header plus the Transform / Material / Light
 // sub-panels. Holds the transient rotation-edit state. Shows a placeholder when nothing
@@ -14,8 +16,22 @@ public sealed class EntityInspectorSection : ISection
 {
     private static readonly string[] LightTypes = ["None", "Directional", "Point", "Spot"];
 
+    private readonly ResourceSystem _resourceSystem;
+    private readonly EntitySetLoader _entitySetLoader;
+
     private Vector3 _euler;            // cached working rotation (deg) for the selected entity
     private bool    _editingRotation;  // true while a rotation axis is being dragged
+
+    // Lazily built once (the registry doesn't change at runtime) — see HierarchyPanel's
+    // identical pattern for the "+ Add" model/material pickers.
+    private string[]? _materialIds;
+    private int _selectedMaterial;
+
+    public EntityInspectorSection(ResourceSystem resourceSystem, EntitySetLoader entitySetLoader)
+    {
+        _resourceSystem  = resourceSystem;
+        _entitySetLoader = entitySetLoader;
+    }
 
     public void Draw(Scene scene)
     {
@@ -65,12 +81,15 @@ public sealed class EntityInspectorSection : ISection
             0.01f, 0.001f, 1000f, "%.3f", scaleReset.X);
     }
 
-    private static void DrawMaterial(Entity e, Scene scene)
+    private void DrawMaterial(Entity e, Scene scene)
     {
         if (e.Materials.Count == 0) return;
 
         using var s = Widgets.Section("Material");
         if (!s.Open) return;
+
+        DrawMaterialPicker(e);
+        ImGui.Spacing();
 
         for (var i = 0; i < e.Materials.Count; i++)
         {
@@ -78,15 +97,31 @@ public sealed class EntityInspectorSection : ISection
             var index = i;   // capture for the edit closures
 
             ImGui.PushID(i);
-            
+
             ImGui.TextDisabled($"{mat.Name}");
             Widgets.ColorRow4("Base Color", mat.Color, v => EditMaterial(e, scene, index, m => m.Color = v));
             Widgets.SliderRow("Roughness", mat.RoughnessScalar, v => EditMaterial(e, scene, index, m => m.RoughnessScalar = v), 0f, 1f, 0.5f);
             Widgets.SliderRow("Metallic",  mat.MetallicScalar,  v => EditMaterial(e, scene, index, m => m.MetallicScalar  = v), 0f, 1f, 0.1f);
             Widgets.SliderRow("Translucency", mat.Translucency, v => EditMaterial(e, scene, index, m => m.Translucency = v), 0f, 1f, 0f);
-            
+
             ImGui.PopID();
         }
+    }
+
+    // Reassigns every mesh slot to a different material asset at once — see
+    // EntitySetLoader.SetMaterial for why this is uniform rather than per-slot. The per-slot
+    // scalar rows below still work afterward, now tweaking whichever material was just applied.
+    private void DrawMaterialPicker(Entity e)
+    {
+        var materialIds = _materialIds ??= _resourceSystem.MaterialIds.ToArray();
+        if (materialIds.Length == 0) return;
+
+        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X * 0.6f);
+        ImGui.Combo("##changeMaterial", ref _selectedMaterial, materialIds, materialIds.Length);
+
+        ImGui.SameLine();
+        if (ImGui.Button("Apply"))
+            _entitySetLoader.SetMaterial(e, materialIds[_selectedMaterial]);
     }
 
     private static void DrawLight(Entity e)

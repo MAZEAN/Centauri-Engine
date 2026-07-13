@@ -61,10 +61,13 @@ A scene is split into two independent file types, loaded by two separate classes
   live edit and reloads from disk — back to the last Ctrl+S, or the original authored state if
   nothing's been saved yet; only removes entities EntitySetLoader itself tracks, so it never touches
   the environment's own entities (e.g. its `"sun"`). Only what the inspector can actually edit
-  round-trips (name, enabled, transform, light); material *property* edits (Color/Roughness/
-  Metallic/Translucency) aren't persisted — the schema only supports material *bindings* (paths),
-  not inline scalar overrides. Camera/skybox edits aren't persisted either (`EnvironmentLoader` has
-  no `Save()`).
+  round-trips (name, enabled, transform, light, and which material asset is assigned — see
+  `EntitySetLoader.SetMaterial`, which reassigns every mesh slot on the entity at once rather than
+  per-slot, since the schema only knows a material *asset's* id, not which id an already-resolved
+  live `Material` came from). Material *property* edits (Color/Roughness/Metallic/Translucency,
+  tweaking whichever material is currently assigned) still aren't persisted — the schema only
+  supports material *bindings* (paths/ids), not inline scalar overrides. Camera/skybox edits
+  aren't persisted either (`EnvironmentLoader` has no `Save()`).
 
 ## Project layout
 

@@ -11,8 +11,9 @@ using Loading;
 // Scene hierarchy — lists every entity (including light-only ones that can't be
 // ray-picked in the viewport) and selects on click. Selection drives the
 // PropertiesPanel inspector, which already edits lights/materials/transforms.
-// The "+" row composes a new entity from the project's registered models (see
-// ResourceSystem.ModelIds) via EntitySetLoader.CreateEntity; Delete removes the selection.
+// The "+" row composes a new entity from the project's registered models and materials (see
+// ResourceSystem.ModelIds/MaterialIds) via EntitySetLoader.CreateEntity; Delete removes the
+// selection. Changing an existing entity's material lives in EntityInspectorSection instead.
 public sealed class HierarchyPanel
 {
     private const float Width      = 300f;
@@ -33,6 +34,12 @@ public sealed class HierarchyPanel
     // fresh sorted array from ResourceSystem.ModelIds every frame just to feed the combo.
     private string[]? _modelIds;
     private int _selectedModel;
+
+    // Index 0 is always "(Default)" — placing a model without picking a material here falls
+    // back to the usual resolution chain (the model's own default binding, else DefaultMaterial)
+    // exactly as if CreateEntity's materialId had been left null.
+    private string[]? _materialIds;
+    private int _selectedMaterial;
 
     public HierarchyPanel(ImFontPtr font, ResourceSystem resourceSystem, EntitySetLoader entitySetLoader)
     {
@@ -84,6 +91,8 @@ public sealed class HierarchyPanel
             return;
         }
 
+        var materialIds = _materialIds ??= BuildMaterialOptions();
+
         ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X * 0.6f);
         ImGui.Combo("##addModel", ref _selectedModel, modelIds, modelIds.Length);
 
@@ -91,9 +100,22 @@ public sealed class HierarchyPanel
         if (ImGui.Button("+ Add"))
         {
             var modelId = modelIds[_selectedModel];
-            var entity = _entitySetLoader.CreateEntity(modelId, name: modelId);
+            var materialId = _selectedMaterial == 0 ? null : materialIds[_selectedMaterial];
+            var entity = _entitySetLoader.CreateEntity(modelId, materialId, name: modelId);
             scene.Select(entity);
         }
+
+        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
+        ImGui.Combo("##addMaterial", ref _selectedMaterial, materialIds, materialIds.Length);
+    }
+
+    private string[] BuildMaterialOptions()
+    {
+        var ids = _resourceSystem.MaterialIds.ToArray();
+        var options = new string[ids.Length + 1];
+        options[0] = "(Default)";
+        Array.Copy(ids, 0, options, 1, ids.Length);
+        return options;
     }
 
     private static void DrawRow(Scene scene, Entity entity)

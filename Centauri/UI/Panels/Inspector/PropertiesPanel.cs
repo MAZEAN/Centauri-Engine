@@ -7,6 +7,8 @@ using World;
 using Config;
 using Common;
 using Sections;
+using Rendering;
+using Loading;
 
 internal readonly record struct SectionGroup(string Name, Vector4 Accent, ISection[] Sections);
 
@@ -19,13 +21,14 @@ public class PropertiesPanel
     private const ImGuiWindowFlags Flags = Widgets.PanelBase;
 
     private readonly ImFontPtr _font;
-    
-    private readonly EntityInspectorSection _entitySection = new();
+
+    private readonly EntityInspectorSection _entitySection;
     private readonly SectionGroup[] _groups;
 
-    public PropertiesPanel(ImFontPtr font, AppConfig config)
+    public PropertiesPanel(ImFontPtr font, AppConfig config, ResourceSystem resourceSystem, EntitySetLoader entitySetLoader)
     {
         _font = font;
+        _entitySection = new EntityInspectorSection(resourceSystem, entitySetLoader);
         _groups =
         [
             new SectionGroup("Environment", ColorPalette.Green, [
