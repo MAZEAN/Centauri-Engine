@@ -50,6 +50,22 @@ public class Scene
         Revision++;
     }
 
+    // Disposes and drops every entity — the live-scene half of EntitySetLoader.Reset(), which
+    // reloads from disk right after. Distinct from Dispose() (final teardown, doesn't bump
+    // Revision since nothing survives it to care) by actually leaving the scene usable
+    // afterward.
+    public void ClearEntities()
+    {
+        foreach (var entity in _entities)
+        {
+            entity.Transform.OnChanged -= MarkDirty;
+            entity.Dispose();
+        }
+        _entities.Clear();
+        Selected = null;
+        Revision++;
+    }
+
     // first component of type T across the scene, or null — handy for global toggles
     public T? FindComponent<T>() where T : Component
     {

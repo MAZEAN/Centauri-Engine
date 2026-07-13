@@ -25,6 +25,13 @@ public class EntitySetLoader
     private readonly Dictionary<Entity, EntityDefinition> _sources = new();
     private readonly Dictionary<Entity, string> _fileOf = new();
 
+    // Every file ever loaded (or written to via CreateEntity's DefaultEntitySetPath) this
+    // session, independent of whether it currently has any live entities — Save() needs this so
+    // deleting the *last* entity that came from a file still rewrites that file (as now-empty),
+    // instead of silently leaving its stale on-disk content untouched because nothing in
+    // _scene.Entities maps to it anymore.
+    private readonly HashSet<string> _knownFiles = new();
+
     public EntitySetLoader(ResourceSystem resourceSystem, Scene scene, AppConfig config)
     {
         _resourceSystem = resourceSystem;
@@ -49,8 +56,25 @@ public class EntitySetLoader
         _resourceSystem.PreloadEntities(definitions.SelectMany(d => d.def.Entities));
 
         foreach (var (path, def) in definitions)
+        {
+            _knownFiles.Add(path);
             foreach (var e in def.Entities)
                 AddFromDefinition(e, path);
+        }
+    }
+
+    // Discards every live entity and reloads from disk — an easy way back to the last saved
+    // state (or the original authored one, if nothing's been saved yet) when live edits went
+    // somewhere you didn't want. Re-derives EffectivePaths from scratch rather than reusing
+    // _knownFiles, so a file that only just started existing on disk (DefaultEntitySetPath,
+    // written by a Save() earlier this session) is picked up too.
+    public void Reset()
+    {
+        _scene.ClearEntities();
+        _sources.Clear();
+        _fileOf.Clear();
+        _knownFiles.Clear();
+        LoadAll();
     }
 
     private List<string> EffectivePaths()
@@ -100,6 +124,7 @@ public class EntitySetLoader
         _scene.AddEntity(entity);
         _sources[entity] = def;
         _fileOf[entity]  = _config.Render.DefaultEntitySetPath;
+        _knownFiles.Add(_config.Render.DefaultEntitySetPath);
 
         return entity;
     }
@@ -113,21 +138,22 @@ public class EntitySetLoader
         _fileOf.Remove(entity);
     }
 
-    // Writes every tracked entity back to the file it's attributed to (grouping by file), one
-    // EntitySetDefinition per file — composing several sets together at load time never
-    // collapses them into one on save. Entities without tracking (shouldn't happen outside a
-    // bug) are skipped rather than silently dropped from an arbitrary file.
+    // Writes every known file back out (grouping live entities by file), one EntitySetDefinition
+    // per file — composing several sets together at load time never collapses them into one on
+    // save. Iterates _knownFiles rather than deriving the file list from _scene.Entities, so
+    // deleting the *last* entity a file had still rewrites it as empty instead of leaving its
+    // stale on-disk content untouched (nothing would otherwise map to that file anymore).
     public void Save()
     {
         var byFile = _scene.Entities
             .Where(e => _fileOf.ContainsKey(e))
-            .GroupBy(e => _fileOf[e]);
+            .ToLookup(e => _fileOf[e]);
 
-        foreach (var group in byFile)
+        foreach (var file in _knownFiles)
         {
-            var outDef = new EntitySetDefinition { Entities = group.Select(ToDefinition).ToList() };
+            var outDef = new EntitySetDefinition { Entities = byFile[file].Select(ToDefinition).ToList() };
             var json = JsonSerializer.Serialize(outDef, JsonDefaults.Options);
-            File.WriteAllText(PathResolver.Resolve(group.Key), json);
+            File.WriteAllText(PathResolver.Resolve(file), json);
         }
     }
 

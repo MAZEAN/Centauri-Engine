@@ -18,8 +18,11 @@ public class RenderConfig
     [JsonPropertyName("entitySetPaths")]   public List<string> EntitySetPaths { get; init; } = [];
 
     // Where entities created live (via the Outliner's "add entity") are saved if they don't
-    // already belong to one of EntitySetPaths — doesn't need to already exist on disk.
-    [JsonPropertyName("defaultEntitySetPath")] public string DefaultEntitySetPath { get; init; } = "Loading/EntitySets/Session.json";
+    // already belong to one of EntitySetPaths — doesn't need to already exist on disk. Lives
+    // under Loading/Saves/ rather than alongside hand-authored EntitySets/ content, so a future
+    // versioning scheme (timestamped/numbered save files, keeping more than one) has a folder of
+    // its own to grow into without mixing with curated scene content.
+    [JsonPropertyName("defaultEntitySetPath")] public string DefaultEntitySetPath { get; init; } = "Loading/Saves/Session.json";
 
     [JsonPropertyName("defaultShader")]    public string DefaultShader    { get; init; } = "Shaders/shaderPBR";
 

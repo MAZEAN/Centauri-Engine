@@ -102,9 +102,19 @@ public class InputSystem : IDisposable
             return;
         }
 
-        if (key == Key.S && (keyboard.IsKeyPressed(Key.ControlLeft) || keyboard.IsKeyPressed(Key.ControlRight)))
+        var ctrl = keyboard.IsKeyPressed(Key.ControlLeft) || keyboard.IsKeyPressed(Key.ControlRight);
+
+        if (key == Key.S && ctrl)
         {
             SaveScene();
+            return;
+        }
+
+        // Shift-guarded (not just Ctrl+R) — this discards every live, unsaved edit, so it
+        // shouldn't be one accidental keystroke away from Ctrl+S.
+        if (key == Key.R && ctrl && (keyboard.IsKeyPressed(Key.ShiftLeft) || keyboard.IsKeyPressed(Key.ShiftRight)))
+        {
+            ResetScene();
             return;
         }
 
@@ -135,6 +145,19 @@ public class InputSystem : IDisposable
         catch (Exception ex)
         {
             Console.WriteLine($"[Scene] Save failed: {ex.Message}");
+        }
+    }
+
+    private void ResetScene()
+    {
+        try
+        {
+            _entitySetLoader.Reset();
+            Console.WriteLine("[Scene] Reset to last saved state.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Scene] Reset failed: {ex.Message}");
         }
     }
 

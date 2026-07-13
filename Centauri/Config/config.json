@@ -28,8 +28,10 @@
     "modelCacheSize": 64,
     "shaderCacheSize": 32,
     "environmentPath": "Loading/environment.json",
-    "entitySetPaths": ["Loading/Scenes/DefaultScene.json"],
-    "defaultEntitySetPath": "Loading/EntitySets/Session.json",
+    "entitySetPaths": [
+      "Loading/Scenes/DefaultScene.json"
+    ],
+    "defaultEntitySetPath": "Loading/Saves/Session.json",
     "defaultShader": "Shaders/PBR/shaderPBR",
     "renderScale": 1.0
   },
@@ -58,11 +60,23 @@
   },
   "reflectionProbe": {
     "enabled": false,
-    "position": [0, 2, 3],
+    "position": [
+      0,
+      2,
+      3
+    ],
     "resolution": 128,
     "intensity": 0.3,
-    "boxCenter": [0, -1, -3],
-    "boxSize": [20, 3, 20],
+    "boxCenter": [
+      0,
+      -1,
+      -3
+    ],
+    "boxSize": [
+      20,
+      3,
+      20
+    ],
     "boxFalloff": 1.0
   },
   "planarReflection": {

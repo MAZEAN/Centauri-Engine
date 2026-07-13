@@ -50,13 +50,18 @@ A scene is split into two independent file types, loaded by two separate classes
   entities. Zero or more, layered onto the environment at startup per `render.entitySetPaths`
   (default empty — a fresh project boots into an empty scene). Add entities live via the Outliner's
   "+ Add" row (composes from `ResourceSystem.ModelIds`), or Delete-key a selected one in Edit mode.
-  Ctrl+S (`EntitySetLoader.Save()`) writes every tracked entity back to the file it came from — an
-  entity created at runtime and never loaded from a file is attributed to
-  `render.defaultEntitySetPath` until saved once. Only what the inspector can actually edit
-  round-trips (name, enabled, transform, light); material *property* edits (Color/Roughness/
-  Metallic/Translucency) aren't persisted — the schema only supports material *bindings* (paths),
-  not inline scalar overrides. Camera/skybox edits aren't persisted either (`EnvironmentLoader` has
-  no `Save()`).
+  Ctrl+S (`EntitySetLoader.Save()`) writes every *known* file back out (including ones now empty
+  from deletions — see `_knownFiles`, not just whatever `_scene.Entities` currently maps to) to
+  the file it came from. An entity created at runtime and never loaded from a file is attributed
+  to `render.defaultEntitySetPath` (`Loading/Saves/Session.json` by default — kept out of
+  `EntitySets/`, which is for hand-authored content, so a future versioning scheme has its own
+  folder to grow into) until saved once; once that file exists on disk it auto-loads next launch
+  even if never added to `entitySetPaths`. Ctrl+Shift+R (`EntitySetLoader.Reset()`) discards every
+  live edit and reloads from disk — back to the last Ctrl+S, or the original authored state if
+  nothing's been saved yet. Only what the inspector can actually edit round-trips (name, enabled,
+  transform, light); material *property* edits (Color/Roughness/Metallic/Translucency) aren't
+  persisted — the schema only supports material *bindings* (paths), not inline scalar overrides.
+  Camera/skybox edits aren't persisted either (`EnvironmentLoader` has no `Save()`).
 
 ## Project layout
 

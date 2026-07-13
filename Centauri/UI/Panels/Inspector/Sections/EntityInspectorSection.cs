@@ -56,6 +56,13 @@ public sealed class EntityInspectorSection : ISection
 
         Widgets.Vec3Rows("Scale", t.Scale, v => t.Scale = v,
             0.01f, "%.3f", scaleReset);
+
+        // A per-axis Scale row alone means resizing something uniformly needs the same number
+        // typed/dragged three times. Shows X as the reference value (meaningless once the scale
+        // is already non-uniform, same as any single-value display of a 3-component state), but
+        // dragging it always sets all three axes together.
+        Widgets.DragRow("Uniform Scale", t.Scale.X, v => t.Scale = new Vector3(v, v, v),
+            0.01f, 0.001f, 1000f, "%.3f", scaleReset.X);
     }
 
     private static void DrawMaterial(Entity e, Scene scene)
