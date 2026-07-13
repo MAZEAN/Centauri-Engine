@@ -8,6 +8,7 @@ using System.Numerics;
 using Config;
 using World;
 using Rendering;
+using Loading;
 
 public class InputSystem : IDisposable
 {
@@ -15,6 +16,7 @@ public class InputSystem : IDisposable
     private readonly Scene _scene;
     private readonly AppConfig _config;
     private readonly RenderingSystem _renderingSystem;
+    private readonly SceneLoader _sceneLoader;
 
     private IKeyboard _keyboard = null!;
     public IInputContext InputContext { get; private set; } = null!;
@@ -24,13 +26,14 @@ public class InputSystem : IDisposable
     private readonly Dictionary<Camera, CameraController> _controllers = new();
     private readonly DebugHotkeys _hotkeys;
 
-    public InputSystem(IWindow window, Scene scene, AppConfig config, RenderingSystem renderingSystem)
+    public InputSystem(IWindow window, Scene scene, AppConfig config, RenderingSystem renderingSystem, SceneLoader sceneLoader)
     {
         _window          = window;
         _scene           = scene;
         _config          = config;
         _renderingSystem = renderingSystem;
-        
+        _sceneLoader     = sceneLoader;
+
         _hotkeys         = new DebugHotkeys(config, scene, ResetActiveController);
 
         Initialize();
@@ -99,6 +102,12 @@ public class InputSystem : IDisposable
             return;
         }
 
+        if (key == Key.S && (keyboard.IsKeyPressed(Key.ControlLeft) || keyboard.IsKeyPressed(Key.ControlRight)))
+        {
+            SaveScene();
+            return;
+        }
+
         if (key == _config.Input.ToggleModeKey)
         {
             ToggleMode(); _scene.ClearSelection();
@@ -108,6 +117,25 @@ public class InputSystem : IDisposable
         if (_renderingSystem.ImGuiWantsKeyboard) return;
         
         _hotkeys.Handle(key);
+    }
+
+    private void SaveScene()
+    {
+        if (!_sceneLoader.CanSave)
+        {
+            Console.WriteLine("[Scene] Save skipped: scene uses \"include\" and can't be saved yet.");
+            return;
+        }
+
+        try
+        {
+            _sceneLoader.Save();
+            Console.WriteLine("[Scene] Saved.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Scene] Save failed: {ex.Message}");
+        }
     }
 
     private void ToggleMode()

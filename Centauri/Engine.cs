@@ -81,7 +81,7 @@ public class Engine : IWindowCallbacks
 
     private void InitializeInput()
     {
-        _inputSystem = new InputSystem(_window, _scene, _config, _renderingSystem);
+        _inputSystem = new InputSystem(_window, _scene, _config, _renderingSystem, _sceneLoader);
 
         _renderingSystem.InitializeComponents(_window, _inputSystem.InputContext);
         

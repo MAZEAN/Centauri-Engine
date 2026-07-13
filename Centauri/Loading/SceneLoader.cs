@@ -15,8 +15,15 @@ public class SceneLoader
     private readonly ResourceSystem _resourceSystem;
     private readonly Scene _scene;
     private readonly AppConfig _config;
-    
+
     private readonly string _path;
+
+    // The merged definition from the last Load(), and which EntityDefinition each live Entity
+    // came from — Save() reuses both so it only ever writes back the fields the inspector can
+    // actually edit (name, enabled, transform, light) and leaves everything else (model,
+    // material bindings, uv, components, triplanar overrides) exactly as originally authored.
+    private SceneDefinition? _loaded;
+    private readonly Dictionary<Entity, EntityDefinition> _sources = new();
 
     public SceneLoader(ResourceSystem resourceSystem, Scene scene, AppConfig config)
     {
@@ -29,6 +36,7 @@ public class SceneLoader
     public void Load()
     {
         var def = LoadMerged(_path, []);
+        _loaded = def;
 
         _resourceSystem.PreloadScene(def);
 
@@ -36,6 +44,83 @@ public class SceneLoader
         LoadCameras(def);
         LoadSkyboxes(def);
     }
+
+    // Multi-file ("include") scenes flatten every included file's entities into one in-memory
+    // list with no record of which file an entity came from, so Save() has no correct place to
+    // write each one back to — refuse rather than silently collapsing the project into one file.
+    public bool CanSave => _loaded is { Include: not { Count: > 0 } };
+
+    // Writes the scene's live, editor-authored state back to the file it was loaded from.
+    // Cameras and skybox exposure/black level aren't persisted yet — only entities, which is
+    // what the inspector's Transform/Enabled/Light editing (and Authored-value tracking) covers.
+    public void Save()
+    {
+        if (_loaded is not { } loaded)
+            throw new InvalidOperationException("SceneLoader.Save() called before Load().");
+        if (loaded.Include is { Count: > 0 })
+            throw new InvalidOperationException("Saving a scene that uses \"include\" is not supported yet.");
+
+        var outDef = new SceneDefinition
+        {
+            Entities = _scene.Entities.Select(ToDefinition).ToList(),
+            Cameras  = loaded.Cameras,
+            Skyboxes = loaded.Skyboxes,
+        };
+
+        var json = JsonSerializer.Serialize(outDef, JsonDefaults.Options);
+        File.WriteAllText(PathResolver.Resolve(_path), json);
+    }
+
+    private EntityDefinition ToDefinition(Entity entity)
+    {
+        if (!_sources.TryGetValue(entity, out var source))
+            throw new InvalidOperationException(
+                $"Entity '{entity.Name}' has no source definition (not created by SceneLoader) — cannot save.");
+
+        var t = entity.Transform;
+
+        return new EntityDefinition
+        {
+            Name      = entity.Name,
+            Model     = source.Model,
+            Material  = source.Material,
+            Materials = source.Materials,
+            Position  = [t.Position.X, t.Position.Y, t.Position.Z],
+            Scale     = [t.Scale.X, t.Scale.Y, t.Scale.Z],
+            Rotation  = [t.EulerAngles.X, t.EulerAngles.Y, t.EulerAngles.Z],
+            UvScale   = source.UvScale,
+            UvOffset  = source.UvOffset,
+            Enabled   = entity.Enabled,
+            Light     = entity.Light is { } l ? ToDefinition(l) : null,
+            Components = source.Components,
+            TriplanarOverride      = source.TriplanarOverride,
+            TriplanarScaleOverride = source.TriplanarScaleOverride,
+        };
+    }
+
+    private static LightDefinition ToDefinition(Light l) => l switch
+    {
+        DirectionalLight d => new LightDefinition
+        {
+            Type = "directional", Enabled = d.Enabled,
+            Color = [d.Color.X, d.Color.Y, d.Color.Z], Intensity = d.Intensity,
+            Direction = [d.Direction.X, d.Direction.Y, d.Direction.Z],
+        },
+        SpotLight sp => new LightDefinition
+        {
+            Type = "spot", Enabled = sp.Enabled,
+            Color = [sp.Color.X, sp.Color.Y, sp.Color.Z], Intensity = sp.Intensity,
+            Direction = [sp.Direction.X, sp.Direction.Y, sp.Direction.Z],
+            InnerCutoff = sp.InnerCutoff, OuterCutoff = sp.OuterCutoff,
+        },
+        PointLight p => new LightDefinition
+        {
+            Type = "point", Enabled = p.Enabled,
+            Color = [p.Color.X, p.Color.Y, p.Color.Z], Intensity = p.Intensity,
+            Constant = p.Constant, Linear = p.Linear, Quadratic = p.Quadratic,
+        },
+        _ => throw new ArgumentOutOfRangeException(nameof(l), l, "Unknown light type.")
+    };
 
     // Recursively resolves "include": each included file's entities/cameras/skybox get folded
     // into this one before the caller sees it, so a scene can stay a thin index instead of one
@@ -73,6 +158,7 @@ public class SceneLoader
             ApplyComponents(entity, e);
 
             _scene.AddEntity(entity);
+            _sources[entity] = e;
         }
     }
     
