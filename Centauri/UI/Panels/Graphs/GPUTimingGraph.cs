@@ -19,15 +19,13 @@ internal sealed class GPUTimingGraph
     private const float TopPad  = 20f;
     private const float IconSize = 10f;
 
-    private const int   Capacity         = 200;    // samples retained
+    private const int   Capacity         = 100;    // samples retained
     private const float SampleIntervalMs = 50f;    // one plotted point per 50 ms
     private const float WindowSeconds    = Capacity * SampleIntervalMs / 1000f;
-    // Matches GPUProfiler.MaxZones — a lower cap here would silently drop whichever real
-    // profiler zones exceed it from the legend (Slot() returns -1 past this many distinct
-    // names), even though GPUProfiler itself is still timing and reporting them correctly.
-    private const int   MaxZones         = 16;
-    private const int   WarmupFrames     = 100;
-    private const int   Divs = 5;
+
+    private const int MaxZones         = 16;
+    private const int WarmupFrames     = 100;
+    private const int Divs = 5;
 
     private static readonly string WindowLabel = $"-{WindowSeconds:0}s";
     
@@ -42,14 +40,13 @@ internal sealed class GPUTimingGraph
 
     private readonly float[,] _samples = new float[Capacity, MaxZones];   // per-interval, per-zone ms
     private readonly string[] _names   = new string[MaxZones];
-    
+
     // Scratch buffers for Draw()'s stacked-band fill, reused across frames to avoid per-frame
     // allocation. _baseline holds the running per-column top-of-stack as zones are layered;
     // _polyScratch holds one zone's outline (top edge left→right, then bottom edge right→left)
     // for a single AddConvexPolyFilled call instead of (count-1) AddQuadFilled calls per zone.
     private readonly float[] _baseline = new float[Capacity];
     private readonly Vector2[] _polyScratch = new Vector2[Capacity * 2];
-    
     private int _zoneCount;
     private int _head;     // next write slot
     private int _count;    // valid samples (≤ Capacity)
@@ -190,34 +187,51 @@ internal sealed class GPUTimingGraph
         }
 
         // ── stacked bands ───────────────────────────────────────────────────────
-        // One filled polygon per zone (outline: top edge left→right, bottom edge right→left)
-        // instead of one quad per column per zone — same geometry, but _zoneCount draw-list
-        // calls instead of (count-1)*_zoneCount (up to ~1600/frame at full history + 8 zones).
+        // A band's top edge wiggles with the data, so the ribbon is frequently non-convex —
+        // AddConvexPolyFilled's fan triangulation silently corrupts a concave outline (visible
+        // as overlapping/torn bands), so each ribbon is triangulated explicitly as a strip
+        // instead. Still one PrimReserve per zone rather than one AddQuadFilled per column per
+        // zone (each of which redundantly re-validates/reserves internally), while remaining
+        // correct for any top-edge shape.
         if (_count >= 2)
         {
             Array.Clear(_baseline, 0, _count);
+            var uv = ImGui.GetFontTexUvWhitePixel();
 
             for (var z = 0; z < _zoneCount; z++)
             {
                 var c   = Palette[z % Palette.Length];
                 var col = ImGui.GetColorU32(new Vector4(c.X, c.Y, c.Z, 0.65f));
 
-                var n = 0;
                 for (var i = 0; i < _count; i++)
                 {
                     var idx = (_head - _count + i + Capacity) % Capacity;
                     var x   = p0.X + w * (i / (float)(_count - 1));
                     var top = _baseline[i] + _samples[idx, z];
-                    _polyScratch[n++] = new Vector2(x, Y(p1.Y, h, top, yMax));
-                }
-                
-                for (var i = _count - 1; i >= 0; i--)
-                {
-                    var x = p0.X + w * (i / (float)(_count - 1));
-                    _polyScratch[n++] = new Vector2(x, Y(p1.Y, h, _baseline[i], yMax));
+                    _polyScratch[i]           = new Vector2(x, Y(p1.Y, h, top,          yMax));
+                    _polyScratch[Capacity + i] = new Vector2(x, Y(p1.Y, h, _baseline[i], yMax));
                 }
 
-                dl.AddConvexPolyFilled(ref _polyScratch[0], n, col);
+                var triCount = (_count - 1) * 2;
+                dl.PrimReserve(triCount * 3, _count * 2);
+                var baseIdx = dl._VtxCurrentIdx;
+
+                for (var i = 0; i < _count; i++)
+                {
+                    dl.PrimWriteVtx(_polyScratch[i], uv, col);            // top[i]    -> baseIdx + 2i
+                    dl.PrimWriteVtx(_polyScratch[Capacity + i], uv, col); // bottom[i] -> baseIdx + 2i + 1
+                }
+                for (var i = 0; i < _count - 1; i++)
+                {
+                    var t0 = (ushort)(baseIdx + (uint)(2 * i));
+                    var b0 = (ushort)(t0 + 1);
+                    var t1 = (ushort)(t0 + 2);
+                    var b1 = (ushort)(t0 + 3);
+
+                    dl.PrimWriteIdx(t0); dl.PrimWriteIdx(b0); dl.PrimWriteIdx(t1);
+                    dl.PrimWriteIdx(b0); dl.PrimWriteIdx(b1); dl.PrimWriteIdx(t1);
+                }
+
                 for (var i = 0; i < _count; i++)
                 {
                     var idx = (_head - _count + i + Capacity) % Capacity;

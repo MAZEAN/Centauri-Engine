@@ -68,6 +68,15 @@ public class StatsOverlay
             _gpuGraph.Push(gpuTimings, stats.FrameTime);
             Section("GPU (ms)", ColorPalette.Amber, () => _gpuGraph.Draw());
         }
+        
+        Section("Renderer", ColorPalette.Blue, () =>
+        {
+            Row("Draw Calls",     stats.DrawCalls.ToString());
+            Row("Texture Binds",  stats.TextureBinds.ToString());
+            Row("Total Indices",  stats.TotalIndices.ToString());
+            Row("Total Vertices", stats.TotalVertices.ToString());
+            Row("Triangles",      (stats.TotalIndices / 3).ToString());
+        });
 
         Section("Culling", ColorPalette.Green, () =>
         {
@@ -83,7 +92,7 @@ public class StatsOverlay
             Row("Grid",     $"{stats.GridColumns}x{stats.GridRows} ({stats.GridCells})");
             Row("Occupied", stats.GridOccupied.ToString());
             Row("Visited",  stats.GridVisited.ToString());
-        });
+        }, defaultOpen:false);
         
         Section("Shadows", ColorPalette.Blue, () =>
         {
@@ -95,15 +104,7 @@ public class StatsOverlay
                 ? stats.ShadowCulled / (float)stats.ShadowTotal * 100f
                 : 0f;
             Row("Ratio", $"{Widgets.Float(ratio)} %");
-        });
-
-        Section("Renderer", ColorPalette.Blue, () =>
-        {
-            Row("Draw Calls",     stats.DrawCalls.ToString());
-            Row("Texture Binds",  stats.TextureBinds.ToString());
-            Row("Total Indices",  stats.TotalIndices.ToString());
-            Row("Total Vertices", stats.TotalVertices.ToString());
-        });
+        }, defaultOpen:false);
         
         Section("Instancing", ColorPalette.Green, () =>
         {
@@ -114,7 +115,7 @@ public class StatsOverlay
             RowColored("Saved", $"{Widgets.Float(stats.DrawCallReduction)} %",
                 stats.DrawCallReduction > 0f ? ColorPalette.Green : ColorPalette.White);
             Row("Two-Sided", $"{stats.TwoSidedEntities}/{stats.RenderableEntities} ({Widgets.Float(stats.TwoSidedPercent)} %)");
-        });
+        }, defaultOpen:false);
         
         var cam = scene.Cameras.Active;
         Section("Camera", ColorPalette.Red, () =>
@@ -125,7 +126,7 @@ public class StatsOverlay
             Row("Yaw",   Widgets.SignedFloat(cam.Yaw));
             Row("Pitch", Widgets.SignedFloat(cam.Pitch));
             Row("Zoom",  Widgets.Float(cam.Zoom));
-        });
+        }, defaultOpen:false);
 
         Section("Config", ColorPalette.Purple, () =>
         {

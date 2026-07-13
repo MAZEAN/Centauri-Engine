@@ -1,6 +1,6 @@
 # TODO
 
-> Project task tracker and roadmap.
+> Project task tracker and roadmap (unordered)
 
 ---
 
@@ -19,12 +19,13 @@
 * [x] GTAO (Ground-Truth AO)
 * [x] Contact-hardening / PCSS
 * [ ] Raytracing with BVH (only experimental, not real-time)
-* [ ] Physics engine integration (BEPUphysics2)
-* [ ] Basis for game
+* [ ] Physics engine integration (BEPUphysics2) + fixed timestep
 * [ ] Terrain (technique unclear, maybe https://github.com/xandergos/terrain-diffusion/tree/master)
 * [ ] Water simulation (Sea of Thieves algorithm)
 * [x] Complex foliage rendering
 * [ ] Displacement or Bump mapping
+* [ ] Audio
+* [ ] Skeletal animation / skinning
 
 ## Enhancements
 
@@ -47,6 +48,10 @@
 * [ ] Keybindings
 * [x] UI improvements (DPI-scaling etc.)
 * [x] Improve tree models
+* [ ] Automated tests
+* [ ] Scene save/serialization
+* [ ] Transform hierarchy in scene format
+* [ ] Local-light shadows
 
 ## Optional
 * [ ] Hosek-Wilkie sky algorithm

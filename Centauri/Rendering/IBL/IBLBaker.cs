@@ -117,7 +117,6 @@ public sealed class IBLBaker : IDisposable
                         || Vector3.Dot(sunDir, _proceduralSunDir) < RebakeCosThreshold
                         || MathF.Abs(turbidity - _proceduralTurbidity) > RebakeValueEpsilon
                         || MathF.Abs(intensity - _proceduralIntensity) > RebakeValueEpsilon
-                        || cloudSpeed > 0f
                         || MathF.Abs(cloudCoverage - _proceduralCloudCoverage) > RebakeValueEpsilon
                         || MathF.Abs(cloudScale - _proceduralCloudScale) > RebakeValueEpsilon
                         || MathF.Abs(cloudShading - _proceduralCloudShading) > RebakeValueEpsilon;
