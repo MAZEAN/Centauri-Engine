@@ -10,7 +10,9 @@ using Utils.Misc;
 using Panels.Inspector;
 using Panels.Stats;
 using Panels.Toolbar;
+using Rendering;
 using Rendering.Profiling;
+using Loading;
 
 // Owns the whole ImGui surface — the controller plus every panel.
 // RenderingSystem holds one of these instead of juggling them individually.
@@ -26,15 +28,15 @@ public sealed class UISystem : IDisposable
     public bool WantsMouse    => _imGui.WantsMouseCapture;
     public bool WantsKeyboard => _imGui.WantsKeyboardCapture;
 
-    public UISystem(GL gl, AppConfig config, IWindow window, IInputContext input)
+    public UISystem(GL gl, AppConfig config, IWindow window, IInputContext input, ResourceSystem resourceSystem, EntitySetLoader entitySetLoader)
     {
         _config       = config;
-        
+
         _imGui        = new ImGuiManager(gl, config.ImGui, window, input);
-        
+
         _statsOverlay = new StatsOverlay(_imGui.Font, config);
         _properties    = new PropertiesPanel(_imGui.Font, _config);
-        _outliner = new HierarchyPanel(_imGui.Font);
+        _outliner = new HierarchyPanel(_imGui.Font, resourceSystem, entitySetLoader);
         _toolbar = new ViewportToolbar(_imGui.Font, config);
     }
 

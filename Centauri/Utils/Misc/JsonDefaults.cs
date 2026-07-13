@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 
 public static class JsonDefaults
 {
-    // Shared by ConfigLoader and SceneLoader so config and scene parse/serialize
+    // Shared by ConfigLoader, EnvironmentLoader and EntitySetLoader so config and scene files parse/serialize
     // identically: case-insensitive reads, enum-by-name, indented + null-skipping writes.
     public static readonly JsonSerializerOptions Options = new()
     {

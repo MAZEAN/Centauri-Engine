@@ -27,11 +27,31 @@ See `Centauri/Utils/Misc/HeadlessCapture.cs`. Useful for verifying a change does
 regress, but llvmpipe frame times (often 1–2s/frame) are **not** representative of real GPU
 performance — don't draw fill-rate/timing conclusions from it, only correctness/visual ones.
 
-The default scene (`Centauri/Loading/scene.json`, pointed to by `render.scenePath` in config.json)
-references model/texture assets that may not exist in every checkout (e.g. this sandbox only ships
-`TestCube`/`TestPlane`/`Tree` under `Assets/Objects` and `Testing/Trees`). For headless smoke-testing
-without the full asset pack, write a throwaway scene JSON using only the available models/no skybox
-panorama, and point `render.scenePath` at it temporarily — don't commit that swap.
+A scene is two file types (see "Scene loading" below): the environment (`render.environmentPath`,
+required — camera + skybox) and zero or more entity sets (`render.entitySetPaths`, empty by default).
+The demo content lives at `Centauri/Loading/EntitySets/Demo.json` but isn't loaded unless listed in
+`entitySetPaths`, and references model/texture assets that may not exist in every checkout (e.g. this
+sandbox only ships `TestCube`/`TestPlane`/`Tree` under `Assets/Objects` and `Testing/Trees`). For
+headless smoke-testing without the full asset pack, write a throwaway environment/entity-set JSON
+using only the available models/no skybox panorama, and point `render.environmentPath`/
+`entitySetPaths` at them temporarily — don't commit that swap.
+
+## Scene loading
+
+A scene is split into two independent file types, loaded by two separate classes:
+- **Environment** (`Loading/Environment/`, `EnvironmentDefinition`/`EnvironmentLoader`) — camera(s)
+  + skybox. Exactly one, required, path set by `render.environmentPath`.
+- **Entity sets** (`Loading/EntitySets/`, `EntitySetDefinition`/`EntitySetLoader`) — a list of
+  entities. Zero or more, layered onto the environment at startup per `render.entitySetPaths`
+  (default empty — a fresh project boots into an empty scene). Add entities live via the Outliner's
+  "+ Add" row (composes from `ResourceSystem.ModelIds`), or Delete-key a selected one in Edit mode.
+  Ctrl+S (`EntitySetLoader.Save()`) writes every tracked entity back to the file it came from — an
+  entity created at runtime and never loaded from a file is attributed to
+  `render.defaultEntitySetPath` until saved once. Only what the inspector can actually edit
+  round-trips (name, enabled, transform, light); material *property* edits (Color/Roughness/
+  Metallic/Translucency) aren't persisted — the schema only supports material *bindings* (paths),
+  not inline scalar overrides. Camera/skybox edits aren't persisted either (`EnvironmentLoader` has
+  no `Save()`).
 
 ## Project layout
 
@@ -51,7 +71,7 @@ Centauri/
     Resources/              GLShader (+ hot-reload support), GLTexture, HDR/EXR loader
   UI/                       ImGui-based editor UI (UISystem owns StatsOverlay, Outliner, Properties, Toolbar)
   World/                    Scene, Entity, Transform, Camera, Light, ECS-ish component collections
-  Loading/                  SceneLoader, scene JSON definitions, ComponentFactory
+  Loading/                  Environment/ + EntitySets/ loaders (see "Scene loading" below), ComponentFactory
   Utils/                    Misc (Time, FrameStats, ShaderHotReload, HeadlessCapture), Math, Geometry, Caching
   Shaders/                  .vert/.frag/.comp GLSL sources
   Assets/, Testing/          content (models, textures, HDRIs) — CopyToOutputDirectory

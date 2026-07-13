@@ -16,7 +16,7 @@ public class InputSystem : IDisposable
     private readonly Scene _scene;
     private readonly AppConfig _config;
     private readonly RenderingSystem _renderingSystem;
-    private readonly SceneLoader _sceneLoader;
+    private readonly EntitySetLoader _entitySetLoader;
 
     private IKeyboard _keyboard = null!;
     public IInputContext InputContext { get; private set; } = null!;
@@ -26,13 +26,13 @@ public class InputSystem : IDisposable
     private readonly Dictionary<Camera, CameraController> _controllers = new();
     private readonly DebugHotkeys _hotkeys;
 
-    public InputSystem(IWindow window, Scene scene, AppConfig config, RenderingSystem renderingSystem, SceneLoader sceneLoader)
+    public InputSystem(IWindow window, Scene scene, AppConfig config, RenderingSystem renderingSystem, EntitySetLoader entitySetLoader)
     {
         _window          = window;
         _scene           = scene;
         _config          = config;
         _renderingSystem = renderingSystem;
-        _sceneLoader     = sceneLoader;
+        _entitySetLoader = entitySetLoader;
 
         _hotkeys         = new DebugHotkeys(config, scene, ResetActiveController);
 
@@ -114,22 +114,22 @@ public class InputSystem : IDisposable
             return;
         }
 
+        if (key == Key.Delete && _config.Input.Mode == ViewMode.Edit && _scene.Selected is { } selected)
+        {
+            _entitySetLoader.DeleteEntity(selected);
+            return;
+        }
+
         if (_renderingSystem.ImGuiWantsKeyboard) return;
-        
+
         _hotkeys.Handle(key);
     }
 
     private void SaveScene()
     {
-        if (!_sceneLoader.CanSave)
-        {
-            Console.WriteLine("[Scene] Save skipped: scene uses \"include\" and can't be saved yet.");
-            return;
-        }
-
         try
         {
-            _sceneLoader.Save();
+            _entitySetLoader.Save();
             Console.WriteLine("[Scene] Saved.");
         }
         catch (Exception ex)

@@ -5,7 +5,12 @@
     "border": "Hidden",
     "enableVSync": false,
     "samples": 1,
-    "clearColor": [0.3, 0.3, 0.3, 1.0]
+    "clearColor": [
+      0.3,
+      0.3,
+      0.3,
+      1.0
+    ]
   },
   "camera": {
     "fov": 45,
@@ -22,7 +27,9 @@
     "textureCacheSize": 128,
     "modelCacheSize": 64,
     "shaderCacheSize": 32,
-    "scenePath": "Loading/scene.json",
+    "environmentPath": "Loading/environment.json",
+    "entitySetPaths": [],
+    "defaultEntitySetPath": "Loading/EntitySets/Session.json",
     "defaultShader": "Shaders/PBR/shaderPBR",
     "renderScale": 1.0
   },
@@ -51,7 +58,7 @@
   },
   "reflectionProbe": {
     "enabled": false,
-    "position": [0, 2, -3],
+    "position": [0, 2, 3],
     "resolution": 128,
     "intensity": 0.3,
     "boxCenter": [0, -1, -3],

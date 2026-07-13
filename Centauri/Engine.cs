@@ -22,7 +22,8 @@ public class Engine : IWindowCallbacks
     private Scene _scene = null!;
     private RenderingSystem _renderingSystem = null!;
     private ResourceSystem _resourceSystem = null!;
-    private SceneLoader _sceneLoader = null!;
+    private EnvironmentLoader _environmentLoader = null!;
+    private EntitySetLoader _entitySetLoader = null!;
     private SimulationSystem _simulation = null!;
     private ShaderHotReload? _shaderHotReload;
 
@@ -72,19 +73,22 @@ public class Engine : IWindowCallbacks
 
     private void LoadScene()
     {
-        _sceneLoader = new SceneLoader(_resourceSystem, _scene, _config);
-        Time.Run("Scene assets + entities", _sceneLoader.Load);
-        
+        _environmentLoader = new EnvironmentLoader(_resourceSystem, _scene, _config);
+        Time.Run("Environment", _environmentLoader.Load);
+
+        _entitySetLoader = new EntitySetLoader(_resourceSystem, _scene, _config);
+        Time.Run("Entity sets", _entitySetLoader.LoadAll);
+
         _scene.Cameras.InitializeAspect(_window);
         Time.Run("IBL bake", () => _renderingSystem.BakeEnvironments(_scene));
     }
 
     private void InitializeInput()
     {
-        _inputSystem = new InputSystem(_window, _scene, _config, _renderingSystem, _sceneLoader);
+        _inputSystem = new InputSystem(_window, _scene, _config, _renderingSystem, _entitySetLoader);
 
-        _renderingSystem.InitializeComponents(_window, _inputSystem.InputContext);
-        
+        _renderingSystem.InitializeComponents(_window, _inputSystem.InputContext, _resourceSystem, _entitySetLoader);
+
         var fb = _window.FramebufferSize;
         _renderingSystem.Resize((uint)fb.X, (uint)fb.Y);
     }

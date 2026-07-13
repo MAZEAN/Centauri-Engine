@@ -8,7 +8,19 @@ public class RenderConfig
     [JsonPropertyName("textureCacheSize")] public int    TextureCacheSize { get; init; } = 128;
     [JsonPropertyName("modelCacheSize")]   public int    ModelCacheSize   { get; init; } = 64;
     [JsonPropertyName("shaderCacheSize")]  public int    ShaderCacheSize  { get; init; } = 32;
-    [JsonPropertyName("scenePath")]        public string ScenePath        { get; init; } = "Loading/scene.json";
+    // The always-loaded half of a scene (camera + skybox) — see EnvironmentLoader.
+    [JsonPropertyName("environmentPath")]  public string EnvironmentPath   { get; init; } = "Loading/environment.json";
+
+    // Zero or more entity-set files layered onto the environment at startup — see
+    // EntitySetLoader. Empty by default: a fresh project boots into an empty scene rather than
+    // always dragging in whatever demo/debug content happens to exist. List a file here (or add
+    // entities live via the Outliner, then Ctrl+S) to populate it.
+    [JsonPropertyName("entitySetPaths")]   public List<string> EntitySetPaths { get; init; } = [];
+
+    // Where entities created live (via the Outliner's "add entity") are saved if they don't
+    // already belong to one of EntitySetPaths — doesn't need to already exist on disk.
+    [JsonPropertyName("defaultEntitySetPath")] public string DefaultEntitySetPath { get; init; } = "Loading/EntitySets/Session.json";
+
     [JsonPropertyName("defaultShader")]    public string DefaultShader    { get; init; } = "Shaders/shaderPBR";
 
     // Fraction of the window's framebuffer resolution the scene (HDR target, prepass, GTAO,

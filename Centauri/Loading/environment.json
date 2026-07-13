@@ -1,0 +1,26 @@
+{
+  "cameras": [
+    {
+      "name": "Main",
+      "position": [0, 0, 3],
+      "up": "Y",
+      "yaw": -90,
+      "pitch": 0,
+      "active": true,
+      "primary": true
+    },
+    {
+      "name": "Debug",
+      "position": [3, 0.5, 0],
+      "up": "Y",
+      "yaw": -180,
+      "pitch": 0,
+      "active": false,
+      "primary": false
+    }
+  ],
+  "skybox": [
+    { "name": "Day", "panorama": "Assets/Textures/Skybox/DaySky.exr", "exposure": 0.5, "blackLevel": 0.02, "active": true },
+    { "name": "Night", "panorama": "Assets/Textures/Skybox/NightSky.exr", "exposure": 0.5, "blackLevel": 0.01, "active": false }
+  ]
+}

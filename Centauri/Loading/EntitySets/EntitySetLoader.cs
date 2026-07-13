@@ -10,73 +10,119 @@ using Rendering;
 using Utils.Misc;
 using World;
 
-public class SceneLoader
+// Loads zero or more EntitySetDefinition files (AppConfig's Render.EntitySetPaths) into the
+// scene, and can write them back out. Each file
+// keeps its own identity end to end: every live Entity remembers both the EntityDefinition it
+// was built from and which file that came from (_sources / _fileOf), so Save() always has an
+// unambiguous, correct destination for it — including entities added at runtime via
+// CreateEntity(), which are attributed to Render.DefaultEntitySetPath until saved once, at
+// which point that file starts existing on disk like any other set.
+public class EntitySetLoader
 {
     private readonly ResourceSystem _resourceSystem;
     private readonly Scene _scene;
     private readonly AppConfig _config;
 
-    private readonly string _path;
-
-    // The merged definition from the last Load(), and which EntityDefinition each live Entity
-    // came from — Save() reuses both so it only ever writes back the fields the inspector can
-    // actually edit (name, enabled, transform, light) and leaves everything else (model,
-    // material bindings, uv, components, triplanar overrides) exactly as originally authored.
-    private SceneDefinition? _loaded;
     private readonly Dictionary<Entity, EntityDefinition> _sources = new();
+    private readonly Dictionary<Entity, string> _fileOf = new();
 
-    public SceneLoader(ResourceSystem resourceSystem, Scene scene, AppConfig config)
+    public EntitySetLoader(ResourceSystem resourceSystem, Scene scene, AppConfig config)
     {
         _resourceSystem = resourceSystem;
         _scene = scene;
-        _path = config.Render.ScenePath;
         _config = config;
     }
 
-    public void Load()
+    // Loads every configured entity set (Render.EntitySetPaths), in order. An empty list is
+    // valid and expected — the default is an empty scene (environment only); entity content is
+    // opt-in via config, or added live via CreateEntity().
+    public void LoadAll()
     {
-        var def = LoadMerged(_path, []);
-        _loaded = def;
+        var paths = _config.Render.EntitySetPaths;
+        if (paths.Count == 0) return;
 
-        _resourceSystem.PreloadScene(def);
+        var definitions = paths.Select(p => (path: p, def: LoadDefinition(p))).ToList();
 
-        LoadEntities(def);
-        LoadCameras(def);
-        LoadSkyboxes(def);
+        _resourceSystem.PreloadEntities(definitions.SelectMany(d => d.def.Entities));
+
+        foreach (var (path, def) in definitions)
+            foreach (var e in def.Entities)
+                AddFromDefinition(e, path);
     }
 
-    // Multi-file ("include") scenes flatten every included file's entities into one in-memory
-    // list with no record of which file an entity came from, so Save() has no correct place to
-    // write each one back to — refuse rather than silently collapsing the project into one file.
-    public bool CanSave => _loaded is { Include: not { Count: > 0 } };
-
-    // Writes the scene's live, editor-authored state back to the file it was loaded from.
-    // Cameras and skybox exposure/black level aren't persisted yet — only entities, which is
-    // what the inspector's Transform/Enabled/Light editing (and Authored-value tracking) covers.
-    public void Save()
+    private static EntitySetDefinition LoadDefinition(string path)
     {
-        if (_loaded is not { } loaded)
-            throw new InvalidOperationException("SceneLoader.Save() called before Load().");
-        if (loaded.Include is { Count: > 0 })
-            throw new InvalidOperationException("Saving a scene that uses \"include\" is not supported yet.");
+        var fullPath = PathResolver.Resolve(path);
+        var json = File.ReadAllText(fullPath);
+        return JsonSerializer.Deserialize<EntitySetDefinition>(json, JsonDefaults.Options)
+               ?? throw new Exception($"Failed to deserialize entity set file: {path}");
+    }
 
-        var outDef = new SceneDefinition
+    private void AddFromDefinition(EntityDefinition e, string sourcePath)
+    {
+        var entity = BuildEntity(e);
+        ApplyTransform(entity, e);
+        ApplyComponents(entity, e);
+
+        _scene.AddEntity(entity);
+        _sources[entity] = e;
+        _fileOf[entity]  = sourcePath;
+    }
+
+    // Adds a brand-new entity (no prior EntityDefinition) placing the given model id — the
+    // "compose a new entity from the available object list" workflow. materialId is optional;
+    // when omitted the usual resolution chain applies (the model's own default binding, else
+    // DefaultMaterial). Attributed to Render.DefaultEntitySetPath so Save() has somewhere to put
+    // it; that file doesn't need to already exist.
+    public Entity CreateEntity(string? modelId, string? materialId = null, string name = "New Entity")
+    {
+        var def = new EntityDefinition
         {
-            Entities = _scene.Entities.Select(ToDefinition).ToList(),
-            Cameras  = loaded.Cameras,
-            Skyboxes = loaded.Skyboxes,
+            Name     = name,
+            Model    = modelId,
+            Material = materialId,
         };
 
-        var json = JsonSerializer.Serialize(outDef, JsonDefaults.Options);
-        File.WriteAllText(PathResolver.Resolve(_path), json);
+        var entity = BuildEntity(def);
+        ApplyTransform(entity, def);
+
+        _scene.AddEntity(entity);
+        _sources[entity] = def;
+        _fileOf[entity]  = _config.Render.DefaultEntitySetPath;
+
+        return entity;
+    }
+
+    // Removes an entity the editor created/loaded — drops its save tracking too, so a deleted
+    // entity doesn't reappear on the next Save() of whichever file it belonged to.
+    public void DeleteEntity(Entity entity)
+    {
+        _scene.RemoveEntity(entity);
+        _sources.Remove(entity);
+        _fileOf.Remove(entity);
+    }
+
+    // Writes every tracked entity back to the file it's attributed to (grouping by file), one
+    // EntitySetDefinition per file — composing several sets together at load time never
+    // collapses them into one on save. Entities without tracking (shouldn't happen outside a
+    // bug) are skipped rather than silently dropped from an arbitrary file.
+    public void Save()
+    {
+        var byFile = _scene.Entities
+            .Where(e => _fileOf.ContainsKey(e))
+            .GroupBy(e => _fileOf[e]);
+
+        foreach (var group in byFile)
+        {
+            var outDef = new EntitySetDefinition { Entities = group.Select(ToDefinition).ToList() };
+            var json = JsonSerializer.Serialize(outDef, JsonDefaults.Options);
+            File.WriteAllText(PathResolver.Resolve(group.Key), json);
+        }
     }
 
     private EntityDefinition ToDefinition(Entity entity)
     {
-        if (!_sources.TryGetValue(entity, out var source))
-            throw new InvalidOperationException(
-                $"Entity '{entity.Name}' has no source definition (not created by SceneLoader) — cannot save.");
-
+        var source = _sources[entity];
         var t = entity.Transform;
 
         return new EntityDefinition
@@ -122,65 +168,25 @@ public class SceneLoader
         _ => throw new ArgumentOutOfRangeException(nameof(l), l, "Unknown light type.")
     };
 
-    // Recursively resolves "include": each included file's entities/cameras/skybox get folded
-    // into this one before the caller sees it, so a scene can stay a thin index instead of one
-    // file holding everything as content grows. Optional — a single-file scene with no
-    // "include" behaves exactly as before.
-    private static SceneDefinition LoadMerged(string path, HashSet<string> visiting)
-    {
-        var fullPath = PathResolver.Resolve(path);
-        if (!visiting.Add(fullPath))
-            throw new Exception($"Scene include cycle detected involving '{path}'.");
-
-        var json = File.ReadAllText(fullPath);
-        var def  = JsonSerializer.Deserialize<SceneDefinition>(json, JsonDefaults.Options)
-                   ?? throw new Exception($"Failed to deserialize scene file: {path}");
-
-        if (def.Include is not { Count: > 0 } includes)
-            return def;
-
-        foreach (var included in includes.Select(inc => LoadMerged(inc, visiting)))
-        {
-            def.Entities.AddRange(included.Entities);
-            def.Cameras.AddRange(included.Cameras);
-            def.Skyboxes.AddRange(included.Skyboxes);
-        }
-
-        return def;
-    }
-
-    private void LoadEntities(SceneDefinition def)
-    {
-        foreach (var e in def.Entities)
-        {
-            var entity = BuildEntity(e);
-            ApplyTransform(entity, e);
-            ApplyComponents(entity, e);
-
-            _scene.AddEntity(entity);
-            _sources[entity] = e;
-        }
-    }
-    
     private Entity BuildEntity(EntityDefinition e)
     {
         var model = !string.IsNullOrEmpty(e.Model)
             ? _resourceSystem.GetModel(e.Model)
             : null;
-        
+
         var materials = ResolveMaterials(e, model);
         var light = e.Light is { } l ? CreateLight(l) : null;
-        
+
         var entity = new Entity(model, materials, light)
         {
-            Name    = e.Name,
+            Name     = e.Name,
             UvScale  = new Vector2(e.UvScale[0],  e.UvScale[1]),
             UvOffset = new Vector2(e.UvOffset[0], e.UvOffset[1]),
             Enabled  = e.Enabled
         };
         return entity;
     }
-    
+
     private static void ApplyTransform(Entity entity, EntityDefinition e)
     {
         entity.Transform.Position = new Vector3(e.Position[0], e.Position[1], e.Position[2]);
@@ -204,15 +210,14 @@ public class SceneLoader
             entity.AddComponent(ComponentFactory.Create(c));
     }
 
-    
     private Material?[] ResolveMaterials(EntityDefinition e, Model? model)
     {
-        if (model is null) 
+        if (model is null)
             return Array.Empty<Material?>();
 
         var count = model.Meshes.Count;
         var result = new Material?[count];
-        
+
         // Priority: the entity's own binding, else its singular "material", else whatever the
         // placed model declares as its default (Assets/Objects/**/*.model) — so placing the
         // same model repeatedly doesn't require repeating its material list every time.
@@ -261,7 +266,7 @@ public class SceneLoader
 
         return result;
     }
-    
+
     private static Light CreateLight(LightDefinition l)
     {
         var color     = new Vector3(l.Color[0], l.Color[1], l.Color[2]);
@@ -286,57 +291,6 @@ public class SceneLoader
                 Constant = l.Constant, Linear = l.Linear, Quadratic = l.Quadratic
             },
             _ => throw new Exception($"Unknown light type '{l.Type}'.")
-        };
-    }
-
-    private void LoadCameras(SceneDefinition def)
-    {
-        if (def.Cameras.Count == 0)
-            throw new Exception("Scene must contain at least one camera.");
-
-        foreach (var c in def.Cameras)
-        {
-            var camera = new Camera(
-                _config.Camera,
-                c.Name,
-                new Vector3(c.Position[0], c.Position[1], c.Position[2]),
-                ParseUp(c.Up),
-                c.Yaw,
-                c.Pitch
-            );
-
-            _scene.Cameras.Add(camera);
-        }
-
-        // active (view) camera — honor the scene's `active` flag, fall back to the first
-        var active = def.Cameras.FirstOrDefault(c => c.Active) ?? def.Cameras[0];
-        _scene.Cameras.SetActive(active.Name);
-
-        // primary (culling) camera — honor `primary`, fall back to the active camera
-        var primary = def.Cameras.FirstOrDefault(c => c.Primary) ?? active;
-        _scene.Cameras.SetPrimary(primary.Name);
-    }
-    
-    private void LoadSkyboxes(SceneDefinition def)
-    {
-        foreach (var s in def.Skyboxes)
-            if (s.Panorama.Length > 0)
-                _scene.Skyboxes.Add(s.Name, _resourceSystem.Textures.Get(s.Panorama), s.Exposure, s.BlackLevel);
-
-        // honor an `active` flag like cameras do; otherwise the first stays active
-        var active = def.Skyboxes.FirstOrDefault(s => s.Active);
-        if (active is { Name.Length: > 0 })
-            _scene.Skyboxes.SetActive(active.Name);
-    }
-    
-    private static Vector3 ParseUp(string axis)
-    {
-        return axis.ToUpper() switch
-        {
-            "X" => Vector3.UnitX,
-            "Y" => Vector3.UnitY,
-            "Z" => Vector3.UnitZ,
-            _ => throw new Exception($"Invalid up axis: {axis}")
         };
     }
 }

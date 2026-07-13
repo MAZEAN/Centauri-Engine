@@ -189,21 +189,37 @@ public class ResourceSystem : IDisposable
         _materials[path] = material;
         return material;
     }
-    
-    public void PreloadScene(SceneDefinition def)
+
+    // Every model/material id this project's Assets/ knows about, for UI that lets you pick
+    // one to place (the Outliner's "add entity" flow) rather than typing a path/id by hand.
+    public IEnumerable<string> ModelIds    => _modelRegistry.Keys.OrderBy(k => k);
+    public IEnumerable<string> MaterialIds => _materialRegistry.Keys.OrderBy(k => k);
+
+    public void PreloadEnvironment(EnvironmentDefinition def)
     {
-        var modelPaths = def.Entities
+        var texturePaths = new HashSet<string>();
+
+        foreach (var s in def.Skyboxes)
+            AddPath(texturePaths, s.Panorama);
+
+        DecodeAssetsInParallelAndUpload([], texturePaths);
+    }
+
+    public void PreloadEntities(IEnumerable<EntityDefinition> entities)
+    {
+        var list = entities as IReadOnlyCollection<EntityDefinition> ?? entities.ToList();
+
+        var modelPaths = list
             .Where(e => !string.IsNullOrEmpty(e.Model))
             .Select(e => ResolveModelPath(e.Model!))
             .Distinct()
             .ToList();
-        
-        var materialPaths = def.Entities.SelectMany(EntityMaterialPaths).Distinct();
+
+        var materialPaths = list.SelectMany(EntityMaterialPaths).Distinct();
         var texturePaths = new HashSet<string>();
-        
+
         foreach (var matPath in materialPaths)
         {
-            
             var m = ReadMaterialDef(matPath);
             AddPath(texturePaths, AlbedoKey(m.Albedo, m.Opacity));
             AddPath(texturePaths, m.Normal);
@@ -211,9 +227,6 @@ public class ResourceSystem : IDisposable
             AddPath(texturePaths, m.Metallic);
             AddPath(texturePaths, m.AO);
         }
-        
-        foreach (var s in def.Skyboxes)
-            AddPath(texturePaths, s.Panorama);
 
         DecodeAssetsInParallelAndUpload(modelPaths, texturePaths);
     }
@@ -240,7 +253,7 @@ public class ResourceSystem : IDisposable
         });
     }
     
-    // Same priority SceneLoader.ResolveMaterials uses: the entity's own binding, else its
+    // Same priority EntitySetLoader.ResolveMaterials uses: the entity's own binding, else its
     // singular "material", else whatever the placed model declares as its default.
     private IEnumerable<string> EntityMaterialPaths(EntityDefinition e)
     {
