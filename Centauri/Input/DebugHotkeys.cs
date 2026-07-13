@@ -26,11 +26,16 @@ internal sealed class DebugHotkeys
     {
         switch (key)
         {
-            case Key.M: _config.Debug.ToggleShowStatsOverlay(); break;
-            case Key.C: _scene.Cameras.Cycle(); _resetActiveController(); break;
-            case Key.B: _scene.Skyboxes.Cycle(); break;
-            case Key.N: _scene.FindComponent<DayNightCycle>()?.Toggle(); break;
-            case Key.G: _config.Debug.CycleShading(); break;
+            case Key.M: _config.Debug.ToggleShowStatsOverlay(); 
+                break;
+            case Key.C: _scene.Cameras.Cycle(); _resetActiveController();
+                break;
+            case Key.B: _scene.Skyboxes.Cycle();
+                break;
+            case Key.N: _scene.FindComponent<DayNightCycle>()?.Toggle();
+                break;
+            case Key.G: _config.Debug.CycleShading();
+                break;
         }
     }
 }

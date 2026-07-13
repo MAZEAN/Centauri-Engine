@@ -49,7 +49,7 @@
 * [x] UI improvements (DPI-scaling etc.)
 * [x] Improve tree models
 * [ ] Automated tests
-* [ ] Scene save/serialization
+* [x] Scene save/serialization
 * [ ] Transform hierarchy in scene format
 * [ ] Local-light shadows
 

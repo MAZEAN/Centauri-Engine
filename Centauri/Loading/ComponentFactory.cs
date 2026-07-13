@@ -5,8 +5,9 @@ using System.Text.Json;
 
 using World.Components;
 
-// Builds Components from their scene.json definitions. Adding a new authorable
-// behavior is one line here plus the Component subclass — no per-type JSON plumbing.
+// Builds Components from their entity-set JSON definitions (EntityDefinition.Components, or an
+// environment's "sun"). Adding a new authorable behavior is one line here plus the Component
+// subclass — no per-type JSON plumbing.
 public static class ComponentFactory
 {
     private static readonly Dictionary<string, Func<ComponentDefinition, Component>> Registry =

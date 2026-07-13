@@ -9,7 +9,7 @@ public class RenderConfig
     [JsonPropertyName("modelCacheSize")]   public int    ModelCacheSize   { get; init; } = 64;
     [JsonPropertyName("shaderCacheSize")]  public int    ShaderCacheSize  { get; init; } = 32;
     // The always-loaded half of a scene (camera + skybox) — see EnvironmentLoader.
-    [JsonPropertyName("environmentPath")]  public string EnvironmentPath   { get; init; } = "Loading/environment.json";
+    [JsonPropertyName("environmentPath")]  public string EnvironmentPath   { get; init; } = "Loading/Environment/environment.json";
 
     // Zero or more entity-set files layered onto the environment at startup — see
     // EntitySetLoader. Empty by default: a fresh project boots into an empty scene rather than

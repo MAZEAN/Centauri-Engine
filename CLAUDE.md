@@ -29,12 +29,12 @@ performance — don't draw fill-rate/timing conclusions from it, only correctnes
 
 A scene is two file types (see "Scene loading" below): the environment (`render.environmentPath`,
 required — camera + skybox) and zero or more entity sets (`render.entitySetPaths`, empty by default).
-The demo content lives at `Centauri/Loading/EntitySets/Demo.json` but isn't loaded unless listed in
-`entitySetPaths`, and references model/texture assets that may not exist in every checkout (e.g. this
-sandbox only ships `TestCube`/`TestPlane`/`Tree` under `Assets/Objects` and `Testing/Trees`). For
-headless smoke-testing without the full asset pack, write a throwaway environment/entity-set JSON
-using only the available models/no skybox panorama, and point `render.environmentPath`/
-`entitySetPaths` at them temporarily — don't commit that swap.
+Hand-authored entity-set content lives under `Centauri/Loading/Scenes/` (e.g. `DefaultScene.json`)
+but isn't loaded unless listed in `entitySetPaths`, and references model/texture assets that may not
+exist in every checkout (e.g. this sandbox only ships `TestCube`/`TestPlane`/`Tree` under
+`Assets/Objects` and `Testing/Trees`). For headless smoke-testing without the full asset pack, write
+a throwaway environment/entity-set JSON using only the available models/no skybox panorama, and point
+`render.environmentPath`/`entitySetPaths` at them temporarily — don't commit that swap.
 
 ## Scene loading
 
@@ -46,7 +46,8 @@ A scene is split into two independent file types, loaded by two separate classes
   (`RenderingSystem.UpdateProceduralIbl`), so with entity sets empty by default the environment's
   `"sun"` is what makes those work out of the box — don't also put a directional light in an entity
   set unless you intend two suns (`DirectionalLights[0]` wins, order-dependent).
-- **Entity sets** (`Loading/EntitySets/`, `EntitySetDefinition`/`EntitySetLoader`) — a list of
+- **Entity sets** (loader code in `Loading/EntitySets/` — `EntitySetDefinition`/`EntitySetLoader`/
+  `EntityFactory`; hand-authored content in `Loading/Scenes/`, e.g. `DefaultScene.json`) — a list of
   entities. Zero or more, layered onto the environment at startup per `render.entitySetPaths`
   (default empty — a fresh project boots into an empty scene). Add entities live via the Outliner's
   "+ Add" row (composes from `ResourceSystem.ModelIds`), or Delete-key a selected one in Edit mode.
@@ -54,14 +55,16 @@ A scene is split into two independent file types, loaded by two separate classes
   from deletions — see `_knownFiles`, not just whatever `_scene.Entities` currently maps to) to
   the file it came from. An entity created at runtime and never loaded from a file is attributed
   to `render.defaultEntitySetPath` (`Loading/Saves/Session.json` by default — kept out of
-  `EntitySets/`, which is for hand-authored content, so a future versioning scheme has its own
+  `Loading/Scenes/`, which is for hand-authored content, so a future versioning scheme has its own
   folder to grow into) until saved once; once that file exists on disk it auto-loads next launch
   even if never added to `entitySetPaths`. Ctrl+Shift+R (`EntitySetLoader.Reset()`) discards every
   live edit and reloads from disk — back to the last Ctrl+S, or the original authored state if
-  nothing's been saved yet. Only what the inspector can actually edit round-trips (name, enabled,
-  transform, light); material *property* edits (Color/Roughness/Metallic/Translucency) aren't
-  persisted — the schema only supports material *bindings* (paths), not inline scalar overrides.
-  Camera/skybox edits aren't persisted either (`EnvironmentLoader` has no `Save()`).
+  nothing's been saved yet; only removes entities EntitySetLoader itself tracks, so it never touches
+  the environment's own entities (e.g. its `"sun"`). Only what the inspector can actually edit
+  round-trips (name, enabled, transform, light); material *property* edits (Color/Roughness/
+  Metallic/Translucency) aren't persisted — the schema only supports material *bindings* (paths),
+  not inline scalar overrides. Camera/skybox edits aren't persisted either (`EnvironmentLoader` has
+  no `Save()`).
 
 ## Project layout
 
@@ -81,7 +84,9 @@ Centauri/
     Resources/              GLShader (+ hot-reload support), GLTexture, HDR/EXR loader
   UI/                       ImGui-based editor UI (UISystem owns StatsOverlay, Outliner, Properties, Toolbar)
   World/                    Scene, Entity, Transform, Camera, Light, ECS-ish component collections
-  Loading/                  Environment/ + EntitySets/ loaders (see "Scene loading" below), ComponentFactory
+  Loading/                  Environment/ + EntitySets/ loaders (see "Scene loading" below), Assets/
+                             (ModelDefinition/MaterialDefinition — Assets/ registry file formats),
+                             ComponentFactory; Scenes/ + Saves/ hold the actual JSON content
   Utils/                    Misc (Time, FrameStats, ShaderHotReload, HeadlessCapture), Math, Geometry, Caching
   Shaders/                  .vert/.frag/.comp GLSL sources
   Assets/, Testing/          content (models, textures, HDRIs) — CopyToOutputDirectory

@@ -60,6 +60,7 @@ public class InputSystem : IDisposable
     public void Update(float deltaTime)
     {
         if (_config.Input.Mode != ViewMode.Fly) return;
+        
         GetController(_scene.Cameras.Active).UpdateMovement(_keyboard, deltaTime);
     }
 
@@ -73,9 +74,7 @@ public class InputSystem : IDisposable
 
     private void OnMouseDown(IMouse mouse, MouseButton button)
     {
-        if (_config.Input.Mode == ViewMode.Edit
-            && button == MouseButton.Left
-            && !_renderingSystem.ImGuiWantsMouse)
+        if (_config.Input.Mode == ViewMode.Edit && button == MouseButton.Left && !_renderingSystem.ImGuiWantsMouse)
         {
             PickAtCursor();
         }
@@ -84,6 +83,7 @@ public class InputSystem : IDisposable
     private void OnMouseWheel(IMouse mouse, ScrollWheel scroll)
     {
         if (_config.Input.Mode == ViewMode.Edit && !_keyboard.IsKeyPressed(Key.ShiftLeft)) return;
+        
         GetController(_scene.Cameras.Active).Zoom(scroll);
     }
 
@@ -91,6 +91,7 @@ public class InputSystem : IDisposable
     {
         var cam = _scene.Cameras.Active;
         var ray = cam.ScreenPointToRay(_mousePos, new Vector2(_window.Size.X, _window.Size.Y));
+        
         _scene.Select(_scene.Pick(ray));
     }
 

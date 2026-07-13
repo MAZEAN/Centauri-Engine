@@ -27,7 +27,7 @@
     "textureCacheSize": 128,
     "modelCacheSize": 64,
     "shaderCacheSize": 32,
-    "environmentPath": "Loading/environment.json",
+    "environmentPath": "Loading/Environment/environment.json",
     "entitySetPaths": [
       "Loading/Scenes/DefaultScene.json"
     ],
