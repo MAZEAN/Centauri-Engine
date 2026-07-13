@@ -40,7 +40,12 @@ using only the available models/no skybox panorama, and point `render.environmen
 
 A scene is split into two independent file types, loaded by two separate classes:
 - **Environment** (`Loading/Environment/`, `EnvironmentDefinition`/`EnvironmentLoader`) — camera(s)
-  + skybox. Exactly one, required, path set by `render.environmentPath`.
+  + skybox + an optional `"sun"` (reuses `EntityDefinition`'s schema wholesale). Exactly one,
+  required, path set by `render.environmentPath`. Procedural sky/clouds/IBL and the Day/Night
+  inspector section all require an actual `DirectionalLight` entity to read a sun direction from
+  (`RenderingSystem.UpdateProceduralIbl`), so with entity sets empty by default the environment's
+  `"sun"` is what makes those work out of the box — don't also put a directional light in an entity
+  set unless you intend two suns (`DirectionalLights[0]` wins, order-dependent).
 - **Entity sets** (`Loading/EntitySets/`, `EntitySetDefinition`/`EntitySetLoader`) — a list of
   entities. Zero or more, layered onto the environment at startup per `render.entitySetPaths`
   (default empty — a fresh project boots into an empty scene). Add entities live via the Outliner's

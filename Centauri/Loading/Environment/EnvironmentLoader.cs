@@ -17,6 +17,7 @@ public class EnvironmentLoader
     private readonly ResourceSystem _resourceSystem;
     private readonly Scene _scene;
     private readonly AppConfig _config;
+    private readonly EntityFactory _factory;
     private readonly string _path;
 
     public EnvironmentLoader(ResourceSystem resourceSystem, Scene scene, AppConfig config)
@@ -24,6 +25,7 @@ public class EnvironmentLoader
         _resourceSystem = resourceSystem;
         _scene = scene;
         _config = config;
+        _factory = new EntityFactory(resourceSystem);
         _path = config.Render.EnvironmentPath;
     }
 
@@ -38,6 +40,13 @@ public class EnvironmentLoader
 
         LoadCameras(def);
         LoadSkyboxes(def);
+        LoadSun(def);
+    }
+
+    private void LoadSun(EnvironmentDefinition def)
+    {
+        if (def.Sun is { } sunDef)
+            _scene.AddEntity(_factory.Build(sunDef));
     }
 
     private void LoadCameras(EnvironmentDefinition def)

@@ -74,20 +74,6 @@
       "rotation": [45, 0, 45]
     },
     {
-      "name":     "Sun",
-      "position": [0, 0, 0],
-      "light": {
-        "type":      "directional",
-        "direction": [-0.2, -1.0, -0.3],
-        "color":     [1.0, 1.0, 1.0],
-        "intensity": 1.0,
-        "enabled":   true
-      },
-      "components": [
-        { "type": "dayNight", "speed": 0.01, "startTime": 0.35, "dayIntensity": 4.0 }
-      ]
-    },
-    {
       "name":     "Lamp",
       "position": [0, 2, 0],
       "light": {

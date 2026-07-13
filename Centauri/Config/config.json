@@ -28,7 +28,7 @@
     "modelCacheSize": 64,
     "shaderCacheSize": 32,
     "environmentPath": "Loading/environment.json",
-    "entitySetPaths": [],
+    "entitySetPaths": ["Loading/EntitySets/TestScene.json"],
     "defaultEntitySetPath": "Loading/EntitySets/Session.json",
     "defaultShader": "Shaders/PBR/shaderPBR",
     "renderScale": 1.0
