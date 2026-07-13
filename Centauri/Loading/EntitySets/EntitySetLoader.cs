@@ -63,14 +63,22 @@ public class EntitySetLoader
         }
     }
 
-    // Discards every live entity and reloads from disk — an easy way back to the last saved
-    // state (or the original authored one, if nothing's been saved yet) when live edits went
-    // somewhere you didn't want. Re-derives EffectivePaths from scratch rather than reusing
-    // _knownFiles, so a file that only just started existing on disk (DefaultEntitySetPath,
-    // written by a Save() earlier this session) is picked up too.
+    // Discards every entity *this loader* is responsible for and reloads from disk — an easy way
+    // back to the last saved state (or the original authored one, if nothing's been saved yet)
+    // when live edits went somewhere you didn't want. Only removes entities tracked in _sources,
+    // not Scene.Entities wholesale — the environment's own entities (e.g. its "sun", added
+    // directly by EnvironmentLoader) aren't ours to touch and must survive a reset. Re-derives
+    // EffectivePaths from scratch rather than reusing _knownFiles, so a file that only just
+    // started existing on disk (DefaultEntitySetPath, written by a Save() earlier this session)
+    // is picked up too.
     public void Reset()
     {
-        _scene.ClearEntities();
+        foreach (var entity in _sources.Keys.ToList())
+        {
+            _scene.RemoveEntity(entity);
+            entity.Dispose();
+        }
+
         _sources.Clear();
         _fileOf.Clear();
         _knownFiles.Clear();
@@ -134,6 +142,7 @@ public class EntitySetLoader
     public void DeleteEntity(Entity entity)
     {
         _scene.RemoveEntity(entity);
+        entity.Dispose();
         _sources.Remove(entity);
         _fileOf.Remove(entity);
     }
