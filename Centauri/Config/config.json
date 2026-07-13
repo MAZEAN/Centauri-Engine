@@ -33,7 +33,8 @@
   "debug": {
     "enableCulling": true,
     "showGrid": false,
-    "tracyEnabled": false
+    "tracyEnabled": false,
+    "shaderHotReload": false
   },
   "input": {
     "mode": "Fly",

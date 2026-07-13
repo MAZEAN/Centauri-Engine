@@ -24,6 +24,7 @@ public class Engine : IWindowCallbacks
     private ResourceSystem _resourceSystem = null!;
     private SceneLoader _sceneLoader = null!;
     private SimulationSystem _simulation = null!;
+    private ShaderHotReload? _shaderHotReload;
 
     private int _frameCount;
 
@@ -64,6 +65,9 @@ public class Engine : IWindowCallbacks
         _resourceSystem  = new ResourceSystem(_gl, _config);
         _renderingSystem = new RenderingSystem(_gl, _config);
         _simulation = new SimulationSystem(_config);
+
+        if (_config.Debug.ShaderHotReload)
+            _shaderHotReload = new ShaderHotReload(PathResolver.Resolve("Shaders"));
     }
 
     private void LoadScene()
@@ -120,7 +124,8 @@ public class Engine : IWindowCallbacks
     public void OnUpdate(double deltaTime)
     {
         var delta = (float)deltaTime;
-        
+
+        _shaderHotReload?.Poll();
         _inputSystem.Update(delta);
         _simulation.Update(_scene, delta);
         _renderingSystem.Update(delta);
@@ -150,6 +155,7 @@ public class Engine : IWindowCallbacks
     
     public void OnClose()
     {
+        _shaderHotReload?.Dispose();
         _renderingSystem.Dispose();
         _inputSystem.Dispose();
         _scene.Dispose();

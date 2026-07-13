@@ -38,6 +38,8 @@ internal sealed class RenderContext
 
 public class RenderingSystem : IDisposable
 {
+    private const float Tolerance = 0.001f;
+    
     private readonly GL            _gl;
     private readonly AppConfig     _config;
     
@@ -137,7 +139,7 @@ public class RenderingSystem : IDisposable
     // itself (only available transiently at InitializeComponents/Engine.OnResize time).
     private void CheckRenderScale()
     {
-        if (_config.Render.RenderScale == _lastRenderScale) return;
+        if (Math.Abs(_config.Render.RenderScale - _lastRenderScale) < Tolerance) return;
 
         _lastRenderScale = _config.Render.RenderScale;
         Resize(_outputWidth, _outputHeight);

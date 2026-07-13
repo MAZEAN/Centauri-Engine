@@ -24,6 +24,11 @@ public class DebugConfig
     // DepthMask(true)) instead of reusing ZPrepass's depth via Lequal. Lets a suspected
     // depth-reuse bug be A/B tested with a single toggle instead of a code round-trip.
     [JsonPropertyName("enableZPrepass")]    public bool EnableZPrepass    { get; set; } = true;
+    // Dev convenience, off by default: watches Shaders/ and hot-swaps a shader's live GL program
+    // in place on save instead of requiring a restart — see Utils.Misc.ShaderHotReload. Read
+    // once at startup (Engine.InitializeSystems), not live-reactive itself — restart to pick up
+    // a change to this specific flag.
+    [JsonPropertyName("shaderHotReload")]   public bool ShaderHotReload   { get; set; } = false;
 
     [JsonIgnore] public ShadingMode Shading { get; set; } = ShadingMode.Shaded;
 

@@ -14,24 +14,83 @@ public class GLShader : GLResource
     private readonly Dictionary<int, Vector4>   _vec4Cache  = new();
     private readonly Dictionary<int, Matrix4x4> _matCache   = new();
 
+    private readonly string _vertexPath;
+    private readonly string _fragmentPath;
+
+    // Every GLShader that currently exists, regardless of which pass or Material owns it — most
+    // shaders in this engine are constructed directly by their owning pass (PostProcessor,
+    // ShadowMapper, GTAOPass, ...), not through ResourceSystem's cache, so that cache alone can't
+    // find "every shader built from this source file" for ShaderHotReload to reload. Shaders are
+    // create-once-live-until-app-exit in this engine (no per-frame churn), so a plain static list
+    // — not weak references — is fine: DeleteGL removes the entry the one time a shader actually
+    // gets disposed.
+    private static readonly List<GLShader> _live = [];
+    public static IReadOnlyList<GLShader> Live => _live;
+
+    public string VertexPath   => _vertexPath;
+    public string FragmentPath => _fragmentPath;
+
     public GLShader(GL gl, string vertexPath, string fragmentPath) : base(gl)
     {
-        var vertex   = LoadShader(ShaderType.VertexShader,   vertexPath);
-        var fragment = LoadShader(ShaderType.FragmentShader, fragmentPath);
+        _vertexPath   = vertexPath;
+        _fragmentPath = fragmentPath;
 
-        Handle = Gl.CreateProgram();
-        Gl.AttachShader(Handle, vertex);
-        Gl.AttachShader(Handle, fragment);
-        Gl.LinkProgram(Handle);
-        Gl.GetProgram(Handle, GLEnum.LinkStatus, out var status);
+        Handle = LinkOrThrow(vertexPath, fragmentPath);
+        _live.Add(this);
+    }
 
-        if (status == 0)
-            throw new Exception($"Program failed to link with error: {Gl.GetProgramInfoLog(Handle)}");
+    private uint LinkOrThrow(string vertexPath, string fragmentPath)
+    {
+        var vertex   = CompileOrThrow(ShaderType.VertexShader,   vertexPath);
+        var fragment = CompileOrThrow(ShaderType.FragmentShader, fragmentPath);
 
-        Gl.DetachShader(Handle, vertex);
-        Gl.DetachShader(Handle, fragment);
+        var program = Gl.CreateProgram();
+        Gl.AttachShader(program, vertex);
+        Gl.AttachShader(program, fragment);
+        Gl.LinkProgram(program);
+        Gl.GetProgram(program, GLEnum.LinkStatus, out var status);
+
+        Gl.DetachShader(program, vertex);
+        Gl.DetachShader(program, fragment);
         Gl.DeleteShader(vertex);
         Gl.DeleteShader(fragment);
+
+        if (status == 0)
+        {
+            var log = Gl.GetProgramInfoLog(program);
+            Gl.DeleteProgram(program);
+            throw new Exception($"Program failed to link with error: {log}");
+        }
+
+        return program;
+    }
+
+    // Recompiles from the same source paths this shader was created with, swapping the live GL
+    // program in place on success — every existing reference to this GLShader instance (held
+    // throughout the engine: materials, passes, the shader batcher) picks up the change with no
+    // rewiring, since only Handle changes, not the object's identity. On a compile/link error the
+    // CURRENT, working program is left completely untouched — a bad edit mid-iteration should
+    // degrade to "still showing the last good frame", not crash the running engine or go black.
+    // See Utils.Misc.ShaderHotReload, the only caller.
+    public bool TryReload(out string? error)
+    {
+        uint program;
+        try
+        {
+            program = LinkOrThrow(_vertexPath, _fragmentPath);
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+
+        Gl.DeleteProgram(Handle);
+        Handle = program;
+        InvalidateCaches();
+
+        error = null;
+        return true;
     }
 
     public void Use()
@@ -142,7 +201,7 @@ public class GLShader : GLResource
         return location;
     }
 
-    private uint LoadShader(ShaderType type, string path)
+    private uint CompileOrThrow(ShaderType type, string path)
     {
         var src    = File.ReadAllText(path);
         var handle = Gl.CreateShader(type);
@@ -150,9 +209,18 @@ public class GLShader : GLResource
         Gl.ShaderSource(handle, src);
         Gl.CompileShader(handle);
 
-        var infoLog = Gl.GetShaderInfoLog(handle);
-        if (!string.IsNullOrWhiteSpace(infoLog))
-            throw new Exception($"Error compiling shader of type {type}, failed with error {infoLog}");
+        // GL_COMPILE_STATUS, not "info log is non-empty" — a driver is free to report warnings
+        // (deprecated syntax, unused varyings) on a shader that compiled successfully, and the
+        // old check treated any such warning as a hard failure. That distinction matters more
+        // once TryReload calls this too: a warning-only edit should hot-swap in cleanly, not be
+        // reported as a reload error.
+        Gl.GetShader(handle, GLEnum.CompileStatus, out var status);
+        if (status == 0)
+        {
+            var infoLog = Gl.GetShaderInfoLog(handle);
+            Gl.DeleteShader(handle);
+            throw new Exception($"Error compiling shader of type {type} ({path}): {infoLog}");
+        }
 
         return handle;
     }
@@ -170,6 +238,7 @@ public class GLShader : GLResource
     
     protected override void DeleteGL()
     {
+        _live.Remove(this);
         Gl.DeleteProgram(Handle);
     }
 }
