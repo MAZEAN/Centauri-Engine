@@ -109,6 +109,11 @@ uniform int uHasMetallic;
 uniform int uHasAO;
 uniform int uHasHeight;
 
+// Per-entity override (Material.ParallaxEnabled) to turn displacement off without unbinding
+// Height from the .mat file — e.g. to opt one instance of a shared material out of a
+// known-bad case (a UV-pole mesh) without affecting every other entity using that material.
+uniform int uParallaxEnabled;
+
 // UV-space depth scale for the parallax ray march — see ParallaxUV(). Only meaningful when
 // uHasHeight == 1.
 uniform float uParallaxScale;
@@ -557,6 +562,59 @@ vec2 ParallaxUV(vec2 uv, vec3 viewDirTangent)
     return result;
 }
 
+const int PARALLAX_SHADOW_LAYERS = 16;
+
+// Soft parallax self-shadowing (Tatarchuk's POM-with-self-shadowing): marches from the
+// ray-hit point toward the light in tangent space and, at each step, checks whether the
+// height map's actual surface height there pokes up above the ray's own height — if so, that
+// bump sits between this point and the light and should darken it. Unlike ParallaxUV's
+// steep-parallax search (which only needs the *first* hit), this deliberately walks every
+// layer rather than breaking on the first occluder, and weights each occlusion by how early
+// (how close to this point) it occurs, so a shadow softens with distance instead of being a
+// flat binary contact/no-contact cutoff — the same reasoning CSM's PCSS contact-hardening
+// already uses for the main shadow map, applied at the scale of the height map's own detail
+// instead of the scene's.
+//
+// uv/surfaceDepth are the point ParallaxUV already found (its return UV and — since it
+// doesn't return depth — the height re-sampled there, which is exactly the depth that point
+// was resolved at). lightDirTangent is tangent-space, same convention as ParallaxUV's
+// viewDirTangent.
+float ParallaxSelfShadow(vec2 uv, vec3 lightDirTangent, float surfaceDepth)
+{
+    // A light on/below the tangent plane isn't a self-shadowing question here — DirectLighting's
+    // own N·L term (folded into CalcPBR) already zeroes this point's contribution from it.
+    if (lightDirTangent.z <= 0.05) return 1.0;
+
+    // Already at (or above) the surface's own top — nothing left above this point for another
+    // bump to occlude it from.
+    if (surfaceDepth <= 0.0) return 1.0;
+
+    float layerDepth = surfaceDepth / float(PARALLAX_SHADOW_LAYERS);
+    vec2  step = (lightDirTangent.xy / max(lightDirTangent.z, 0.5)) * uParallaxScale
+               / float(PARALLAX_SHADOW_LAYERS);
+
+    vec2  shadowUv    = uv + step;
+    float rayDepth     = surfaceDepth - layerDepth;
+    float shadowAmount = 0.0;
+
+    for (int i = 0; i < PARALLAX_SHADOW_LAYERS; i++)
+    {
+        if (rayDepth <= 0.0) break;
+
+        float texDepth = 1.0 - texture(uHeightMap, shadowUv).r;
+        if (texDepth < rayDepth)
+        {
+            float occlusion = (rayDepth - texDepth) * (1.0 - float(i) / float(PARALLAX_SHADOW_LAYERS));
+            shadowAmount = max(shadowAmount, occlusion);
+        }
+
+        shadowUv += step;
+        rayDepth  -= layerDepth;
+    }
+
+    return 1.0 - clamp(shadowAmount, 0.0, 1.0);
+}
+
 // Tangent-space normal maps can't be blended per-axis like color (each projection has its own
 // tangent space and a naive blend cancels detail out) — "whiteout blending" (Ben Golus) adds
 // each projection's tangent-space XY onto the world normal's matching components and
@@ -607,8 +665,13 @@ vec3 SurfaceNormal(vec2 uv)
     return N;
 }
 
-// analytic lights: directional (with CSM shadow + optional leaf translucency), point, spot.
-vec3 DirectLighting(vec3 N, vec3 V, vec3 albedo, float roughness, float metallic)
+// analytic lights: directional (with CSM shadow + optional leaf translucency + parallax
+// self-shadow), point, spot. `uv`/`parallaxRunning` are main()'s already-resolved parallax
+// state — see ParallaxSelfShadow's comment for why self-shadowing is scoped to the directional
+// light only: it's the dominant light in every scene this engine targets (procedural sky +
+// sun), and running a second 16-tap march per point/spot light too would multiply this cost
+// by however many are in range for a much less visible payoff.
+vec3 DirectLighting(vec3 N, vec3 V, vec3 albedo, float roughness, float metallic, vec2 uv, bool parallaxRunning)
 {
     vec3 Lo = vec3(0.0);
 
@@ -619,7 +682,11 @@ vec3 DirectLighting(vec3 N, vec3 V, vec3 albedo, float roughness, float metallic
         vec3 radiance = uDir.color.xyz * uDir.params.x;
         float shadow  = uHasShadow == 1 ? ShadowFactor(N, L) : 0.0;
 
-        Lo += CalcPBR(L, radiance, N, V, albedo, roughness, metallic) * (1.0 - shadow);
+        float parallaxShadow = parallaxRunning
+            ? ParallaxSelfShadow(uv, normalize(transpose(fTBN) * L), 1.0 - texture(uHeightMap, uv).r)
+            : 1.0;
+
+        Lo += CalcPBR(L, radiance, N, V, albedo, roughness, metallic) * (1.0 - shadow) * parallaxShadow;
 
         if (uTranslucency > 0.0)
         {
@@ -692,19 +759,22 @@ void main()
     vec3 V = normalize(uCameraPos - fFragPos);
 
     // Parallax needs a texture-space UV to offset, so it's skipped under triplanar (which
-    // samples from world position instead — see SampleMaterialMap) and when the tangent basis
-    // is degenerate (same validity check SurfaceNormal uses for normal mapping).
-    bool tangentValid = dot(fTBN[0], fTBN[0]) > 1e-5;
+    // samples from world position instead — see SampleMaterialMap), when the tangent basis is
+    // degenerate (same validity check SurfaceNormal uses for normal mapping), and when the
+    // entity has opted out via uParallaxEnabled (Material.ParallaxEnabled).
+    bool tangentValid    = dot(fTBN[0], fTBN[0]) > 1e-5;
+    bool parallaxRunning = uHasHeight == 1 && uParallaxEnabled == 1 && uTriplanar == 0 && tangentValid;
 
     vec2 uv = fUv;
-    if (uHasHeight == 1 && uTriplanar == 0 && tangentValid)
+    if (parallaxRunning)
         uv = ParallaxUV(fUv, normalize(transpose(fTBN) * V));
 
     // See uDebugParallax's declaration. Diagnoses *why* nothing's visible as much as *whether*
-    // it is: black means no height map bound at all (check the .mat file), blue means it's
-    // being skipped because uTriplanar is on, magenta means the mesh's tangent basis is
-    // degenerate (needs a proper UV unwrap + tangent-generating import, not a parallax bug) —
-    // only the grayscale case is the actual live offset magnitude.
+    // it is: black means no height map bound at all (check the .mat file), dark gray means a
+    // height map is bound but this entity has ParallaxEnabled off, blue means it's being
+    // skipped because uTriplanar is on, magenta means the mesh's tangent basis is degenerate
+    // (needs a proper UV unwrap + tangent-generating import, not a parallax bug) — only the
+    // grayscale case is the actual live offset magnitude.
     //
     // This write still goes through the normal HDR post-process chain (auto-exposure, bloom,
     // TAA, tonemap, color grading) same as any other pixel this shader produces — there's no
@@ -714,11 +784,12 @@ void main()
     // because color grading's white balance shifts channels unevenly — it's not a reliable
     // "how much" signal. Grayscale luminance survives that far better, since tonemap/grading
     // are built to be roughly luminance-monotonic even when they're not hue-preserving; the
-    // three special-case colors below stay identifiable regardless, since they're discrete
-    // states rather than a gradient a reader has to judge by degree.
+    // discrete special-case colors below stay identifiable regardless, since a reader only
+    // needs to tell them apart, not judge them by degree.
     if (uDebugParallax == 1)
     {
         if (uHasHeight == 0)      { FragColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
+        if (uParallaxEnabled == 0) { FragColor = vec4(0.3, 0.3, 0.3, 1.0); return; }
         if (uTriplanar == 1)      { FragColor = vec4(0.0, 0.0, 1.0, 1.0); return; }
         if (!tangentValid)        { FragColor = vec4(1.0, 0.0, 1.0, 1.0); return; }
 
@@ -758,7 +829,7 @@ void main()
     vec3 N    = SurfaceNormal(uv);
     roughness = max(SpecularAARoughness(roughness, N), MIN_ROUGHNESS);
 
-    vec3 Lo      = DirectLighting(N, V, albedo, roughness, metallic);
+    vec3 Lo      = DirectLighting(N, V, albedo, roughness, metallic, uv, parallaxRunning);
     vec3 ambient = AmbientLighting(N, V, albedo, roughness, metallic, ao);
 
     vec3 color = ambient + Lo;

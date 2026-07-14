@@ -346,7 +346,8 @@ public class ResourceSystem : IDisposable
             Wind           = def.Wind,
             Triplanar      = def.Triplanar,
             TriplanarScale = def.TriplanarScale,
-            ParallaxScale  = def.ParallaxScale
+            ParallaxScale  = def.ParallaxScale,
+            ParallaxEnabled = def.ParallaxEnabled
         };
     }
 

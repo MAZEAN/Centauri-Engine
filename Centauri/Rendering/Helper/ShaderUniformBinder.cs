@@ -104,6 +104,7 @@ public sealed class ShaderUniformBinder
         shader.SetUniform("uTriplanar",       mat.Triplanar ? 1 : 0);
         shader.SetUniform("uTriplanarScale",  mat.TriplanarScale);
         shader.SetUniform("uParallaxScale",   mat.ParallaxScale);
+        shader.SetUniform("uParallaxEnabled", mat.ParallaxEnabled ? 1 : 0);
         // Global, not per-material — see ShadingMode.ParallaxDebug's comment: toggled from the
         // viewport toolbar/G-cycle same as Normals/Depth/AO/Velocity, not from the inspector.
         shader.SetUniform("uDebugParallax",   _config.Debug.Shading == ShadingMode.ParallaxDebug ? 1 : 0);

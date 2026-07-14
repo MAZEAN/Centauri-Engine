@@ -32,6 +32,13 @@ public class Material
     // ray march's step assumption and produces swimming/peeling artifacts.
     public float ParallaxScale { get; set; } = 0.05f;
 
+    // Lets displacement be turned off per entity (via MakeMaterialUnique cloning the same way
+    // Color/Roughness/etc. already do) without unbinding Height from the .mat file — useful to
+    // A/B a specific instance, or to opt an entity out of a shared material's displacement
+    // where it's a known-bad case (e.g. a UV-pole mesh) without affecting every other entity
+    // using that material.
+    public bool ParallaxEnabled { get; set; } = true;
+
     public Material(GLShader shader)
     {
         Shader = shader;
@@ -54,7 +61,8 @@ public class Material
         Wind           = Wind,
         Triplanar      = Triplanar,
         TriplanarScale = TriplanarScale,
-        ParallaxScale  = ParallaxScale
+        ParallaxScale  = ParallaxScale,
+        ParallaxEnabled = ParallaxEnabled
     };
     
     public ulong SortKey

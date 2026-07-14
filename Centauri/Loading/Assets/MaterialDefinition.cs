@@ -34,4 +34,5 @@ public class MaterialDefinition
     [JsonPropertyName("triplanar")]      public bool   Triplanar      { get; set; } = false;
     [JsonPropertyName("triplanarScale")] public float  TriplanarScale { get; set; } = 1f;
     [JsonPropertyName("parallaxScale")]  public float  ParallaxScale  { get; set; } = 0.05f;
+    [JsonPropertyName("parallaxEnabled")] public bool  ParallaxEnabled { get; set; } = true;
 }
