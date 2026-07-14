@@ -23,7 +23,23 @@ const int   BLOCKER_TAPS = 8;   // subset of POISSON_DISK — cheaper than the f
 const float FOLIAGE_FRESNEL_ATTEN = 0.05;
 
 const int PARALLAX_MIN_LAYERS = 8;
-const int PARALLAX_MAX_LAYERS = 32;
+const int PARALLAX_MAX_LAYERS = 32;          // view-angle-driven layer range (see ParallaxUV)
+const int PARALLAX_ABSOLUTE_MAX_LAYERS = 64; // hard cap once uParallaxScale's own boost applies
+
+// Reference uParallaxScale the view-angle-only 8-32 layer range was tuned against. Layer count
+// (and therefore per-layer step size) previously depended only on view angle, never on
+// uParallaxScale itself — so a bigger displacement got the *same* step count spread over a
+// larger UV range, i.e. a coarser step. Once that step exceeds roughly one period of the
+// height map's own detail (a ridge, a brick), the ray march can skip past the *correct* ridge
+// and lock onto a neighboring one instead, which looks like duplicated/broken detail rather
+// than smooth displacement — a classic steep-parallax aliasing failure, not a bug in the
+// stepping logic itself. Scaling layer count up with uParallaxScale keeps the step-to-scale
+// ratio closer to constant instead of degrading as scale grows. This is a heuristic, not a
+// guarantee: the shader has no way to know the height map's actual spatial frequency (that's
+// data, not something derivable here), so a texture with very fine detail pushed to a large
+// scale can still alias — but it makes typical textures far less scale-sensitive than a fixed
+// layer count would be.
+const float PARALLAX_REFERENCE_SCALE = 0.02;
 
 // GGX's NDF denominator (NdotH²(a²-1)+1) hits exactly 0 at roughness 0 whenever H lands exactly
 // on N (a straight-on specular peak) — a² is 0 there too, so NDF is a literal 0/0 = NaN, not just
@@ -473,6 +489,13 @@ vec4 SampleMaterialMap(sampler2D tex, vec3 triWeights, vec2 uv)
 vec2 ParallaxUV(vec2 uv, vec3 viewDirTangent)
 {
     float numLayers = mix(float(PARALLAX_MAX_LAYERS), float(PARALLAX_MIN_LAYERS), abs(viewDirTangent.z));
+
+    // See PARALLAX_REFERENCE_SCALE's comment. Capped so uParallaxScale alone can't push the
+    // loop past PARALLAX_ABSOLUTE_MAX_LAYERS regardless of view angle.
+    float scaleBoost = clamp(uParallaxScale / PARALLAX_REFERENCE_SCALE, 1.0,
+                              float(PARALLAX_ABSOLUTE_MAX_LAYERS) / float(PARALLAX_MAX_LAYERS));
+    numLayers = min(numLayers * scaleBoost, float(PARALLAX_ABSOLUTE_MAX_LAYERS));
+
     float layerDepth = 1.0 / numLayers;
 
     // viewDirTangent.z is clamped away from 0 rather than the whole vector normalized against
@@ -487,7 +510,7 @@ vec2 ParallaxUV(vec2 uv, vec3 viewDirTangent)
     float currentLayerDepth = 0.0;
     float currentHeight = 1.0 - texture(uHeightMap, currentUv).r;
 
-    for (int i = 0; i < PARALLAX_MAX_LAYERS; i++)
+    for (int i = 0; i < PARALLAX_ABSOLUTE_MAX_LAYERS; i++)
     {
         if (currentLayerDepth >= currentHeight)
             break;
