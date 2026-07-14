@@ -476,8 +476,13 @@ vec2 ParallaxUV(vec2 uv, vec3 viewDirTangent)
     float layerDepth = 1.0 / numLayers;
 
     // viewDirTangent.z is clamped away from 0 rather than the whole vector normalized against
-    // it, so a near-grazing view still gets a bounded (not exploding) UV step per layer.
-    vec2  step    = (viewDirTangent.xy / max(abs(viewDirTangent.z), 0.2)) * uParallaxScale / numLayers;
+    // it, so a near-grazing view still gets a bounded (not exploding) UV step per layer. 0.2
+    // (originally) still let xy/z reach 5x uParallaxScale — plenty to jump several bricks'
+    // worth of UV per pixel on anything with meaningfully-oblique geometry (a cube's faces
+    // aren't just "flat vs. edge-on": their *local* angle to the camera sweeps continuously
+    // toward grazing near every silhouette edge/corner), which reads as the texture being
+    // "stretched"/incoherent rather than displaced. 0.5 caps the same worst case at 2x.
+    vec2  step    = (viewDirTangent.xy / max(abs(viewDirTangent.z), 0.5)) * uParallaxScale / numLayers;
     vec2  currentUv = uv;
     float currentLayerDepth = 0.0;
     float currentHeight = 1.0 - texture(uHeightMap, currentUv).r;
@@ -497,7 +502,16 @@ vec2 ParallaxUV(vec2 uv, vec3 viewDirTangent)
     float afterDepth  = currentHeight - currentLayerDepth;
     float beforeDepth = (1.0 - texture(uHeightMap, prevUv).r) - currentLayerDepth + layerDepth;
 
-    float weight = afterDepth / max(afterDepth - beforeDepth, 1e-5);
+    // weight is meant to be an interpolation FRACTION between the two samples, but nothing
+    // otherwise bounds it to [0,1] — when (afterDepth - beforeDepth) is small (a near-flat
+    // height region between the two samples) the `max(..., 1e-5)` floor stops a literal
+    // divide-by-zero but not the *result* from blowing up to an enormous value whenever
+    // afterDepth itself isn't correspondingly tiny. GLSL's mix() extrapolates unboundedly for
+    // t outside [0,1] rather than clamping, so an unclamped weight here sent the returned UV
+    // arbitrarily far outside currentUv/prevUv — multiple UV units off on typical PBR
+    // (photographed, non-hard-edged) height maps, reading as the texture being incoherently
+    // "stretched" rather than displaced.
+    float weight = clamp(afterDepth / max(afterDepth - beforeDepth, 1e-5), 0.0, 1.0);
     return mix(currentUv, prevUv, weight);
 }
 
@@ -648,7 +662,18 @@ void main()
     // it is: black means no height map bound at all (check the .mat file), blue means it's
     // being skipped because uTriplanar is on, magenta means the mesh's tangent basis is
     // degenerate (needs a proper UV unwrap + tangent-generating import, not a parallax bug) —
-    // only the green->red case is the actual live offset magnitude.
+    // only the grayscale case is the actual live offset magnitude.
+    //
+    // This write still goes through the normal HDR post-process chain (auto-exposure, bloom,
+    // TAA, tonemap, color grading) same as any other pixel this shader produces — there's no
+    // "raw debug output" bypass here (unlike the G-buffer-based Normals/Depth/AO/Velocity
+    // views under the viewport toolbar, which draw *after* that chain). A hue split (e.g.
+    // green=low/red=high) reads as almost solid red across a wide range of actual offsets,
+    // because color grading's white balance shifts channels unevenly — it's not a reliable
+    // "how much" signal. Grayscale luminance survives that far better, since tonemap/grading
+    // are built to be roughly luminance-monotonic even when they're not hue-preserving; the
+    // three special-case colors below stay identifiable regardless, since they're discrete
+    // states rather than a gradient a reader has to judge by degree.
     if (uDebugParallax == 1)
     {
         if (uHasHeight == 0)      { FragColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
@@ -657,12 +682,12 @@ void main()
 
         // Deliberately NOT normalized by uParallaxScale: the ray-marched offset is itself
         // roughly proportional to uParallaxScale (see ParallaxUV's `step`), so dividing by it
-        // back out cancels that scaling and saturates red at almost any oblique angle
+        // back out cancels that scaling and saturates white at almost any oblique angle
         // regardless of how small uParallaxScale actually is — useless for judging whether a
         // given scale is too weak or too strong. A fixed absolute UV-space scale instead shows
-        // genuine magnitude: green ~= no visible offset, red ~= a large, likely-too-strong one.
+        // genuine magnitude: black ~= no visible offset, white ~= a large, likely-too-strong one.
         float offsetMag = clamp(length(uv - fUv) * 8.0, 0.0, 1.0);
-        FragColor = vec4(offsetMag, 1.0 - offsetMag, 0.0, 1.0);
+        FragColor = vec4(vec3(offsetMag), 1.0);
         return;
     }
 
