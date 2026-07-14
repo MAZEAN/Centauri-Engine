@@ -128,8 +128,16 @@ public sealed class EntityInspectorSection : ISection
             // whether the material has a height map bound (see HasAnyTexture), which the
             // inspector has no binding UI for yet (materials are bound via .mat files only).
             if (mat.Height != null)
+            {
                 Widgets.DragRow("Parallax Scale", mat.ParallaxScale,
                     v => EditMaterial(e, scene, index, m => m.ParallaxScale = v), 0.005f, 0f, 0.5f, "%.3f", 0.05f);
+
+                // The effect is subtle-to-invisible at near head-on view angles by design (real
+                // parallax mapping), so a plain look often can't tell "working" from "silently
+                // not" — see uDebugParallax's comment in shaderPBR.frag for what the colors mean.
+                Widgets.CheckRow("Debug Parallax", mat.DebugParallax,
+                    v => EditMaterial(e, scene, index, m => m.DebugParallax = v));
+            }
 
             ImGui.PopID();
         }

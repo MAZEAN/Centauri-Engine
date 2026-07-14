@@ -97,6 +97,13 @@ uniform int uHasHeight;
 // uHasHeight == 1.
 uniform float uParallaxScale;
 
+// 1 = replace the lit result with a green->red heatmap of |ParallaxUV(fUv) - fUv| relative to
+// uParallaxScale — see main(). The effect itself is barely visible near head-on view angles by
+// design (real parallax mapping), so there's otherwise no way to confirm per-pixel whether it's
+// actually running on a given material/mesh vs. silently no-op'ing (e.g. a degenerate tangent
+// basis skipping it entirely — see main()'s ParallaxUV guard).
+uniform int uDebugParallax;
+
 uniform float uRoughnessScalar;
 uniform float uMetallicScalar;
 uniform float uTranslucency;
@@ -631,9 +638,33 @@ void main()
     // Parallax needs a texture-space UV to offset, so it's skipped under triplanar (which
     // samples from world position instead — see SampleMaterialMap) and when the tangent basis
     // is degenerate (same validity check SurfaceNormal uses for normal mapping).
+    bool tangentValid = dot(fTBN[0], fTBN[0]) > 1e-5;
+
     vec2 uv = fUv;
-    if (uHasHeight == 1 && uTriplanar == 0 && dot(fTBN[0], fTBN[0]) > 1e-5)
+    if (uHasHeight == 1 && uTriplanar == 0 && tangentValid)
         uv = ParallaxUV(fUv, normalize(transpose(fTBN) * V));
+
+    // See uDebugParallax's declaration. Diagnoses *why* nothing's visible as much as *whether*
+    // it is: black means no height map bound at all (check the .mat file), blue means it's
+    // being skipped because uTriplanar is on, magenta means the mesh's tangent basis is
+    // degenerate (needs a proper UV unwrap + tangent-generating import, not a parallax bug) —
+    // only the green->red case is the actual live offset magnitude.
+    if (uDebugParallax == 1)
+    {
+        if (uHasHeight == 0)      { FragColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
+        if (uTriplanar == 1)      { FragColor = vec4(0.0, 0.0, 1.0, 1.0); return; }
+        if (!tangentValid)        { FragColor = vec4(1.0, 0.0, 1.0, 1.0); return; }
+
+        // Deliberately NOT normalized by uParallaxScale: the ray-marched offset is itself
+        // roughly proportional to uParallaxScale (see ParallaxUV's `step`), so dividing by it
+        // back out cancels that scaling and saturates red at almost any oblique angle
+        // regardless of how small uParallaxScale actually is — useless for judging whether a
+        // given scale is too weak or too strong. A fixed absolute UV-space scale instead shows
+        // genuine magnitude: green ~= no visible offset, red ~= a large, likely-too-strong one.
+        float offsetMag = clamp(length(uv - fUv) * 8.0, 0.0, 1.0);
+        FragColor = vec4(offsetMag, 1.0 - offsetMag, 0.0, 1.0);
+        return;
+    }
 
     vec3 triWeights = uTriplanar == 1 ? TriplanarWeights(normalize(fNormal)) : vec3(0.0);
 

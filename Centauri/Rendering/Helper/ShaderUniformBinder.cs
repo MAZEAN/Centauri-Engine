@@ -104,6 +104,7 @@ public sealed class ShaderUniformBinder
         shader.SetUniform("uTriplanar",       mat.Triplanar ? 1 : 0);
         shader.SetUniform("uTriplanarScale",  mat.TriplanarScale);
         shader.SetUniform("uParallaxScale",   mat.ParallaxScale);
+        shader.SetUniform("uDebugParallax",   mat.DebugParallax ? 1 : 0);
     }
     
     public static void UploadWind(GLShader shader, FoliageConfig foliage)
