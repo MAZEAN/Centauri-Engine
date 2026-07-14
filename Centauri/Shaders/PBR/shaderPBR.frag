@@ -512,7 +512,24 @@ vec2 ParallaxUV(vec2 uv, vec3 viewDirTangent)
     // (photographed, non-hard-edged) height maps, reading as the texture being incoherently
     // "stretched" rather than displaced.
     float weight = clamp(afterDepth / max(afterDepth - beforeDepth, 1e-5), 0.0, 1.0);
-    return mix(currentUv, prevUv, weight);
+    vec2  result = mix(currentUv, prevUv, weight);
+
+    // Defense in depth against UV-pole-style singularities (a spherically-unwrapped mesh's
+    // pinch points, where the tangent basis becomes ill-conditioned — small but nonzero, so
+    // main()'s tangentValid check doesn't catch it — and can differ wildly between adjacent
+    // pixels). `step` is already bounded per-layer, but an unstable viewDirTangent there can
+    // still point in a near-arbitrary direction each pixel, and the ray march can walk further
+    // than the "well-behaved" analysis this scale is tuned against assumes. Clamping the total
+    // offset to a small multiple of uParallaxScale turns that failure mode from a
+    // discontinuous black hole into a bounded, localized artifact — the same trade every
+    // tangent-space effect (normal mapping included) makes at this kind of singularity.
+    vec2 offset = result - uv;
+    float offsetLen = length(offset);
+    float maxOffset = uParallaxScale * 3.0;
+    if (offsetLen > maxOffset)
+        result = uv + offset * (maxOffset / offsetLen);
+
+    return result;
 }
 
 // Tangent-space normal maps can't be blended per-axis like color (each projection has its own
