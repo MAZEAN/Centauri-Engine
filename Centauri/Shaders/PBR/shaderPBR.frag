@@ -22,6 +22,9 @@ const float SHADOW_FADE = 0.1;   // fraction of the shadow distance over which s
 const int   BLOCKER_TAPS = 8;   // subset of POISSON_DISK — cheaper than the full PCF tap count
 const float FOLIAGE_FRESNEL_ATTEN = 0.05;
 
+const int PARALLAX_MIN_LAYERS = 8;
+const int PARALLAX_MAX_LAYERS = 32;
+
 // GGX's NDF denominator (NdotH²(a²-1)+1) hits exactly 0 at roughness 0 whenever H lands exactly
 // on N (a straight-on specular peak) — a² is 0 there too, so NDF is a literal 0/0 = NaN, not just
 // a sharp highlight. SpecularAARoughness widens roughness based on screen-space normal variance,
@@ -81,12 +84,18 @@ uniform sampler2D uNormalMap;    // slot 1 — surface detail
 uniform sampler2D uRoughnessMap; // slot 2 — how rough/smooth
 uniform sampler2D uMetallicMap;  // slot 3 — metal or not
 uniform sampler2D uAOMap;        // slot 4 — shadow in crevices
+uniform sampler2D uHeightMap;    // slot 13 — parallax occlusion mapping
 
 uniform int uHasAlbedo;          // 1 if bound, 0 if using scalar fallback
 uniform int uHasNormal;
 uniform int uHasRoughness;
 uniform int uHasMetallic;
 uniform int uHasAO;
+uniform int uHasHeight;
+
+// UV-space depth scale for the parallax ray march — see ParallaxUV(). Only meaningful when
+// uHasHeight == 1.
+uniform float uParallaxScale;
 
 uniform float uRoughnessScalar;
 uniform float uMetallicScalar;
@@ -437,9 +446,52 @@ vec4 SampleTriplanar(sampler2D tex, vec3 worldPos, vec3 weights)
         + texture(tex, uv.xy) * weights.z;
 }
 
-vec4 SampleMaterialMap(sampler2D tex, vec3 triWeights)
+vec4 SampleMaterialMap(sampler2D tex, vec3 triWeights, vec2 uv)
 {
-    return uTriplanar == 1 ? SampleTriplanar(tex, fFragPos, triWeights) : texture(tex, fUv);
+    return uTriplanar == 1 ? SampleTriplanar(tex, fFragPos, triWeights) : texture(tex, uv);
+}
+
+// Parallax occlusion mapping: ray-marches uHeightMap in tangent space to fake per-pixel depth
+// (self-occlusion/parallax as the view angle changes) without moving any geometry — see the
+// engine roadmap discussion on displacement mapping for why this is the v1 over true
+// tessellation-based vertex displacement (no tessellation stage exists yet; this needs none).
+// Steep parallax (linear search for the first step below the surface) followed by one
+// linear-interpolation refinement between that step and the previous one (Brawley/Tatarchuk's
+// POM) — cheap and avoids steep parallax's stair-stepping at grazing angles.
+//
+// viewDirTangent is the tangent-space view vector (surface -> camera); its Z component is how
+// "on-axis" the view is with the surface normal — steep (near-silhouette) angles get more
+// layers so thin high-frequency detail doesn't skip past between steps.
+
+vec2 ParallaxUV(vec2 uv, vec3 viewDirTangent)
+{
+    float numLayers = mix(float(PARALLAX_MAX_LAYERS), float(PARALLAX_MIN_LAYERS), abs(viewDirTangent.z));
+    float layerDepth = 1.0 / numLayers;
+
+    // viewDirTangent.z is clamped away from 0 rather than the whole vector normalized against
+    // it, so a near-grazing view still gets a bounded (not exploding) UV step per layer.
+    vec2  step    = (viewDirTangent.xy / max(abs(viewDirTangent.z), 0.2)) * uParallaxScale / numLayers;
+    vec2  currentUv = uv;
+    float currentLayerDepth = 0.0;
+    float currentHeight = 1.0 - texture(uHeightMap, currentUv).r;
+
+    for (int i = 0; i < PARALLAX_MAX_LAYERS; i++)
+    {
+        if (currentLayerDepth >= currentHeight)
+            break;
+
+        currentUv -= step;
+        currentHeight = 1.0 - texture(uHeightMap, currentUv).r;
+        currentLayerDepth += layerDepth;
+    }
+
+    vec2 prevUv = currentUv + step;
+
+    float afterDepth  = currentHeight - currentLayerDepth;
+    float beforeDepth = (1.0 - texture(uHeightMap, prevUv).r) - currentLayerDepth + layerDepth;
+
+    float weight = afterDepth / max(afterDepth - beforeDepth, 1e-5);
+    return mix(currentUv, prevUv, weight);
 }
 
 // Tangent-space normal maps can't be blended per-axis like color (each projection has its own
@@ -463,10 +515,10 @@ vec3 SampleTriplanarNormal(sampler2D tex, vec3 worldPos, vec3 N, vec3 weights)
 
 // world-space shading normal: normal-map detail through the TBN when present (and valid),
 // else the interpolated vertex normal; flipped for back faces.
-vec3 SurfaceNormal()
+vec3 SurfaceNormal(vec2 uv)
 {
     vec3 N;
-    
+
     if (uTriplanar == 1 && uHasNormal == 1)
     {
         vec3 geoN = normalize(fNormal);
@@ -476,7 +528,7 @@ vec3 SurfaceNormal()
     {
         vec3 T = fTBN[0];
         N = (uHasNormal == 1 && dot(T, T) > 1e-5)
-            ? normalize(fTBN * (texture(uNormalMap, fUv).rgb * 2.0 - 1.0))
+            ? normalize(fTBN * (texture(uNormalMap, uv).rgb * 2.0 - 1.0))
             : normalize(fNormal);
     }
 
@@ -574,12 +626,21 @@ void main()
 {
     if (dot(vec4(fFragPos, 1.0), uClipPlane) < 0.0) discard;
 
+    vec3 V = normalize(uCameraPos - fFragPos);
+
+    // Parallax needs a texture-space UV to offset, so it's skipped under triplanar (which
+    // samples from world position instead — see SampleMaterialMap) and when the tangent basis
+    // is degenerate (same validity check SurfaceNormal uses for normal mapping).
+    vec2 uv = fUv;
+    if (uHasHeight == 1 && uTriplanar == 0 && dot(fTBN[0], fTBN[0]) > 1e-5)
+        uv = ParallaxUV(fUv, normalize(transpose(fTBN) * V));
+
     vec3 triWeights = uTriplanar == 1 ? TriplanarWeights(normalize(fNormal)) : vec3(0.0);
 
-    vec4  albedoSample = uHasAlbedo    == 1 ? SampleMaterialMap(uAlbedoMap,    triWeights) : uColor;
-    float roughness    = uHasRoughness == 1 ? SampleMaterialMap(uRoughnessMap, triWeights).r : uRoughnessScalar;
-    float metallic     = uHasMetallic  == 1 ? SampleMaterialMap(uMetallicMap,  triWeights).r : uMetallicScalar;
-    float ao           = uHasAO == 1 ? SampleMaterialMap(uAOMap, triWeights).r : 1.0;
+    vec4  albedoSample = uHasAlbedo    == 1 ? SampleMaterialMap(uAlbedoMap,    triWeights, uv) : uColor;
+    float roughness    = uHasRoughness == 1 ? SampleMaterialMap(uRoughnessMap, triWeights, uv).r : uRoughnessScalar;
+    float metallic     = uHasMetallic  == 1 ? SampleMaterialMap(uMetallicMap,  triWeights, uv).r : uMetallicScalar;
+    float ao           = uHasAO == 1 ? SampleMaterialMap(uAOMap, triWeights, uv).r : 1.0;
 
     // uAlbedoMap is stored premultiplied (GLTexture.Decode premultiplies LDR textures at load
     // time) specifically so mipmap generation/filtering blends toward black at transparent
@@ -596,9 +657,8 @@ void main()
     if (albedoSample.a < uFoliageAlphaCutoff || albedoSample.a < DitherThreshold(gl_FragCoord.xy))
         discard;
 
-    vec3 N    = SurfaceNormal();
+    vec3 N    = SurfaceNormal(uv);
     roughness = max(SpecularAARoughness(roughness, N), MIN_ROUGHNESS);
-    vec3 V    = normalize(uCameraPos - fFragPos);
 
     vec3 Lo      = DirectLighting(N, V, albedo, roughness, metallic);
     vec3 ambient = AmbientLighting(N, V, albedo, roughness, metallic, ao);

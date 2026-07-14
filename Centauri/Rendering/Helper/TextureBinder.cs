@@ -6,8 +6,9 @@ using Graphics.Resources;
 using Graphics.Resources.Materials;
 
 // Per-frame texture-unit bind cache: skips a redundant glBindTexture when a unit already
-// holds the wanted handle. Covers the material slots (0-4); returns the count of real GPU
-// binds for stats. Reset() must run each frame since other passes bind units directly.
+// holds the wanted handle. Covers the material slots (0-4, plus height at 13); returns the
+// count of real GPU binds for stats. Reset() must run each frame since other passes bind
+// units directly.
 public sealed class TextureBinder
 {
     private readonly GL _gl;
@@ -31,6 +32,7 @@ public sealed class TextureBinder
         binds += Bind(mat.Roughness, TextureUnit.Texture2);
         binds += Bind(mat.Metallic,  TextureUnit.Texture3);
         binds += Bind(mat.AO,        TextureUnit.Texture4);
+        binds += Bind(mat.Height,    TextureUnit.Texture13);
         return binds;
     }
 

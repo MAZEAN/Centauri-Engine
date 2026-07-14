@@ -133,3 +133,5 @@ Changes are typically committed locally, rebased onto the latest `origin/main`, 
 fresh `git worktree` (`git am` + `dotnet build`) before being handed off — direct pushes only happen
 when explicitly requested. See git log for the granularity/style of commit messages expected (present
 tense, explain *why* not *what*, flag any incidental/unscoped fixes separately in the message body).
+
+When code changes occur, usually generate a patch file if it makes sense to do so.

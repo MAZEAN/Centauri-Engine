@@ -22,6 +22,7 @@ public class MaterialDefinition
     [JsonPropertyName("roughness")] public string? Roughness { get; set; }
     [JsonPropertyName("metallic")]  public string? Metallic  { get; set; }
     [JsonPropertyName("ao")]        public string? AO        { get; set; }
+    [JsonPropertyName("height")]    public string? Height    { get; set; } // parallax occlusion mapping
     [JsonPropertyName("opacity")]   public string? Opacity   { get; set; } // merged into albedo's alpha channel at load
 
     [JsonPropertyName("roughnessScalar")] public float RoughnessScalar { get; set; } = 0.5f;
@@ -32,4 +33,5 @@ public class MaterialDefinition
     [JsonPropertyName("wind")]           public bool   Wind          { get; set; } = false;
     [JsonPropertyName("triplanar")]      public bool   Triplanar      { get; set; } = false;
     [JsonPropertyName("triplanarScale")] public float  TriplanarScale { get; set; } = 1f;
+    [JsonPropertyName("parallaxScale")]  public float  ParallaxScale  { get; set; } = 0.05f;
 }

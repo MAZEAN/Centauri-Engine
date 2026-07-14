@@ -226,6 +226,7 @@ public class ResourceSystem : IDisposable
             AddPath(texturePaths, m.Roughness);
             AddPath(texturePaths, m.Metallic);
             AddPath(texturePaths, m.AO);
+            AddPath(texturePaths, m.Height);
         }
 
         DecodeAssetsInParallelAndUpload(modelPaths, texturePaths);
@@ -336,6 +337,7 @@ public class ResourceSystem : IDisposable
             Roughness = def.Roughness != null ? Textures.Get(def.Roughness) : null,
             Metallic  = def.Metallic  != null ? Textures.Get(def.Metallic)  : null,
             AO        = def.AO        != null ? Textures.Get(def.AO)         : DefaultTexture,
+            Height    = def.Height    != null ? Textures.Get(def.Height)    : null,
             RoughnessScalar = def.RoughnessScalar,
             MetallicScalar  = def.MetallicScalar,
             Translucency   = def.TranslucencyScalar,
@@ -343,7 +345,8 @@ public class ResourceSystem : IDisposable
             TwoSided       = def.TwoSided,
             Wind           = def.Wind,
             Triplanar      = def.Triplanar,
-            TriplanarScale = def.TriplanarScale
+            TriplanarScale = def.TriplanarScale,
+            ParallaxScale  = def.ParallaxScale
         };
     }
 

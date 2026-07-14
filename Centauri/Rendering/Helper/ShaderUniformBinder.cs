@@ -45,6 +45,7 @@ public sealed class ShaderUniformBinder
         shader.SetUniform("uRoughnessMap", 2);
         shader.SetUniform("uMetallicMap",  3);
         shader.SetUniform("uAOMap",        4);
+        shader.SetUniform("uHeightMap",    13);
     }
     
     private void UploadIbl(GLShader shader, bool iblActive, float iblIntensityScale)
@@ -92,6 +93,7 @@ public sealed class ShaderUniformBinder
         shader.SetUniform("uHasRoughness", mat.Roughness != null ? 1 : 0);
         shader.SetUniform("uHasMetallic",  mat.Metallic  != null ? 1 : 0);
         shader.SetUniform("uHasAO",        mat.AO        != null ? 1 : 0);
+        shader.SetUniform("uHasHeight",    mat.Height    != null ? 1 : 0);
 
         shader.SetUniform("uRoughnessScalar", mat.RoughnessScalar);
         shader.SetUniform("uMetallicScalar",  mat.MetallicScalar);
@@ -101,6 +103,7 @@ public sealed class ShaderUniformBinder
         shader.SetUniform("uWind",            mat.Wind ? 1 : 0);
         shader.SetUniform("uTriplanar",       mat.Triplanar ? 1 : 0);
         shader.SetUniform("uTriplanarScale",  mat.TriplanarScale);
+        shader.SetUniform("uParallaxScale",   mat.ParallaxScale);
     }
     
     public static void UploadWind(GLShader shader, FoliageConfig foliage)

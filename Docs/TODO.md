@@ -23,7 +23,7 @@
 * [ ] Terrain (technique unclear, maybe https://github.com/xandergos/terrain-diffusion/tree/master)
 * [ ] Water simulation (Sea of Thieves algorithm)
 * [x] Complex foliage rendering
-* [ ] Displacement or Bump mapping
+* [ ] Displacement mapping (Parallax Occlusion Mapping (POM))
 * [ ] Audio
 * [ ] Skeletal animation / skinning
 

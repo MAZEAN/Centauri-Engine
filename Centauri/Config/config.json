@@ -29,7 +29,7 @@
     "shaderCacheSize": 32,
     "environmentPath": "Loading/Environment/environment.json",
     "entitySetPaths": [
-      "Loading/Scenes/DefaultScene.json"
+      "Loading/Scenes/TestScene.json"
     ],
     "defaultEntitySetPath": "Loading/Saves/Session.json",
     "defaultShader": "Shaders/PBR/shaderPBR",

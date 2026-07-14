@@ -124,6 +124,13 @@ public sealed class EntityInspectorSection : ISection
                 Widgets.DragRow("Triplanar Scale", mat.TriplanarScale,
                     v => EditMaterial(e, scene, index, m => m.TriplanarScale = v), 0.05f, 0.01f, 100f, "%.2f m", 1f);
 
+            // No on/off toggle here — unlike Triplanar/Wind this isn't a flag, it's driven by
+            // whether the material has a height map bound (see HasAnyTexture), which the
+            // inspector has no binding UI for yet (materials are bound via .mat files only).
+            if (mat.Height != null)
+                Widgets.DragRow("Parallax Scale", mat.ParallaxScale,
+                    v => EditMaterial(e, scene, index, m => m.ParallaxScale = v), 0.005f, 0f, 0.5f, "%.3f", 0.05f);
+
             ImGui.PopID();
         }
     }
@@ -161,7 +168,7 @@ public sealed class EntityInspectorSection : ISection
     {
         foreach (var mat in e.Materials)
             if (mat is { Albedo: not null } or { Normal: not null } or { Roughness: not null }
-                     or { Metallic: not null })
+                     or { Metallic: not null } or { Height: not null })
                 return true;
         return false;
     }
