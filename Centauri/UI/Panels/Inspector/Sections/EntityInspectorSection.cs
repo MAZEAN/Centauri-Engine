@@ -127,17 +127,14 @@ public sealed class EntityInspectorSection : ISection
             // No on/off toggle here — unlike Triplanar/Wind this isn't a flag, it's driven by
             // whether the material has a height map bound (see HasAnyTexture), which the
             // inspector has no binding UI for yet (materials are bound via .mat files only).
+            // A live view of the actual offset this produces is the viewport toolbar's
+            // "ParallaxDebug" shading mode (or the G cycle hotkey) — global, not per-material,
+            // since the effect is subtle-to-invisible at near head-on angles by design and
+            // otherwise hard to eyeball as "working" vs. silently not, on whichever material
+            // happens to be selected.
             if (mat.Height != null)
-            {
                 Widgets.DragRow("Parallax Scale", mat.ParallaxScale,
                     v => EditMaterial(e, scene, index, m => m.ParallaxScale = v), 0.005f, 0f, 0.5f, "%.3f", 0.05f);
-
-                // The effect is subtle-to-invisible at near head-on view angles by design (real
-                // parallax mapping), so a plain look often can't tell "working" from "silently
-                // not" — see uDebugParallax's comment in shaderPBR.frag for what the colors mean.
-                Widgets.CheckRow("Debug Parallax", mat.DebugParallax,
-                    v => EditMaterial(e, scene, index, m => m.DebugParallax = v));
-            }
 
             ImGui.PopID();
         }

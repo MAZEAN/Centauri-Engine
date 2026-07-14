@@ -32,13 +32,6 @@ public class Material
     // ray march's step assumption and produces swimming/peeling artifacts.
     public float ParallaxScale { get; set; } = 0.05f;
 
-    // Live-only visualization aid, never persisted (no MaterialDefinition field) — replaces
-    // the lit result with a green(no offset)->red(uParallaxScale-sized offset) heatmap of the
-    // actual per-pixel parallax UV shift, since the effect itself is subtle-to-invisible at
-    // near head-on viewing angles by design and otherwise near-impossible to eyeball as
-    // "working" vs "quietly falling through to the flat-UV path" on a real asset.
-    public bool DebugParallax { get; set; } = false;
-
     public Material(GLShader shader)
     {
         Shader = shader;
@@ -61,8 +54,7 @@ public class Material
         Wind           = Wind,
         Triplanar      = Triplanar,
         TriplanarScale = TriplanarScale,
-        ParallaxScale  = ParallaxScale,
-        DebugParallax  = DebugParallax
+        ParallaxScale  = ParallaxScale
     };
     
     public ulong SortKey

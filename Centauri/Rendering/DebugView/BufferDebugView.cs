@@ -27,7 +27,10 @@ public sealed class BufferDebugView : IDisposable
     public void Render(ShadingMode mode, uint normalTex, uint depthTex, uint aoTex, uint velocityTex,
         float near, float far)    
     {
-        if (mode == ShadingMode.Shaded) return;
+        // ParallaxDebug has no G-buffer source here — shaderPBR.frag already wrote its own
+        // debug output straight into the scene color during the lit pass (see
+        // ShaderUniformBinder.UploadMaterial's uDebugParallax), so there's nothing to overlay.
+        if (mode is ShadingMode.Shaded or ShadingMode.ParallaxDebug) return;
 
         _gl.Disable(EnableCap.DepthTest);
 

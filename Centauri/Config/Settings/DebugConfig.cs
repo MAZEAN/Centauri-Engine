@@ -2,7 +2,11 @@ namespace Centauri.Config;
 
 using System.Text.Json.Serialization;
 
-public enum ShadingMode { Shaded, Normals, Depth, AmbientOcclusion, Velocity }
+// ParallaxDebug doesn't come from a G-buffer like the others (see BufferDebugView) — it's
+// produced directly by shaderPBR.frag's own uDebugParallax branch on every material with a
+// bound height map, so RenderingSystem/BufferDebugView both special-case it: no prepass forced,
+// nothing to overlay after the fact. See ShaderUniformBinder.UploadMaterial.
+public enum ShadingMode { Shaded, Normals, Depth, AmbientOcclusion, Velocity, ParallaxDebug }
 
 public class DebugConfig
 {

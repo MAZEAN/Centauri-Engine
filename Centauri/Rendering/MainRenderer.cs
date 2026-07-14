@@ -193,7 +193,7 @@ public class MainRenderer : IDisposable
 
         RegisterDraw(ref stats, mesh, material, instanceCount);
 
-        ShaderUniformBinder.UploadMaterial(shader, material);
+        _uniforms.UploadMaterial(shader, material);
 
         mesh.ConfigureInstancing(_instanceBuffer.Handle);
         mesh.DrawInstanced(instanceCount);

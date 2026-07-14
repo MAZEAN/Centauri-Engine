@@ -354,7 +354,8 @@ public class RenderingSystem : IDisposable
         _context.GtaoActive = _config.GTAO.Enabled || _config.Debug.Shading == ShadingMode.AmbientOcclusion;
         _context.SsrActive  = _config.SSR.Enabled;
         _context.TaaActive  = _config.TAA.Enabled;
-        var needPrepass = _context.GtaoActive || _context.SsrActive || _context.TaaActive || _config.Debug.Shading != ShadingMode.Shaded;
+        var needPrepass = _context.GtaoActive || _context.SsrActive || _context.TaaActive ||
+                           _config.Debug.Shading is not (ShadingMode.Shaded or ShadingMode.ParallaxDebug);
         
         if (needPrepass)
             using (_context.Profiler.Measure("Prepass"))

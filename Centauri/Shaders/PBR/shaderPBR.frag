@@ -113,11 +113,13 @@ uniform int uHasHeight;
 // uHasHeight == 1.
 uniform float uParallaxScale;
 
-// 1 = replace the lit result with a green->red heatmap of |ParallaxUV(fUv) - fUv| relative to
-// uParallaxScale — see main(). The effect itself is barely visible near head-on view angles by
-// design (real parallax mapping), so there's otherwise no way to confirm per-pixel whether it's
-// actually running on a given material/mesh vs. silently no-op'ing (e.g. a degenerate tangent
-// basis skipping it entirely — see main()'s ParallaxUV guard).
+// 1 = replace the lit result with a grayscale heatmap of the actual per-pixel parallax UV
+// offset — see main(). Global (ShadingMode.ParallaxDebug, set on every draw regardless of
+// which material's selected — see ShaderUniformBinder.UploadMaterial), not per-material: the
+// effect itself is barely visible near head-on view angles by design (real parallax mapping),
+// so there's otherwise no way to confirm per-pixel whether it's actually running on a given
+// material/mesh vs. silently no-op'ing (e.g. a degenerate tangent basis skipping it entirely —
+// see main()'s ParallaxUV guard).
 uniform int uDebugParallax;
 
 uniform float uRoughnessScalar;
