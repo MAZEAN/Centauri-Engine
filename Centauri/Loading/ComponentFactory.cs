@@ -4,6 +4,7 @@ using System.Numerics;
 using System.Text.Json;
 
 using World.Components;
+using Simulation.Physics;
 
 // Builds Components from their entity-set JSON definitions (EntityDefinition.Components, or an
 // environment's "sun"). Adding a new authorable behavior is one line here plus the Component
@@ -21,6 +22,13 @@ public static class ComponentFactory
                 dayIntensity: d.Float("dayIntensity", 4f),
                 dayColor:     d.Vector3("dayColor"),
                 duskColor:    d.Vector3("duskColor")),
+
+            ["rigidBody"] = d => new RigidBody
+            {
+                Kind  = d.String("kind", "dynamic")  == "static" ? BodyKind.Static  : BodyKind.Dynamic,
+                Shape = d.String("shape", "box")     == "sphere" ? BodyShape.Sphere : BodyShape.Box,
+                Mass  = d.Float("mass", 1f),
+            },
         };
 
     public static Component Create(ComponentDefinition def)
@@ -41,6 +49,13 @@ internal static class ComponentParams
         && d.Params.TryGetValue(key, out var v)
         && v.ValueKind == JsonValueKind.Number
             ? v.GetSingle()
+            : fallback;
+
+    public static string String(this ComponentDefinition d, string key, string fallback) =>
+        d.Params is not null
+        && d.Params.TryGetValue(key, out var v)
+        && v.ValueKind == JsonValueKind.String
+            ? v.GetString()!.ToLowerInvariant()
             : fallback;
 
     public static Vector3? Vector3(this ComponentDefinition d, string key)

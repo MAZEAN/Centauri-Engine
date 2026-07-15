@@ -66,9 +66,24 @@ public class Entity : IDisposable
     public T? GetComponent<T>() where T : Component
     {
         foreach (var c in _components)
-            if (c is T t) 
+            if (c is T t)
                 return t;
         return null;
+    }
+
+    // Detaches the first component of type T, if any. Callers that need cleanup beyond removal
+    // from this list (e.g. PhysicsSystem releasing a RigidBody's BEPU handle) are responsible for
+    // noticing the detach themselves — this is deliberately just list bookkeeping, matching
+    // AddComponent/GetComponent's own scope.
+    public bool RemoveComponent<T>() where T : Component
+    {
+        for (var i = 0; i < _components.Count; i++)
+        {
+            if (_components[i] is not T) continue;
+            _components.RemoveAt(i);
+            return true;
+        }
+        return false;
     }
     
     public void Update(float dt)

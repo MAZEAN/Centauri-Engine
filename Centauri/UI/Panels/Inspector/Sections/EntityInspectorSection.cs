@@ -8,13 +8,16 @@ using Common;
 using Graphics.Resources.Materials;
 using Rendering;
 using Loading;
+using Simulation.Physics;
 
 // The selected-entity inspector: name/enabled header plus the Transform / Material / Light
 // sub-panels. Holds the transient rotation-edit state. Shows a placeholder when nothing
 // is selected.
 public sealed class EntityInspectorSection : ISection
 {
-    private static readonly string[] LightTypes = ["None", "Directional", "Point", "Spot"];
+    private static readonly string[] LightTypes   = ["None", "Directional", "Point", "Spot"];
+    private static readonly string[] PhysicsKinds  = ["None", "Dynamic", "Static"];
+    private static readonly string[] PhysicsShapes = ["Box", "Sphere"];
 
     private readonly ResourceSystem _resourceSystem;
     private readonly EntitySetLoader _entitySetLoader;
@@ -48,6 +51,7 @@ public sealed class EntityInspectorSection : ISection
         DrawTransform(entity);
         DrawMaterial(entity, scene);
         DrawLight(entity);
+        DrawPhysics(entity);
     }
 
     private void DrawTransform(Entity e)
@@ -231,6 +235,70 @@ public sealed class EntityInspectorSection : ISection
         }
     }
     
+    // Attaches/edits/detaches a RigidBody on the selected entity. Shape is derived from the
+    // model's own bounds (see PhysicsSystem.Register) — there's nothing to author there beyond
+    // Box/Sphere. Any edit after the initial attach calls RigidBody.MarkDirty() so PhysicsSystem
+    // tears down and recreates the BEPU body on its next Sync instead of silently keeping the old
+    // one; SyncRigidBodyDefinition mirrors the same edit into the entity's saved definition so it
+    // round-trips (see EntitySetLoader.Save — it just re-emits source.Components verbatim).
+    private void DrawPhysics(Entity e)
+    {
+        using var s = Widgets.Section("Physics");
+        if (!s.Open) return;
+
+        var rb = e.GetComponent<RigidBody>();
+        var kindIndex = rb switch
+        {
+            null                      => 0,
+            { Kind: BodyKind.Static } => 2,
+            _                         => 1
+        };
+
+        if (Widgets.ComboRow("Body", ref kindIndex, PhysicsKinds))
+        {
+            if (kindIndex == 0)
+            {
+                if (rb is not null)
+                {
+                    e.RemoveComponent<RigidBody>();
+                    _entitySetLoader.SyncRigidBodyDefinition(e, null);
+                }
+                return;
+            }
+
+            var kind = kindIndex == 2 ? BodyKind.Static : BodyKind.Dynamic;
+            if (rb is null)
+            {
+                rb = e.AddComponent(new RigidBody { Kind = kind });
+            }
+            else
+            {
+                rb.Kind = kind;
+                rb.MarkDirty();
+            }
+            _entitySetLoader.SyncRigidBodyDefinition(e, rb);
+        }
+
+        if (rb is null) return;
+
+        var shapeIndex = rb.Shape == BodyShape.Sphere ? 1 : 0;
+        if (Widgets.ComboRow("Shape", ref shapeIndex, PhysicsShapes))
+        {
+            rb.Shape = shapeIndex == 1 ? BodyShape.Sphere : BodyShape.Box;
+            rb.MarkDirty();
+            _entitySetLoader.SyncRigidBodyDefinition(e, rb);
+        }
+
+        if (rb.Kind != BodyKind.Dynamic) return;
+
+        Widgets.DragRow("Mass", rb.Mass, v =>
+        {
+            rb.Mass = MathF.Max(0.001f, v);
+            rb.MarkDirty();
+            _entitySetLoader.SyncRigidBodyDefinition(e, rb);
+        }, 0.05f, 0.001f, 10000f, "%.3f kg", 1f);
+    }
+
     private static void EditMaterial(Entity e, Scene scene, int index, Action<Material> apply)
     {
         if (e.MakeMaterialUnique(index)) 

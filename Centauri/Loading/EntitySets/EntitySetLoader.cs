@@ -6,6 +6,7 @@ using Config;
 using Rendering;
 using Utils.Misc;
 using World;
+using Simulation.Physics;
 
 // Loads zero or more EntitySetDefinition files (AppConfig's Render.EntitySetPaths, plus
 // Render.DefaultEntitySetPath if it exists — see EffectivePaths) into the scene, and can write
@@ -173,6 +174,38 @@ public class EntitySetLoader
     // own "sun") or ones with no single-id binding (multi-slot "materials", never set here).
     public string? GetMaterialId(Entity entity) =>
         _sources.TryGetValue(entity, out var source) ? source.Material : null;
+
+    // Keeps the tracked EntityDefinition's Components list in sync with a live RigidBody edit
+    // (inspector "Physics" section: attach, detach, or change Kind/Shape/Mass) — the same
+    // "mirror the live edit back into the tracked source" pattern SetMaterial uses, so Save()
+    // (which just re-emits source.Components verbatim) persists it without needing its own
+    // physics-specific write path. rb = null removes any existing "rigidBody" entry (detach);
+    // untracked entities (e.g. the environment's own "sun") are a no-op, same as SetMaterial.
+    public void SyncRigidBodyDefinition(Entity entity, RigidBody? rb)
+    {
+        if (!_sources.TryGetValue(entity, out var source)) return;
+
+        var components = source.Components ??= new List<ComponentDefinition>();
+        var existing = components.FirstOrDefault(
+            c => c.Type.Equals("rigidBody", StringComparison.OrdinalIgnoreCase));
+
+        if (rb is null)
+        {
+            if (existing is not null) components.Remove(existing);
+            return;
+        }
+
+        var def = existing ?? new ComponentDefinition { Type = "rigidBody" };
+        def.Enabled = rb.Enabled;
+        def.Params = new Dictionary<string, JsonElement>
+        {
+            ["kind"]  = JsonSerializer.SerializeToElement(rb.Kind  == BodyKind.Static  ? "static"  : "dynamic"),
+            ["shape"] = JsonSerializer.SerializeToElement(rb.Shape == BodyShape.Sphere ? "sphere"  : "box"),
+            ["mass"]  = JsonSerializer.SerializeToElement(rb.Mass),
+        };
+
+        if (existing is null) components.Add(def);
+    }
 
     // Removes an entity the editor created/loaded — drops its save tracking too, so a deleted
     // entity doesn't reappear on the next Save() of whichever file it belonged to.

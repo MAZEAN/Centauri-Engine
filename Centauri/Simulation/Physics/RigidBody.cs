@@ -29,9 +29,15 @@ public sealed class RigidBody : Component
     // more; inertia is derived from mass and the collision shape.
     public float Mass { get; set; } = 1f;
 
+    // Marks Kind/Shape/Mass as changed since the body was last (re)built, so PhysicsSystem tears
+    // down and recreates the BEPU body/shape on the next Sync instead of silently ignoring an
+    // edit made after the initial registration (e.g. from the inspector's Physics section).
+    public void MarkDirty() => Dirty = true;
+
     // ---- Runtime state owned by PhysicsSystem (do not set from gameplay code) ----
 
     internal bool Registered;
+    internal bool Dirty;
 
     // Local offset from the Transform origin to the collision-shape centre (model bounds are not
     // necessarily centred on the origin). Kept unrotated; PhysicsSystem rotates it per-frame so the

@@ -50,8 +50,19 @@ The fields map 1:1 onto `Config/Settings/PhysicsConfig.cs`.
 
 ## 3. Give an entity a body
 
-Attach a `RigidBody` component (`Simulation/Physics/RigidBody.cs`). The collision shape is derived
-automatically from the entity's model bounds × transform scale — no manual sizing:
+### From the editor
+
+Select an entity and open the Inspector's **Physics** section. The "Body" dropdown attaches
+(`Dynamic`/`Static`) or detaches (`None`) a `RigidBody`; once attached, "Shape" (`Box`/`Sphere`) and
+— for `Dynamic` bodies — "Mass" are editable. Any change after the initial attach calls
+`RigidBody.MarkDirty()`, so `PhysicsSystem` tears down and rebuilds the underlying BEPU body/shape on
+its next `Sync()` instead of silently keeping the stale one. Edits persist through Ctrl+S like any
+other authored property (see "Scene loading" in `CLAUDE.md`) — see §3.2 below for the on-disk shape.
+
+### From code
+
+Attach a `RigidBody` component (`Simulation/Physics/RigidBody.cs`) directly. The collision shape is
+derived automatically from the entity's model bounds × transform scale — no manual sizing:
 
 ```csharp
 using Centauri.Simulation.Physics;
@@ -69,7 +80,29 @@ ground.AddComponent(new RigidBody { Kind = BodyKind.Static, Shape = BodyShape.Bo
 - `Mass` — kg, dynamic only. Inertia is computed from mass + shape.
 
 `PhysicsSystem.Sync()` runs each frame and registers any entity that has gained a `RigidBody` since
-the last frame, so components added at runtime "just work" — no manual registration call.
+the last frame, so components added at runtime "just work" — no manual registration call. It also
+notices a `RigidBody` that was detached (inspector "Body: None", or `Entity.RemoveComponent<RigidBody>()`
+from code) or whose owning entity was deleted from the scene entirely, and releases the BEPU
+body/shape it was holding — see `PhysicsSystem.Unregister`/`PurgeOrphaned`.
+
+### 3.2 On-disk shape (entity-set JSON)
+
+`RigidBody` round-trips through the generic component mechanism every other authored `Component`
+already uses (`EntityDefinition.Components`, see `ComponentFactory`) — no schema change needed:
+
+```jsonc
+{
+  "name": "Crate",
+  "model": "Assets/Objects/Crate.model",
+  "position": [0, 5, 0],
+  "components": [
+    { "type": "rigidBody", "kind": "dynamic", "shape": "box", "mass": 5.0 }
+  ]
+}
+```
+
+`kind` is `"dynamic"` (default) or `"static"`; `shape` is `"box"` (default) or `"sphere"`; `mass`
+defaults to `1.0` and is ignored for static bodies.
 
 ## 4. How the fixed timestep works
 
@@ -93,27 +126,39 @@ ever make the step the bottleneck (and pairs naturally with the GL 4.3 work).
 ## 5. Verify it
 
 There's no in-engine test project, but the standalone-harness pattern from `CLAUDE.md` exercises the
-whole path with no GL context — a console app referencing `Centauri.csproj` that drops a dynamic box
-onto a static ground and asserts it falls and comes to rest (`restY ≈ 1.0` for a 1 m box on a ground
-surface at `y = 0.5`). That's how this integration was validated; llvmpipe headless rendering is not
-needed since physics is pure CPU.
+whole path with no GL context — a console app referencing `Centauri.csproj`. llvmpipe headless
+rendering is not needed for any of this since physics is pure CPU; only the last check needs it.
+
+Covered so far:
+
+- A dynamic box dropped from `y = 10` onto a static ground (surface at `y = 0.5`) falls and comes to
+  rest at `restY ≈ 1.0` for a 1 m box.
+- Editing a registered body's `Kind` (`Dynamic` → `Static`) and calling `MarkDirty()` actually
+  rebuilds it: the body freezes in place on the next `Sync()` instead of continuing to fall.
+- `Entity.RemoveComponent<RigidBody>()` stops a body from being simulated and doesn't throw on
+  subsequent `SimulationSystem.Update` calls.
+- Deleting the owning `Entity` from the `Scene` entirely (not just detaching the component) doesn't
+  leak a BEPU handle or crash later steps — `PurgeOrphaned` catches it.
+- Round-tripping a `{ "type": "rigidBody", ... }` `ComponentDefinition` through `ComponentFactory`
+  produces a `RigidBody` with the expected `Kind`/`Shape`/`Mass`.
+- The full engine still boots and shuts down cleanly headless (`CENTAURI_HEADLESS_FRAMES`) with
+  `physics.enabled = true` and the inspector's Physics section compiled in.
 
 ## 6. Known limitations / next steps
 
 Deliberately scoped as a foundation. In rough priority order:
 
-- **No editor UI yet** — bodies are attached in code, not from the inspector. An inspector section
-  (kind/shape/mass, "+ Add RigidBody") is the natural next step.
-- **Not serialized** — `RigidBody` doesn't round-trip through the entity-set JSON schema. Fold it in
-  alongside the material-override schema revision (see `CLAUDE.md` "Scene loading").
-- **No body removal on entity delete** — `PhysicsSystem` registers bodies but doesn't yet release a
-  handle when its entity is deleted at runtime. Fine for static scenes; add a removal path before
-  relying on live deletion.
 - **No kinematic bodies** — only `Dynamic` and `Static`. A `Kinematic` kind (Transform drives the
   body, e.g. moving platforms) is the obvious third.
 - **Culling-grid churn** — a moving dynamic body writes its `Transform` every frame, which bumps
   `Scene.Revision` and forces a `CullingSystem` grid rebuild each frame (exactly the case the comment
   in `World/Scene.cs` anticipated). Harmless at current body counts; revisit with an incremental
-  grid update if physics scenes get large.
+  grid update if physics scenes get large. As a side effect, `PhysicsSystem`'s own orphan-cleanup
+  sweep (§3) now piggybacks on that same `Scene.Revision` signal, so it's already only as expensive
+  as that existing tradeoff, not an additional one.
 - **Single friction/bounce material** — `NarrowPhaseCallbacks` uses one global material. Per-material
   friction/restitution would key off `CollidableReference` here.
+- **No collider-size feedback in the inspector** — Box/Sphere half-extents are derived from the
+  model's bounds silently; there's no on-screen gizmo showing what shape actually got built, unlike
+  the debug renderer's AABB/culling-grid overlays (`DebugRenderer.DrawAllAABBs`). Worth adding
+  alongside those once bodies are common enough in a scene to need visually auditing.

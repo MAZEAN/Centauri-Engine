@@ -24,9 +24,19 @@ public sealed class PhysicsSystem : IDisposable
     private readonly BufferPool    _pool;
     private readonly Simulation    _simulation;
 
-    // Dynamic bodies only: statics never move, so once created they need no per-frame tracking.
-    private readonly Dictionary<RigidBody, BodyHandle> _dynamics = new();
-    private readonly List<RigidBody>                    _tracked  = new();
+    // Dynamic bodies only: statics never move, so once created they need no per-frame pose
+    // read-back — _tracked is what StepFixed/Interpolate iterate.
+    private readonly Dictionary<RigidBody, BodyHandle>   _dynamics = new();
+    private readonly Dictionary<RigidBody, StaticHandle> _statics  = new();
+    private readonly Dictionary<RigidBody, TypedIndex>   _shapes   = new();
+    private readonly List<RigidBody>                     _tracked  = new();
+
+    // Last entity known to own each currently-registered RigidBody. Sync() diffs this against the
+    // entity's *current* GetComponent<RigidBody>() each frame to notice a component that was
+    // removed (inspector "Body: None") or replaced — the only way to catch that, since a removed
+    // component simply stops showing up when walking scene.Entities.
+    private readonly Dictionary<Entity, RigidBody> _byEntity = new();
+    private int _lastPurgeRevision = -1;
 
     public int BodyCount => _tracked.Count;
 
@@ -42,14 +52,61 @@ public sealed class PhysicsSystem : IDisposable
         _simulation = Simulation.Create(_pool, narrow, pose, solve);
     }
 
-    // Registers any entity that has picked up a RigidBody component since the last call. Cheap to
-    // call every frame — it early-outs on already-registered components. Body removal on entity
-    // delete isn't handled yet (see PhysicsEngine.md "Known limitations").
+    // Registers any entity that has picked up a RigidBody component since the last call, rebuilds
+    // any body whose Kind/Shape/Mass changed after registration (RigidBody.MarkDirty — e.g. an
+    // inspector edit), and releases bodies whose component was removed or whose entity was deleted
+    // from the scene. Cheap to call every frame: registration/dirty-check early-out per entity, and
+    // the deletion sweep only runs when Scene.Revision has actually moved since the last check.
     public void Sync(Scene scene)
     {
         foreach (var entity in scene.Entities)
-            if (entity.GetComponent<RigidBody>() is { Registered: false } rb)
-                Register(entity, rb);
+        {
+            var current = entity.GetComponent<RigidBody>();
+            _byEntity.TryGetValue(entity, out var prior);
+
+            if (prior != null && !ReferenceEquals(prior, current))
+            {
+                Unregister(prior);
+                _byEntity.Remove(entity);
+            }
+
+            if (current is null) continue;
+
+            if (current.Registered && current.Dirty)
+                Unregister(current);
+
+            if (!current.Registered)
+            {
+                Register(entity, current);
+                _byEntity[entity] = current;
+            }
+        }
+
+        PurgeOrphaned(scene);
+    }
+
+    // Catches the case Sync()'s per-entity loop can't: an entity deleted from the scene entirely
+    // (EntitySetLoader.DeleteEntity et al.) simply stops appearing in scene.Entities, so its
+    // RigidBody's body/shape would otherwise leak in the BEPU simulation forever. Gated on
+    // Scene.Revision so a static scene doesn't pay a HashSet build every frame — Revision already
+    // bumps on add/remove/transform-move, a safe superset of "an entity might have disappeared".
+    private void PurgeOrphaned(Scene scene)
+    {
+        if (_byEntity.Count == 0 || scene.Revision == _lastPurgeRevision) return;
+        _lastPurgeRevision = scene.Revision;
+
+        List<Entity>? stale = null;
+        var live = new HashSet<Entity>(scene.Entities);
+        foreach (var entity in _byEntity.Keys)
+            if (!live.Contains(entity))
+                (stale ??= new List<Entity>()).Add(entity);
+
+        if (stale is null) return;
+        foreach (var entity in stale)
+        {
+            Unregister(_byEntity[entity]);
+            _byEntity.Remove(entity);
+        }
     }
 
     private void Register(Entity entity, RigidBody rb)
@@ -70,10 +127,11 @@ public sealed class PhysicsSystem : IDisposable
         var shapeIndex = rb.Shape == BodyShape.Sphere
             ? _simulation.Shapes.Add(new Sphere(MathF.Max(halfExtents.X, MathF.Max(halfExtents.Y, halfExtents.Z))))
             : _simulation.Shapes.Add(new Box(halfExtents.X * 2f, halfExtents.Y * 2f, halfExtents.Z * 2f));
+        _shapes[rb] = shapeIndex;
 
         if (rb.Kind == BodyKind.Static)
         {
-            _simulation.Statics.Add(new StaticDescription(bodyPosition, bodyOrientation, shapeIndex));
+            _statics[rb] = _simulation.Statics.Add(new StaticDescription(bodyPosition, bodyOrientation, shapeIndex));
         }
         else
         {
@@ -96,6 +154,30 @@ public sealed class PhysicsSystem : IDisposable
         rb.PrevPosition = rb.CurrPosition = transform.Position;
         rb.PrevRotation = rb.CurrRotation = transform.Rotation;
         rb.Registered   = true;
+        rb.Dirty        = false;
+    }
+
+    // Releases whatever BEPU state a registered RigidBody currently owns — body/static handle plus
+    // its shape — and marks it unregistered again. Used both for a real removal (component detached,
+    // entity deleted) and as the "tear down" half of a Dirty rebuild, where Sync() immediately
+    // re-registers afterward with the component's now-current Kind/Shape/Mass.
+    private void Unregister(RigidBody rb)
+    {
+        if (_dynamics.Remove(rb, out var bodyHandle))
+        {
+            _simulation.Bodies.Remove(bodyHandle);
+            _tracked.Remove(rb);
+        }
+        else if (_statics.Remove(rb, out var staticHandle))
+        {
+            _simulation.Statics.Remove(staticHandle);
+        }
+
+        if (_shapes.Remove(rb, out var shapeIndex))
+            _simulation.Shapes.Remove(shapeIndex);
+
+        rb.Registered = false;
+        rb.Dirty      = false;
     }
 
     // Advances the simulation by exactly one fixed step. Snapshots the previous pose first so
