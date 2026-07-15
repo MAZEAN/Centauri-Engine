@@ -23,7 +23,7 @@
 * [ ] Terrain (technique unclear, maybe https://github.com/xandergos/terrain-diffusion/tree/master)
 * [ ] Water simulation (Sea of Thieves algorithm)
 * [x] Complex foliage rendering
-* [ ] Displacement mapping (Parallax Occlusion Mapping (POM))
+* [ ] Displacement mapping (Parallax Occlusion Mapping (POM)) + self-shadowing
 * [ ] Audio
 * [ ] Skeletal animation / skinning
 
@@ -42,7 +42,7 @@
 * [x] Triplanar / world-space UV projection
 * [ ] volumetric fog
 * [x] Tracy Profiler integration
-* [x] Better wind (hierarchy) & leaves (orientation)
+* [x] Better wind
 * [ ] Extend shadows to spot- and point lights
 * [ ] Sky variantions
 * [ ] Keybindings
@@ -52,11 +52,13 @@
 * [x] Scene save/serialization
 * [ ] Transform hierarchy in scene format
 * [ ] Local-light shadows
+* [ ] Better clouds
+* [ ] wind (hierarchy) & leaves (orientation)
 
 ## Optional
 * [ ] Hosek-Wilkie sky algorithm
 * [ ] Full raymarched volumetric clouds
-* [ ] Replace MSAA
+* [x] Replace MSAA
 
 ---
 
