@@ -41,9 +41,16 @@ into Phase 2's layer-count decision) — it does not by itself justify jumping t
 - [ ] Point/spot self-shadowing — only if a scene actually depends on a point/spot light (not
   the directional sun/sky) for the primary reveal of a displaced surface. Skip by default;
   cost multiplies per light in range.
-- [ ] Adaptive layer count from screen-space UV derivatives (`textureQueryLod`) instead of the
-  current view-angle + scale heuristic — a more rigorous fix for the aliasing/duplication
-  failure mode than a fixed reference scale.
+- [x] Adaptive layer count from screen-space UV derivatives — done ahead of a measured Phase 1
+  gap (cheap, no design risk, explicitly requested). Uses `fwidth(uv)` + `textureSize()` rather
+  than `textureQueryLod`, since the latter needs `GL_ARB_texture_query_lod` and this engine
+  targets plain GL 3.3 core; `fwidth`/`textureSize` are core since GLSL 130. Implemented as a
+  *reduction* on top of the existing view-angle/scale heuristic, not a replacement — the scale
+  term stays, since it's what fixed the earlier ridge-duplication bug (large `uParallaxScale`
+  needs more layers regardless of on-screen size) and the derivative term addresses a different
+  axis (fewer layers when the surface is minified on screen and texture()'s own mip filtering
+  has already blurred away the detail extra layers would resolve). See `ParallaxUV` in
+  `shaderPBR.frag` (`PARALLAX_LOD_RANGE`, `PARALLAX_LOD_MIN_FRACTION`).
 - [ ] Cone-step / relief mapping precompute — only if Phase 1's profiling shows the fixed
   per-pixel layer count is the actual bottleneck on real hardware. Needs an offline bake per
   height map (one-time, not per-frame); real implementation cost, so gate it on a measured

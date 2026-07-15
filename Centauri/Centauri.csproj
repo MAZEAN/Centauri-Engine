@@ -24,47 +24,5 @@
         <None Update="Assets\**\*">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
-        <None Update="Testing\Trees\Tree.glb">
-          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="Testing\Trees\Tree.model">
-          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="Testing\Leaves\Standard\GreenLeaf12_1K_back_AO.png">
-          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="Testing\Leaves\Standard\GreenLeaf12_1K_front_AO.png">
-          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="Testing\Leaves\Standard\GreenLeaf12_1K_back_Height.png">
-          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="Testing\Leaves\Standard\GreenLeaf12_1K_back_Normal.png">
-          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="Testing\Leaves\Standard\GreenLeaf12_1K_back_Opacity.png">
-          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="Testing\Leaves\Standard\GreenLeaf12_1K_front_Height.png">
-          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="Testing\Leaves\Standard\GreenLeaf12_1K_front_Normal.png">
-          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="Testing\Leaves\Standard\GreenLeaf12_1K_front_Opacity.png">
-          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="Testing\Leaves\Standard\GreenLeaf12_1K_back_BaseColor.png">
-          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="Testing\Leaves\Standard\GreenLeaf12_1K_back_Roughness.png">
-          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="Testing\Leaves\Standard\GreenLeaf12_1K_front_BaseColor.png">
-          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="Testing\Leaves\Standard\GreenLeaf12_1K_front_Roughness.png">
-          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
     </ItemGroup>
 </Project>

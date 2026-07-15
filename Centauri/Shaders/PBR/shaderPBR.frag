@@ -41,6 +41,14 @@ const int PARALLAX_ABSOLUTE_MAX_LAYERS = 64; // hard cap once uParallaxScale's o
 // layer count would be.
 const float PARALLAX_REFERENCE_SCALE = 0.02;
 
+// Screen-space-derivative-driven layer falloff (see ParallaxUV's texelsPerPixel/mipLevel). Over
+// this many estimated mip levels of minification, layer count falls linearly from 100% of the
+// view-angle/scale heuristic above down to PARALLAX_LOD_MIN_FRACTION of it. Deliberately never
+// reaches 0: PARALLAX_MIN_LAYERS is still a hard floor via the max() in ParallaxUV, so a
+// distant/grazing surface degrades to coarse-but-present displacement rather than popping flat.
+const float PARALLAX_LOD_RANGE = 4.0;
+const float PARALLAX_LOD_MIN_FRACTION = 0.25;
+
 // GGX's NDF denominator (NdotH²(a²-1)+1) hits exactly 0 at roughness 0 whenever H lands exactly
 // on N (a straight-on specular peak) — a² is 0 there too, so NDF is a literal 0/0 = NaN, not just
 // a sharp highlight. SpecularAARoughness widens roughness based on screen-space normal variance,
@@ -502,6 +510,22 @@ vec2 ParallaxUV(vec2 uv, vec3 viewDirTangent)
     float scaleBoost = clamp(uParallaxScale / PARALLAX_REFERENCE_SCALE, 1.0,
                               float(PARALLAX_ABSOLUTE_MAX_LAYERS) / float(PARALLAX_MAX_LAYERS));
     numLayers = min(numLayers * scaleBoost, float(PARALLAX_ABSOLUTE_MAX_LAYERS));
+
+    // fwidth(uv) is how much this fragment's UV changes between adjacent screen pixels; scaled
+    // by the height map's texel resolution it estimates the mip level texture()'s own automatic
+    // LOD selection is already sampling at (same derivative-based math, without needing
+    // GL_ARB_texture_query_lod/textureQueryLod — this engine targets plain GL 3.3 core and
+    // fwidth()/textureSize() are core since GLSL 130). A high estimate means the surface is
+    // minified on screen (distant, or steeply foreshortened while covering few pixels) and
+    // texture() is already blending many texels into each sample — additional ray-march layers
+    // there resolve detail that's already lost to mip filtering, so they cost GPU time without
+    // adding visible quality. This only ever *reduces* the view-angle/scale count above; it does
+    // not replace it, since that term exists to prevent step size from skipping past ridges at
+    // large uParallaxScale (see PARALLAX_REFERENCE_SCALE), which is independent of on-screen size.
+    vec2  texelsPerPixel = fwidth(uv) * vec2(textureSize(uHeightMap, 0));
+    float mipLevel = max(log2(max(texelsPerPixel.x, texelsPerPixel.y)), 0.0);
+    float lodFalloff = clamp(1.0 - mipLevel / PARALLAX_LOD_RANGE, PARALLAX_LOD_MIN_FRACTION, 1.0);
+    numLayers = max(numLayers * lodFalloff, float(PARALLAX_MIN_LAYERS));
 
     float layerDepth = 1.0 / numLayers;
 
