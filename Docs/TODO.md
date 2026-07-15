@@ -19,7 +19,7 @@
 * [x] GTAO (Ground-Truth AO)
 * [x] Contact-hardening / PCSS
 * [ ] Raytracing with BVH (only experimental, not real-time)
-* [ ] Physics engine integration (BEPUphysics2) + fixed timestep
+* [x] Physics engine integration (BEPUphysics2) + fixed timestep (foundation — see Docs/Documentation/PhysicsEngine.md; editor UI/serialization/kinematics still open)
 * [ ] Terrain (technique unclear, maybe https://github.com/xandergos/terrain-diffusion/tree/master)
 * [ ] Water simulation (Sea of Thieves algorithm)
 * [x] Complex foliage rendering

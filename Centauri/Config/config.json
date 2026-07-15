@@ -45,6 +45,14 @@
     "tracyEnabled": false,
     "shaderHotReload": false
   },
+  "physics": {
+    "enabled": true,
+    "gravity": [0, -9.81, 0],
+    "timestepHz": 60,
+    "solverVelocityIterations": 8,
+    "solverSubsteps": 1,
+    "maxStepsPerFrame": 8
+  },
   "input": {
     "mode": "Fly",
     "toggleModeKey": "Tab"

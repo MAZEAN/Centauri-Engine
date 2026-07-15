@@ -23,4 +23,5 @@ public class AppConfig
     [JsonPropertyName("foliage")] public FoliageConfig Foliage { get; init; } = new();
     [JsonPropertyName("culling")] public CullingConfig Culling { get; init; } = new();
     [JsonPropertyName("sky")]     public SkyConfig    Sky { get; init; } = new();
+    [JsonPropertyName("physics")] public PhysicsConfig Physics { get; init; } = new();
 }

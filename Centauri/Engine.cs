@@ -162,6 +162,7 @@ public class Engine : IWindowCallbacks
         _shaderHotReload?.Dispose();
         _renderingSystem.Dispose();
         _inputSystem.Dispose();
+        _simulation.Dispose();
         _scene.Dispose();
         _resourceSystem.Dispose();
     }
