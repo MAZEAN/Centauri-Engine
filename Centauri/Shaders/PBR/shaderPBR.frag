@@ -17,6 +17,7 @@ const float PI               = 3.14159265359;
 const int   MAX_POINT_LIGHTS = 16;
 const int   MAX_SPOT_LIGHTS  = 16;
 const int   MAX_CASCADES = 4;
+const int   MAX_SHADOW_SPOTS = 4;   // must match SpotShadowConfig.MaxShadowSpots
 const float CASCADE_BLEND = 0.1;   // fraction of a cascade's depth range used as the cross-fade band
 const float SHADOW_FADE = 0.1;   // fraction of the shadow distance over which shadows fade out
 const int   BLOCKER_TAPS = 8;   // subset of POISSON_DISK — cheaper than the full PCF tap count
@@ -95,7 +96,7 @@ struct SpotLight {
     vec4 direction; // xyz
     vec4 color;     // xyz
     vec4 params;    // x = intensity, y = constant, z = linear, w = quadratic
-    vec4 cutoffs;   // x = innerCos, y = outerCos
+    vec4 cutoffs;   // x = innerCos, y = outerCos, z = shadow slot + 1 (0 = no shadow)
 };
 
 // ─── uniforms ─────────────────────────────────────────────────────────────────
@@ -192,6 +193,20 @@ uniform int   uPcss;
 uniform float uLightSize;      // tan(sun half-angle): world penumbra growth per unit occluder distance
 uniform float uBlockerRadius;  // blocker-search disk radius, in texels
 uniform float uMaxPenumbra;    // clamp on the resulting PCF radius, in texels
+
+// Spot-light shadows (SpotShadowMapper) — a separate, simpler pass from CSM above: one shared
+// Texture2DArray atlas (SpotShadowConfig.MaxShadowSpots layers), fixed-radius PCF only, no PCSS
+// contact-hardening (keeps the per-light cost and config surface small — see
+// Docs/Documentation/LocalShadows.md). Which atlas layer (if any) a given SpotLight uses is
+// carried on the light itself (uSpots[i].cutoffs.z), not a separate per-light array here.
+uniform sampler2DArrayShadow uSpotShadowMap;   // unit 14
+layout(std140) uniform SpotShadows {
+    mat4 uSpotShadowMatrices[MAX_SHADOW_SPOTS];
+};
+uniform int   uHasSpotShadow;
+uniform float uSpotShadowBias;
+uniform float uSpotShadowNormalBias;
+uniform int   uSpotShadowPcfRadius;
 
 // Lighting
 layout(std140) uniform Lights {
@@ -343,6 +358,40 @@ float ShadowFactor(vec3 N, vec3 L)
     return shadow * fade;
 }
 
+// `slot` is already 0-based (caller decodes SpotLight.cutoffs.z — see CalcSpotLight). Same
+// slope-scaled-bias + normal-offset approach as SampleCascade, but a single fixed-radius PCF tap
+// set instead of PCSS's blocker search: cheap and simple is the point of this pass (see the
+// uSpotShadowMap uniform block comment) — a local light close to its casters rarely needs the
+// same soft, distance-varying penumbra a huge sun/sky light does.
+float SpotShadowFactor(int slot, vec3 N, vec3 L)
+{
+    float nOffset = uSpotShadowNormalBias * (1.0 / float(textureSize(uSpotShadowMap, 0).x));
+    vec4 ls = uSpotShadowMatrices[slot] * vec4(fFragPos + N * nOffset, 1.0);
+
+    if (ls.w <= 0.0)
+        return 0.0;   // behind the light's near plane — nothing meaningful to sample
+
+    vec3 proj = ls.xyz / ls.w * 0.5 + 0.5;
+    if (proj.z > 1.0 || any(lessThan(proj.xy, vec2(0.0))) || any(greaterThan(proj.xy, vec2(1.0))))
+        return 0.0;   // outside the light's frustum entirely — unshadowed, not "fully shadowed"
+
+    float bias    = max(uSpotShadowBias * (1.0 - dot(N, L)), uSpotShadowBias * 0.1);
+    float current = proj.z - bias;
+
+    vec2  texel = 1.0 / vec2(textureSize(uSpotShadowMap, 0).xy);
+    mat2  rot   = InterleavedGradientRotation();
+    float radius = float(uSpotShadowPcfRadius);
+
+    float lit = 0.0;
+    for (int i = 0; i < POISSON_COUNT; ++i)
+    {
+        vec2 offset = (rot * POISSON_DISK[i]) * radius * texel;
+        lit += texture(uSpotShadowMap, vec4(proj.xy + offset, float(slot), current));
+    }
+
+    return 1.0 - lit / float(POISSON_COUNT);
+}
+
 // ─── PBR functions ────────────────────────────────────────────────────────────
 
 // normal distribution — how many microfacets align with halfway vector
@@ -450,7 +499,12 @@ vec3 CalcSpotLight(SpotLight light, vec3 N, vec3 V, vec3 albedo, float roughness
     float coneIntensity = clamp((theta - light.cutoffs.y) / epsilon, 0.0, 1.0);
     vec3  radiance      = light.color.xyz * light.params.x * attenuation * coneIntensity;
 
-    return CalcPBR(L, radiance, N, V, albedo, roughness, metallic);
+    int   slotEncoded = int(light.cutoffs.z);   // 0 = no shadow, else atlas layer + 1
+    float shadow = (uHasSpotShadow == 1 && slotEncoded > 0 && uCheapShading == 0)
+        ? SpotShadowFactor(slotEncoded - 1, N, L)
+        : 0.0;
+
+    return CalcPBR(L, radiance, N, V, albedo, roughness, metallic) * (1.0 - shadow);
 }
 
 void ShowShadowCascadesView(vec3 color, vec4  albedoSample) {

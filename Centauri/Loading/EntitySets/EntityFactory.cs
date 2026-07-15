@@ -139,7 +139,8 @@ public class EntityFactory
             {
                 Color = color, Intensity = l.Intensity, Enabled = l.Enabled,
                 Direction = direction,
-                InnerCutoff = l.InnerCutoff, OuterCutoff = l.OuterCutoff
+                InnerCutoff = l.InnerCutoff, OuterCutoff = l.OuterCutoff,
+                CastsShadow = l.CastsShadow, Range = l.Range
             },
             "point" => new PointLight
             {

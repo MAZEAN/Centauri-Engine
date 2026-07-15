@@ -225,6 +225,10 @@ public sealed class EntityInspectorSection : ISection
                     0.5f, 0f, 90f, "%.1f°", 12.5f);
                 Widgets.DragRow("Outer Cutoff", sp.OuterCutoff, v => sp.OuterCutoff = v,
                     0.5f, 0f, 90f, "%.1f°", 17.5f);
+                Widgets.CheckRow("Casts Shadow", sp.CastsShadow, v => sp.CastsShadow = v);
+                if (sp.CastsShadow)
+                    Widgets.DragRow("Shadow Range", sp.Range, v => sp.Range = v,
+                        0.5f, 1f, 200f, "%.1f m", 25f);
                 break;
             case PointLight p:
                 Widgets.DragRow("Linear",    p.Linear,    v => p.Linear    = v,

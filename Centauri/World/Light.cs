@@ -28,4 +28,15 @@ public class SpotLight : Light
     public Vector3 Direction   { get; set; } = new(0f, -1f, 0f);
     public float   InnerCutoff { get; set; } = 12.5f; // degrees
     public float   OuterCutoff { get; set; } = 17.5f; // degrees
+
+    // Opt-in: shadow-casting spot lights are capped (SpotShadowConfig.MaxShadowSpots) and each
+    // one is a real extra render pass, so this stays off by default even with
+    // SpotShadowConfig.Enabled on — see Docs/Documentation/LocalShadows.md.
+    public bool  CastsShadow { get; set; } = false;
+
+    // Shadow frustum far plane, world units. Distinct from the light's actual illumination
+    // falloff (still governed by the constant/linear/quadratic attenuation MainRenderer applies)
+    // — this only bounds how far the depth pass's perspective projection reaches, so it wants to
+    // roughly match where the light visually stops mattering rather than being tuned precisely.
+    public float Range { get; set; } = 25f;
 }

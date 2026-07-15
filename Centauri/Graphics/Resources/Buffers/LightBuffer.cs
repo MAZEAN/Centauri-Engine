@@ -70,9 +70,12 @@ public sealed class LightBuffer : IDisposable
         _pointCount++;
     }
 
+    // shadowSlot: -1 if this light isn't casting a shadow this frame (SpotShadowMapper.SlotOf).
+    // Packed into cutoffs.z as slot+1 (0 = no shadow) rather than a separate UBO field, since
+    // cutoffs.zw were otherwise always-zero padding — see shaderPBR.frag's SpotLight struct.
     public void AddSpot(Vector3 position, Vector3 direction, Vector3 color, float intensity,
                         float constant, float linear, float quadratic,
-                        float innerCutoffDeg, float outerCutoffDeg)
+                        float innerCutoffDeg, float outerCutoffDeg, int shadowSlot = -1)
     {
         if (_spotCount >= MaxSpot) return;
 
@@ -82,7 +85,7 @@ public sealed class LightBuffer : IDisposable
         w.Vec3(color);
         w.Vec4(intensity, constant, linear, quadratic);
         w.Vec4(MathF.Cos(innerCutoffDeg * MathF.PI / 180f),
-               MathF.Cos(outerCutoffDeg * MathF.PI / 180f), 0f, 0f);
+               MathF.Cos(outerCutoffDeg * MathF.PI / 180f), shadowSlot + 1, 0f);
         _spotCount++;
     }
 

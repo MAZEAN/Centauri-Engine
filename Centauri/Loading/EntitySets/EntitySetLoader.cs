@@ -264,22 +264,33 @@ public class EntitySetLoader
     {
         DirectionalLight d => new LightDefinition
         {
-            Type = "directional", Enabled = d.Enabled,
-            Color = [d.Color.X, d.Color.Y, d.Color.Z], Intensity = d.Intensity,
-            Direction = [d.Direction.X, d.Direction.Y, d.Direction.Z],
+            Type = "directional",
+            Enabled = d.Enabled,
+            Color = [d.Color.X, d.Color.Y, d.Color.Z],
+            Intensity = d.Intensity,
+            Direction = [d.Direction.X, d.Direction.Y, d.Direction.Z]
         },
         SpotLight sp => new LightDefinition
         {
-            Type = "spot", Enabled = sp.Enabled,
-            Color = [sp.Color.X, sp.Color.Y, sp.Color.Z], Intensity = sp.Intensity,
+            Type = "spot",
+            Enabled = sp.Enabled,
+            Color = [sp.Color.X, sp.Color.Y, sp.Color.Z],
+            Intensity = sp.Intensity,
             Direction = [sp.Direction.X, sp.Direction.Y, sp.Direction.Z],
-            InnerCutoff = sp.InnerCutoff, OuterCutoff = sp.OuterCutoff,
+            InnerCutoff = sp.InnerCutoff,
+            OuterCutoff = sp.OuterCutoff,
+            CastsShadow = sp.CastsShadow,
+            Range = sp.Range
         },
         PointLight p => new LightDefinition
         {
-            Type = "point", Enabled = p.Enabled,
-            Color = [p.Color.X, p.Color.Y, p.Color.Z], Intensity = p.Intensity,
-            Constant = p.Constant, Linear = p.Linear, Quadratic = p.Quadratic,
+            Type = "point",
+            Enabled = p.Enabled,
+            Color = [p.Color.X, p.Color.Y, p.Color.Z],
+            Intensity = p.Intensity,
+            Constant = p.Constant,
+            Linear = p.Linear,
+            Quadratic = p.Quadratic
         },
         _ => throw new ArgumentOutOfRangeException(nameof(l), l, "Unknown light type.")
     };

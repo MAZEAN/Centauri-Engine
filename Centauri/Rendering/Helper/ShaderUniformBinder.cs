@@ -16,12 +16,14 @@ public sealed class ShaderUniformBinder
     private readonly AppConfig _config;
     private readonly IBLBaker _ibl;
     private readonly ShadowMapper _shadows;
+    private readonly SpotShadowMapper _spotShadows;
 
-    public ShaderUniformBinder(AppConfig config, IBLBaker ibl, ShadowMapper shadows)
+    public ShaderUniformBinder(AppConfig config, IBLBaker ibl, ShadowMapper shadows, SpotShadowMapper spotShadows)
     {
         _config  = config;
         _ibl     = ibl;
         _shadows = shadows;
+        _spotShadows = spotShadows;
     }
 
     public void UploadGlobals(GLShader shader, Camera camera, bool iblActive, float iblIntensityScale,
@@ -36,6 +38,7 @@ public sealed class ShaderUniformBinder
         UploadIbl(shader, iblActive, iblIntensityScale);
         UploadGtao(shader, gtaoActive);
         UploadShadow(shader);
+        UploadSpotShadow(shader);
     }
 
     private static void UploadTextureSlots(GLShader shader)
@@ -84,6 +87,15 @@ public sealed class ShaderUniformBinder
         shader.SetUniform("uLightSize",    _config.Shadows.LightSize);
         shader.SetUniform("uBlockerRadius", _config.Shadows.BlockerSearchRadius);
         shader.SetUniform("uMaxPenumbra",  _config.Shadows.MaxPenumbraRadius);
+    }
+
+    private void UploadSpotShadow(GLShader shader)
+    {
+        shader.SetUniform("uSpotShadowMap", 14);
+        shader.SetUniform("uHasSpotShadow", _spotShadows.Active ? 1 : 0);
+        shader.SetUniform("uSpotShadowBias",       _config.SpotShadows.DepthBias);
+        shader.SetUniform("uSpotShadowNormalBias", _config.SpotShadows.NormalBias);
+        shader.SetUniform("uSpotShadowPcfRadius",  _config.SpotShadows.PcfRadius);
     }
 
     public void UploadMaterial(GLShader shader, Material mat)

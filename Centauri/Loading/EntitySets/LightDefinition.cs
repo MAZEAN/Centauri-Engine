@@ -20,4 +20,6 @@ public class LightDefinition
     // spot
     [JsonPropertyName("innerCutoff")] public float InnerCutoff { get; set; } = 12.5f;
     [JsonPropertyName("outerCutoff")] public float OuterCutoff { get; set; } = 17.5f;
+    [JsonPropertyName("castsShadow")] public bool  CastsShadow { get; set; } = false;
+    [JsonPropertyName("range")]       public float Range       { get; set; } = 25f;
 }

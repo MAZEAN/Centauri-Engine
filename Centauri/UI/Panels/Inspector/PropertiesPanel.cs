@@ -36,6 +36,7 @@ public class PropertiesPanel
                 new SkySection(config.Sky),
                 new DayNightSection(),
                 new ShadowSection(config.Shadows),
+                new SpotShadowSection(config.SpotShadows),
                 new FoliageSection(config.Foliage)
             ]),
             new SectionGroup("Reflections", ColorPalette.Blue, [

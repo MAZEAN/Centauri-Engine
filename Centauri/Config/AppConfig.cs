@@ -14,6 +14,7 @@ public class AppConfig
     [JsonPropertyName("reflectionProbe")] public ReflectionProbeConfig ReflectionProbe { get; init; } = new();
     [JsonPropertyName("planarReflection")] public PlanarReflectionConfig PlanarReflection { get; init; } = new();
     [JsonPropertyName("shadows")] public ShadowConfig Shadows { get; init; } = new();
+    [JsonPropertyName("spotShadows")] public SpotShadowConfig SpotShadows { get; init; } = new();
     [JsonPropertyName("grading")] public ColorGrading ColorGrading { get; init; } = new();
     [JsonPropertyName("gtao")]    public GTAOConfig   GTAO { get; init; } = new();
     [JsonPropertyName("bloom")]   public BloomConfig  Bloom { get; init; } = new();

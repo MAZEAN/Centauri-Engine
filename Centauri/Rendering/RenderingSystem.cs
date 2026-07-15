@@ -49,6 +49,7 @@ public class RenderingSystem : IDisposable
     private readonly DebugRenderer _debugRenderer;
     private readonly SkyboxRenderer _skyboxRenderer;
     private readonly ShadowMapper _shadows;
+    private readonly SpotShadowMapper _spotShadows;
     private readonly IBLBaker _ibl;
     private readonly ReflectionProbeBaker _reflectionProbe;
     private readonly InstanceBuffer _instances;
@@ -91,9 +92,10 @@ public class RenderingSystem : IDisposable
         
         _context.Profiler = new GPUProfiler(gl);
         _shadows = new ShadowMapper(gl, _config, _instances, _context.Profiler);
+        _spotShadows = new SpotShadowMapper(gl, _config, _instances, _context.Profiler);
         _ibl = new IBLBaker(gl, _config.IBL);
 
-        _mainRenderer   = new MainRenderer(gl, config, _ibl, _shadows, _instances);
+        _mainRenderer   = new MainRenderer(gl, config, _ibl, _shadows, _spotShadows, _instances);
         _gridRenderer   = new GridRenderer(gl);
         _debugRenderer  = new DebugRenderer(gl, config);
         _skyboxRenderer = new SkyboxRenderer(gl, config);
@@ -362,6 +364,7 @@ public class RenderingSystem : IDisposable
         // (GL_TIME_ELAPSED zones can't nest, so this can't also be wrapped in an outer Measure()
         // here — see ShadowMapper and PostProcessor.Composite for the same pattern).
         _shadows.Render(scene, _context.Culling, ref _context.Stats);
+        _spotShadows.Render(scene, _context.Culling, scene.Cameras.Active, ref _context.Stats);
 
         // GTAO (and the Normals/Depth/AO debug views) all need the prepass buffers
         _context.GtaoActive = _config.GTAO.Enabled || _config.Debug.Shading == ShadingMode.AmbientOcclusion;
@@ -460,6 +463,7 @@ public class RenderingSystem : IDisposable
         _ibl.Dispose();
         _reflectionProbe.Dispose();
         _shadows.Dispose();
+        _spotShadows.Dispose();
         _context.Profiler.Dispose();
         _instances.Dispose();
     }

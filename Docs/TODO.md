@@ -43,7 +43,7 @@
 * [ ] volumetric fog
 * [x] Tracy Profiler integration
 * [x] Better wind
-* [ ] Extend shadows to spot- and point lights
+* [x] Extend shadows to spot lights (point lights deferred — GL 3.3 core has no cubemap array; see Docs/Documentation/LocalShadows.md)
 * [ ] Sky variantions
 * [ ] Keybindings
 * [x] UI improvements (DPI-scaling etc.)
@@ -51,7 +51,7 @@
 * [ ] Automated tests
 * [x] Scene save/serialization
 * [ ] Transform hierarchy in scene format
-* [ ] Local-light shadows
+* [x] Local-light shadows (spot only — see Docs/Documentation/LocalShadows.md)
 * [ ] Better clouds
 * [ ] wind (hierarchy) & leaves (orientation)
 * [ ] GL 3.3 → 4.3 upgrade (enables clustered lighting, GPU particles & cheaper foliage)

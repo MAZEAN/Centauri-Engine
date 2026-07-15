@@ -36,6 +36,7 @@ public class MainRenderer : IDisposable
     private readonly AppConfig _config;
     private readonly IBLBaker _ibl;
     private readonly ShadowMapper _shadows;
+    private readonly SpotShadowMapper _spotShadows;
 
     private const float SpotConstant  = 1.0f;
     private const float SpotLinear    = 0.09f;
@@ -44,6 +45,7 @@ public class MainRenderer : IDisposable
 
     private readonly LightBuffer _lightBuffer;
     private readonly ShadowBuffer _shadowBuffer;
+    private readonly SpotShadowBuffer _spotShadowBuffer;
     private readonly HashSet<GLShader> _lightBlockBound = [];
 
     private readonly TextureBinder _textures;
@@ -70,17 +72,20 @@ public class MainRenderer : IDisposable
     private bool  _iblActive;
     private bool? _twoSided;
 
-    public MainRenderer(GL gl, AppConfig config, IBLBaker ibl, ShadowMapper shadows, InstanceBuffer instances)
+    public MainRenderer(GL gl, AppConfig config, IBLBaker ibl, ShadowMapper shadows,
+        SpotShadowMapper spotShadows, InstanceBuffer instances)
     {
         _gl = gl;
         _config = config;
         _ibl = ibl;
         _shadows = shadows;
+        _spotShadows = spotShadows;
 
         _lightBuffer = new LightBuffer(gl);
         _shadowBuffer = new ShadowBuffer(gl);
+        _spotShadowBuffer = new SpotShadowBuffer(gl, config.SpotShadows.MaxShadowSpots);
         _textures    = new TextureBinder(gl);
-        _uniforms    = new ShaderUniformBinder(config, ibl, shadows);
+        _uniforms    = new ShaderUniformBinder(config, ibl, shadows, spotShadows);
         _instanceBuffer = instances;
     }
 
@@ -132,6 +137,8 @@ public class MainRenderer : IDisposable
         BindIbl(scene);
         BindShadows();
         UploadShadowData();
+        BindSpotShadows();
+        UploadSpotShadowData();
     }
 
     private void DrawBatch(Batch batch, RenderContext context, ref FrameStats stats)
@@ -245,8 +252,9 @@ public class MainRenderer : IDisposable
         shader.Use();
         if (_lightBlockBound.Add(shader))
         {
-            shader.BindUniformBlock("Lights",  LightBuffer.BindingPoint);
-            shader.BindUniformBlock("Shadows", ShadowBuffer.BindingPoint);
+            shader.BindUniformBlock("Lights",      LightBuffer.BindingPoint);
+            shader.BindUniformBlock("Shadows",     ShadowBuffer.BindingPoint);
+            shader.BindUniformBlock("SpotShadows", SpotShadowBuffer.BindingPoint);
         }
 
         shader.SetUniform("uView",      context.View);
@@ -277,7 +285,7 @@ public class MainRenderer : IDisposable
             _lightBuffer.AddSpot(
                 s.Position, s.Light.Direction, s.Light.Color, s.Light.Intensity,
                 SpotConstant, SpotLinear, SpotQuadratic,
-                s.Light.InnerCutoff, s.Light.OuterCutoff);
+                s.Light.InnerCutoff, s.Light.OuterCutoff, _spotShadows.SlotOf(s.Light));
 
         _lightBuffer.Upload();
     }
@@ -342,6 +350,24 @@ public class MainRenderer : IDisposable
         _shadowBuffer.Upload();
     }
 
+    private void BindSpotShadows()
+    {
+        if (!_spotShadows.Active) return;
+
+        _gl.ActiveTexture(TextureUnit.Texture14);
+        _gl.BindTexture(TextureTarget.Texture2DArray, _spotShadows.AtlasDepthTexture);
+    }
+
+    private void UploadSpotShadowData()
+    {
+        if (!_spotShadows.Active) return;
+
+        for (var i = 0; i < _config.SpotShadows.MaxShadowSpots; i++)
+            _spotShadowBuffer.SetSlot(i, _spotShadows.SlotMatrix(i));
+
+        _spotShadowBuffer.Upload();
+    }
+
     private static void ResetFrameStats(ref FrameStats stats)
     {
         stats.DrawnEntities  = 0;
@@ -358,5 +384,6 @@ public class MainRenderer : IDisposable
     {
         _lightBuffer.Dispose();
         _shadowBuffer.Dispose();
+        _spotShadowBuffer.Dispose();
     }
 }
