@@ -55,17 +55,17 @@
 * [ ] Better clouds
 * [ ] wind (hierarchy) & leaves (orientation)
 * [ ] GL 3.3 → 4.3 upgrade (enables clustered lighting, GPU particles & cheaper foliage)
+* [ ] Morph the add entity menu to resemble blender's (Shift + A)
 
 ## Optional
 * [ ] Hosek-Wilkie sky algorithm
 * [ ] Full raymarched volumetric clouds
 * [x] Replace MSAA
+* [ ] Link leaves to branches in the wind
 
 ---
 
 ## Bug Fixes
-
-* [ ] Leaves become disconnected from the branch (not linked)
 
 ---
 
