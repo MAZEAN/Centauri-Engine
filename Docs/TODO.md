@@ -54,7 +54,7 @@
 * [x] Local-light shadows (spot only — see Docs/Documentation/LocalShadows.md)
 * [ ] Better clouds
 * [ ] wind (hierarchy) & leaves (orientation)
-* [ ] GL 3.3 → 4.3 upgrade (enables clustered lighting, GPU particles & cheaper foliage)
+* [ ] GL 3.3 → 4.3 upgrade (context bump done; feature adoption trigger-gated — see Docs/Roadmaps/GL4_UPGRADE.md)
 * [ ] Morph the add entity menu to resemble blender's (Shift + A)
 
 ## Optional

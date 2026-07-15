@@ -96,7 +96,15 @@ public class Engine : IWindowCallbacks
     private void InitializeOpenGL()
     {
         _gl = GL.GetApi(_window);
-        
+
+        // The driver may silently grant a different (usually higher, occasionally lower) context
+        // than WindowManager requested — logging what was actually negotiated catches that
+        // immediately instead of it surfacing later as a confusing GLSL/feature-availability bug.
+        unsafe
+        {
+            Console.WriteLine($"[Engine] GL: {_gl.GetStringS(GLEnum.Version)} | {_gl.GetStringS(GLEnum.Renderer)}");
+        }
+
         var c = _config.Window.ClearColor;
         _gl.ClearColor(c[0], c[1], c[2], c[3]);
         
