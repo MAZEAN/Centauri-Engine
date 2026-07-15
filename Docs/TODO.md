@@ -54,6 +54,7 @@
 * [ ] Local-light shadows
 * [ ] Better clouds
 * [ ] wind (hierarchy) & leaves (orientation)
+* [ ] GL 3.3 → 4.3 upgrade (enables clustered lighting, GPU particles & cheaper foliage)
 
 ## Optional
 * [ ] Hosek-Wilkie sky algorithm

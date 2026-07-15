@@ -169,7 +169,8 @@ public sealed class EntityInspectorSection : ISection
         if (_entitySetLoader.GetMaterialId(e) is not { } materialId) return;
 
         var idx = Array.IndexOf(materialIds, materialId);
-        if (idx >= 0) _selectedMaterial = idx;
+        if (idx >= 0) 
+            _selectedMaterial = idx;
     }
 
     // AO isn't checked here — ResourceSystem.LoadMaterial always assigns it a fallback
