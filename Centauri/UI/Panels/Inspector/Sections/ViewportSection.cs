@@ -30,6 +30,7 @@ public sealed class ViewportSection : ISection
         Widgets.CheckRow("Anisotropic",     _config.AnisotropicFilter, v => _config.AnisotropicFilter = v);
         Widgets.CheckRow("Bounding Boxes",  _config.ShowBoundingBoxes, v => _config.ShowBoundingBoxes = v);
         Widgets.CheckRow("Spatial Grid",    _config.ShowCullingGrid,   v => _config.ShowCullingGrid   = v);
+        Widgets.CheckRow("Physics Colliders", _config.ShowPhysicsColliders, v => _config.ShowPhysicsColliders = v);
         Widgets.CheckRow("Cameras",         _config.ShowCameras,       v => _config.ShowCameras       = v);
         Widgets.CheckRow("Frustums",        _config.ShowFrustums,      v => _config.ShowFrustums      = v);
     }

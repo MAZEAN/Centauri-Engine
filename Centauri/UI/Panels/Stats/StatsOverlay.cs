@@ -117,6 +117,17 @@ public class StatsOverlay
             Row("Two-Sided", $"{stats.TwoSidedEntities}/{stats.RenderableEntities} ({Widgets.Float(stats.TwoSidedPercent)} %)");
         }, defaultOpen:false);
         
+        if (_config.Physics.Enabled)
+        {
+            Section("Physics", ColorPalette.Green, () =>
+            {
+                Row("Dynamic Bodies", stats.PhysicsDynamicBodies.ToString());
+                Row("Static Bodies",  stats.PhysicsStaticBodies.ToString());
+                Row("Steps/Frame",    stats.PhysicsStepsThisFrame.ToString());
+                Row("Step Time",      $"{Widgets.Float(stats.PhysicsStepMsThisFrame, 3)} ms");
+            }, defaultOpen:false);
+        }
+
         var cam = scene.Cameras.Active;
         Section("Camera", ColorPalette.Red, () =>
         {

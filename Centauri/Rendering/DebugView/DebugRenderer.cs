@@ -9,6 +9,7 @@ using Config;
 using Graphics.Geometry;
 using Utils.Geometry;
 using Culling;
+using Simulation.Physics;
 
 public sealed class DebugRenderer : IDisposable
 {
@@ -16,6 +17,7 @@ public sealed class DebugRenderer : IDisposable
     private const float FaceAlpha     = 0.05f; // translucency of AABB side faces
     private const float GridFaceAlpha = 0.01f;   // translucent fill on cells in view this frame
     private const float GridFaceSelectedAlpha = 0.05f;   // translucent fill on cells in view this frame
+    private const float VelocityVectorScale   = 0.25f;  // world units drawn per 1 m/s of LinearVelocity
     
     private readonly AppConfig _config;
     private readonly Draw _draw;
@@ -96,6 +98,47 @@ public sealed class DebugRenderer : IDisposable
         }
     }
     
+    // Wireframe box/sphere per registered RigidBody (magenta = Dynamic, blue = Static — see
+    // ColorPalette), plus a yellow arrow for a Dynamic body's current LinearVelocity, scaled by
+    // VelocityVectorScale. The collider shape mirrors PhysicsSystem.Register's own
+    // HalfExtents/CenterOffset math exactly (that's where those fields are written), so this
+    // always draws what the simulation is actually colliding against, not an approximation of it.
+    public void DrawPhysicsColliders(Scene scene)
+    {
+        AssertActive();
+        if (!_config.Debug.ShowPhysicsColliders) return;
+
+        Span<Vector3> corners = stackalloc Vector3[8];
+        foreach (var entity in scene.Entities)
+        {
+            if (entity.GetComponent<RigidBody>() is not { Registered: true } rb) continue;
+
+            var t      = entity.Transform;
+            var center = t.Position + Vector3.Transform(rb.CenterOffset, t.Rotation);
+            var color  = rb.Kind == BodyKind.Static ? ColorPalette.PhysicsStatic : ColorPalette.PhysicsDynamic;
+
+            _draw.Color(color);
+            if (rb.Shape == BodyShape.Sphere)
+            {
+                _draw.Model(Matrix4x4.CreateTranslation(center));
+                _draw.Lines(Shapes.SphereEdges(rb.HalfExtents.X));
+            }
+            else
+            {
+                _draw.Model(Matrix4x4.CreateFromQuaternion(t.Rotation) * Matrix4x4.CreateTranslation(center));
+                new BoundingBox(-rb.HalfExtents, rb.HalfExtents).GetBoxCorners(corners);
+                _draw.Lines(Shapes.BoxEdges(corners));
+            }
+
+            if (rb.Kind != BodyKind.Dynamic || rb.LinearVelocity.LengthSquared() < 1e-6f) continue;
+
+            _draw.Model(Matrix4x4.Identity);
+            _draw.Color(ColorPalette.PhysicsVelocity);
+            var tip = center + rb.LinearVelocity * VelocityVectorScale;
+            _draw.Lines([center.X, center.Y, center.Z, tip.X, tip.Y, tip.Z]);
+        }
+    }
+
     public void DrawSelection(Scene scene)
     {
         AssertActive();

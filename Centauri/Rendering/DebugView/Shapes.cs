@@ -31,6 +31,33 @@ internal static class Shapes
     public static float[] BoxEdges(ReadOnlySpan<Vector3> corners) => Expand(corners, EdgeIndices);
     public static float[] BoxFaces(ReadOnlySpan<Vector3> corners) => Expand(corners, FaceIndices);
 
+    // Three orthogonal great circles (XY/XZ/YZ), local space and unrotated — a sphere reads the
+    // same from every angle, so unlike BoxEdges this needs no per-instance corner computation;
+    // callers just translate a Model matrix to the collider's world centre. GL_LINES layout
+    // (Draw.Lines), same as BoxEdges.
+    public static float[] SphereEdges(float radius, int segments = 24)
+    {
+        var v = new float[segments * 2 * 3 * 3]; // 3 circles * segments segments * 2 verts * 3 floats
+        var i = 0;
+
+        void Circle(Func<float, Vector3> point)
+        {
+            for (var s = 0; s < segments; s++)
+            {
+                var p0 = point(MathF.Tau * s       / segments);
+                var p1 = point(MathF.Tau * (s + 1) / segments);
+                v[i++] = p0.X; v[i++] = p0.Y; v[i++] = p0.Z;
+                v[i++] = p1.X; v[i++] = p1.Y; v[i++] = p1.Z;
+            }
+        }
+
+        Circle(a => new Vector3(MathF.Cos(a) * radius, MathF.Sin(a) * radius, 0f));
+        Circle(a => new Vector3(MathF.Cos(a) * radius, 0f, MathF.Sin(a) * radius));
+        Circle(a => new Vector3(0f, MathF.Cos(a) * radius, MathF.Sin(a) * radius));
+
+        return v;
+    }
+
     private static float[] Expand(ReadOnlySpan<Vector3> corners, int[] indices)
     {
         var v = new float[indices.Length * 3];

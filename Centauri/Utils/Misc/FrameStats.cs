@@ -35,4 +35,10 @@ public struct FrameStats
     public int GridOccupied { get; set; }    // cells holding at least one entity
     public int GridVisited  { get; set; }    // cells touched by the camera query
     public int GridCells => GridColumns * GridRows;
+
+    // Physics (SimulationSystem.PhysicsSystem — see Docs/Documentation/PhysicsEngine.md)
+    public int   PhysicsDynamicBodies   { get; set; }
+    public int   PhysicsStaticBodies    { get; set; }
+    public int   PhysicsStepsThisFrame  { get; set; }   // fixed steps the accumulator spent this frame
+    public float PhysicsStepMsThisFrame { get; set; }   // summed BEPU Timestep() cost across them
 }

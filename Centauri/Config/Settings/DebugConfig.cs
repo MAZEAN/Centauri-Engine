@@ -19,6 +19,7 @@ public class DebugConfig
     [JsonPropertyName("showCameras")]       public bool ShowCameras       { get; set; } = false;
     [JsonPropertyName("showGrid")]          public bool ShowGrid          { get; set; } = false;
     [JsonPropertyName("showCullingGrid")]   public bool ShowCullingGrid   { get; set; } = false;
+    [JsonPropertyName("showPhysicsColliders")] public bool ShowPhysicsColliders { get; set; } = false;
     [JsonPropertyName("showStatsOverlay")]  public bool ShowStatsOverlay  { get; set; } = true;
     [JsonPropertyName("showSkybox")]        public bool ShowSkybox        { get; set; } = true;
     [JsonPropertyName("showGPUTimings")]    public bool ShowGPUTimings    { get; set; } = true;

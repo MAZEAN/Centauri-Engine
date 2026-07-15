@@ -123,7 +123,39 @@ BEPU is stepped **single-threaded** (`Timestep(dt)` with no `IThreadDispatcher`)
 dependency-free. Scenes here are small; a thread dispatcher is the drop-in upgrade if body counts
 ever make the step the bottleneck (and pairs naturally with the GL 4.3 work).
 
-## 5. Verify it
+## 5. Inspecting physics at runtime
+
+### Stats Overlay
+
+With `physics.enabled = true`, the Stats Overlay (top-left, toggle in the Viewport section or via
+`debug.showStatsOverlay`) gets a **Physics** section (collapsed by default, like Culling/Shadows):
+dynamic/static body counts and the fixed-step cost for the current frame (`Steps/Frame` — normally 1,
+higher after a hitch, 0 below `timestepHz`'s period; `Step Time` — the summed `Simulation.Timestep()`
+cost across them). The section is hidden entirely when physics is off rather than showing stale zeros.
+
+### Per-entity live values (Inspector)
+
+The Inspector's **Physics** section (§3) grows a **Live** block under Mass for `Dynamic` bodies:
+`Velocity`, `Angular Vel.`, and `Acceleration` — each shown as both the raw vector and its magnitude.
+These are read straight off `RigidBody.LinearVelocity`/`AngularVelocity`/`LinearAcceleration`
+(`Simulation/Physics/RigidBody.cs`), refreshed every fixed step by `PhysicsSystem.StepFixed`.
+`LinearVelocity`/`AngularVelocity` come directly from the BEPU body; `LinearAcceleration` is a
+finite difference (`ΔLinearVelocity / fixedDt`) since BEPU doesn't expose acceleration as a native
+quantity — for a body only under gravity this settles near the configured `Gravity` vector, and a
+landing impact shows up as a large transient spike the step it happens.
+
+### Viewport collider visualization
+
+Viewport section → **Physics Colliders** (`debug.showPhysicsColliders`, off by default) draws a
+wireframe box or sphere over every registered `RigidBody`, sized and oriented exactly as
+`PhysicsSystem.Register` actually built it (magenta = `Dynamic`, blue = `Static`), plus a yellow
+arrow along a `Dynamic` body's current `LinearVelocity`. Lives in `DebugRenderer.DrawPhysicsColliders`
+alongside the existing AABB/culling-grid/frustum overlays — same on/off toggle pattern, same
+immediate-mode line drawer (`Draw`/`Shapes`). Useful for confirming a collider actually matches the
+visual mesh (a Sphere shape on a long thin model, for instance, is easy to get wrong silently — see
+§7's "no collider-size feedback" note this closes).
+
+## 6. Verify it
 
 There's no in-engine test project, but the standalone-harness pattern from `CLAUDE.md` exercises the
 whole path with no GL context — a console app referencing `Centauri.csproj`. llvmpipe headless
@@ -143,8 +175,16 @@ Covered so far:
   produces a `RigidBody` with the expected `Kind`/`Shape`/`Mass`.
 - The full engine still boots and shuts down cleanly headless (`CENTAURI_HEADLESS_FRAMES`) with
   `physics.enabled = true` and the inspector's Physics section compiled in.
+- Mid-fall, `LinearVelocity.Y` is substantially negative and `LinearAcceleration.Y` sits near the
+  configured gravity (`-9.81`); at rest, `LinearVelocity` decays back to ~0 — confirms §5's Inspector
+  readout isn't just wired up but actually tracks real simulated motion.
+- `SimulationSystem.PhysicsDynamicBodies`/`PhysicsStaticBodies` match the bodies actually registered.
+- A modelless entity-set scene (`components: [{ "type": "rigidBody", ... }]`, no `"model"`) with
+  `debug.showPhysicsColliders = true` runs 90 headless frames without crashing, and the captured
+  screenshot shows correctly-shaped box/sphere wireframes at the falling bodies' live positions —
+  confirms the collider debug-draw path (§5) end to end, GL calls included, not just that it compiles.
 
-## 6. Known limitations / next steps
+## 7. Known limitations / next steps
 
 Deliberately scoped as a foundation. In rough priority order:
 
@@ -158,7 +198,6 @@ Deliberately scoped as a foundation. In rough priority order:
   as that existing tradeoff, not an additional one.
 - **Single friction/bounce material** — `NarrowPhaseCallbacks` uses one global material. Per-material
   friction/restitution would key off `CollidableReference` here.
-- **No collider-size feedback in the inspector** — Box/Sphere half-extents are derived from the
-  model's bounds silently; there's no on-screen gizmo showing what shape actually got built, unlike
-  the debug renderer's AABB/culling-grid overlays (`DebugRenderer.DrawAllAABBs`). Worth adding
-  alongside those once bodies are common enough in a scene to need visually auditing.
+- **No angular-velocity or torque authoring** — the inspector edits Kind/Shape/Mass but there's no way
+  to give a body initial spin or apply an impulse from the editor; `AngularVelocity` is readable (§5)
+  but not writable outside code.

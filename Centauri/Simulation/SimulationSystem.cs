@@ -3,6 +3,7 @@ namespace Centauri.Simulation;
 using World;
 using Config;
 using Physics;
+using Rendering.Profiling;
 
 // Advances scene state each frame. Component behaviour (animation, day/night) runs once per rendered
 // frame on the real frame delta; rigid-body physics runs on a *fixed* timestep decoupled from the
@@ -17,6 +18,15 @@ public sealed class SimulationSystem : IDisposable
     private PhysicsSystem? _physics;
     private float          _accumulator;
 
+    // Per-frame physics stats for the Stats Overlay's "Physics" section (see PhysicsEngine.md).
+    // Body counts read straight from _physics; steps/ms are frame-local (reset every Update call)
+    // since a hitch can make one rendered frame cover several fixed steps, or — below timestepHz's
+    // period — zero.
+    public int   PhysicsDynamicBodies   => _physics?.DynamicBodyCount ?? 0;
+    public int   PhysicsStaticBodies    => _physics?.StaticBodyCount  ?? 0;
+    public int   PhysicsStepsThisFrame  { get; private set; }
+    public float PhysicsStepMsThisFrame { get; private set; }
+
     public SimulationSystem(AppConfig config)
     {
         _config = config;
@@ -29,7 +39,14 @@ public sealed class SimulationSystem : IDisposable
         TickComponents(scene, dt);
 
         if (_config.Physics.Enabled)
+        {
             StepPhysics(scene, dt);
+        }
+        else
+        {
+            PhysicsStepsThisFrame  = 0;
+            PhysicsStepMsThisFrame = 0f;
+        }
     }
 
     private static void TickComponents(Scene scene, float dt)
@@ -48,6 +65,8 @@ public sealed class SimulationSystem : IDisposable
     // ties simulation behaviour to frame rate.
     private void StepPhysics(Scene scene, float dt)
     {
+        using var _ = Tracy.Scope("Physics");
+
         _physics ??= new PhysicsSystem(_config.Physics);
         _physics.Sync(scene);
 
@@ -56,13 +75,18 @@ public sealed class SimulationSystem : IDisposable
 
         _accumulator += dt;
 
-        var steps = 0;
+        var steps    = 0;
+        var stepMs   = 0f;
         while (_accumulator >= fixedDt && steps < maxSteps)
         {
             _physics.StepFixed(fixedDt);
+            stepMs       += _physics.LastStepMs;
             _accumulator -= fixedDt;
             steps++;
         }
+
+        PhysicsStepsThisFrame  = steps;
+        PhysicsStepMsThisFrame = stepMs;
 
         // If we bailed out on the step cap (a hitch), drop the unspent backlog rather than carry it —
         // and keep the interpolation fraction in [0,1) either way.

@@ -34,10 +34,34 @@ public sealed class RigidBody : Component
     // edit made after the initial registration (e.g. from the inspector's Physics section).
     public void MarkDirty() => Dirty = true;
 
+    // ---- Read-only physical state, updated every fixed step by PhysicsSystem.StepFixed ----
+    // (Dynamic bodies only — a Static body never moves, so these stay at their zero default.)
+    // For display (inspector "Physics" section) rather than gameplay use: querying BEPU's own
+    // BodyReference.Velocity directly would need the same live-simulation access the World/scene
+    // layer deliberately doesn't have (see the class comment) — mirroring it here keeps that
+    // boundary intact.
+
+    // World-space linear velocity in m/s, read straight from the BEPU body each fixed step.
+    public Vector3 LinearVelocity { get; internal set; }
+
+    // World-space angular velocity in rad/s.
+    public Vector3 AngularVelocity { get; internal set; }
+
+    // Finite-difference (ΔLinearVelocity / fixedDt) between this step and the previous one — not a
+    // BEPU-native quantity, so it's derived here rather than read off the body. For a body only
+    // under gravity this settles near the configured Gravity vector; a landing impact shows up as a
+    // large transient spike the step it happens, then drops back once resting.
+    public Vector3 LinearAcceleration { get; internal set; }
+
     // ---- Runtime state owned by PhysicsSystem (do not set from gameplay code) ----
 
     internal bool Registered;
     internal bool Dirty;
+
+    // Local (unrotated) collider half-extents PhysicsSystem last built the body with — Box's own
+    // XYZ half-extents, or Sphere's radius broadcast to all three components. Debug-draw only
+    // (DebugRenderer.DrawPhysicsColliders); not touched by gameplay code.
+    internal Vector3 HalfExtents;
 
     // Local offset from the Transform origin to the collision-shape centre (model bounds are not
     // necessarily centred on the origin). Kept unrotated; PhysicsSystem rotates it per-frame so the

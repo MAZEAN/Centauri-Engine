@@ -164,6 +164,18 @@ public class RenderingSystem : IDisposable
         _context.Stats.FrameTime = _frameTime.FrameTime;
     }
 
+    // Engine.OnUpdate calls this right after SimulationSystem.Update, so the Stats Overlay's
+    // "Physics" section reflects the frame that was just simulated rather than lagging a frame
+    // behind. FrameStats itself has no other producer outside RenderingSystem, hence the setter
+    // rather than exposing _context.Stats for direct mutation.
+    public void SetPhysicsStats(int dynamicBodies, int staticBodies, int steps, float stepMs)
+    {
+        _context.Stats.PhysicsDynamicBodies   = dynamicBodies;
+        _context.Stats.PhysicsStaticBodies    = staticBodies;
+        _context.Stats.PhysicsStepsThisFrame  = steps;
+        _context.Stats.PhysicsStepMsThisFrame = stepMs;
+    }
+
     public void Render(Scene scene, float deltaTime)
     {
         Tracy.Enabled = _config.Debug.TracyEnabled;
@@ -333,6 +345,7 @@ public class RenderingSystem : IDisposable
             _debugRenderer.DrawCameras(scene);
             _debugRenderer.DrawAllAABBs(scene, scene.Cameras.Primary.Frustum);
             _debugRenderer.DrawCullingGrid(scene, _context.Culling.Grid);
+            _debugRenderer.DrawPhysicsColliders(scene);
             _debugRenderer.DrawSelection(scene);
             
             _debugRenderer.End();

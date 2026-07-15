@@ -132,6 +132,9 @@ public class Engine : IWindowCallbacks
         _shaderHotReload?.Poll();
         _inputSystem.Update(delta);
         _simulation.Update(_scene, delta);
+        _renderingSystem.SetPhysicsStats(
+            _simulation.PhysicsDynamicBodies, _simulation.PhysicsStaticBodies,
+            _simulation.PhysicsStepsThisFrame, _simulation.PhysicsStepMsThisFrame);
         _renderingSystem.Update(delta);
     }
 

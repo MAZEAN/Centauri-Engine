@@ -297,6 +297,22 @@ public sealed class EntityInspectorSection : ISection
             rb.MarkDirty();
             _entitySetLoader.SyncRigidBodyDefinition(e, rb);
         }, 0.05f, 0.001f, 10000f, "%.3f kg", 1f);
+
+        // Live physical state — read straight off RigidBody, refreshed every fixed step by
+        // PhysicsSystem.StepFixed (Vector, then magnitude for a quick at-a-glance read). All zero
+        // until physics.enabled and the first Sync() registers the body.
+        ImGui.Spacing();
+        ImGui.TextDisabled("Live");
+        ReadOnlyRow("Velocity",     $"{Widgets.Vec3(rb.LinearVelocity)}  ({Widgets.Float(rb.LinearVelocity.Length())} m/s)");
+        ReadOnlyRow("Angular Vel.", $"{Widgets.Vec3(rb.AngularVelocity)}  ({Widgets.Float(rb.AngularVelocity.Length())} rad/s)");
+        ReadOnlyRow("Acceleration", $"{Widgets.Vec3(rb.LinearAcceleration)}  ({Widgets.Float(rb.LinearAcceleration.Length())} m/s²)");
+    }
+
+    private static void ReadOnlyRow(string label, string value)
+    {
+        ImGui.TextUnformatted(label);
+        ImGui.SameLine();
+        ImGui.TextDisabled(value);
     }
 
     private static void EditMaterial(Entity e, Scene scene, int index, Action<Material> apply)

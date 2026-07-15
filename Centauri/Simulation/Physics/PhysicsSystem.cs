@@ -1,5 +1,6 @@
 namespace Centauri.Simulation.Physics;
 
+using System.Diagnostics;
 using System.Numerics;
 
 using BepuPhysics;
@@ -37,6 +38,11 @@ public sealed class PhysicsSystem : IDisposable
     // component simply stops showing up when walking scene.Entities.
     private readonly Dictionary<Entity, RigidBody> _byEntity = new();
     private int _lastPurgeRevision = -1;
+
+    // Stats surfaced to SimulationSystem for the Stats Overlay's "Physics" section — see §PhysicsEngine.md.
+    public int   DynamicBodyCount => _tracked.Count;
+    public int   StaticBodyCount  => _statics.Count;
+    public float LastStepMs       { get; private set; }
 
     public int BodyCount => _tracked.Count;
 
@@ -121,6 +127,12 @@ public sealed class PhysicsSystem : IDisposable
         halfExtents     = Vector3.Max(halfExtents, new Vector3(1e-3f)); // no degenerate colliders
         rb.CenterOffset = (bounds?.Center ?? Vector3.Zero) * scale;
 
+        // Sphere collapses to a single radius (the largest axis) — broadcast to all three so
+        // DrawPhysicsColliders doesn't need to know which shape it's looking at to read this.
+        rb.HalfExtents = rb.Shape == BodyShape.Sphere
+            ? new Vector3(MathF.Max(halfExtents.X, MathF.Max(halfExtents.Y, halfExtents.Z)))
+            : halfExtents;
+
         var bodyPosition    = transform.Position + Vector3.Transform(rb.CenterOffset, transform.Rotation);
         var bodyOrientation = transform.Rotation;
 
@@ -181,7 +193,9 @@ public sealed class PhysicsSystem : IDisposable
     }
 
     // Advances the simulation by exactly one fixed step. Snapshots the previous pose first so
-    // Interpolate() can blend toward the freshly-integrated one.
+    // Interpolate() can blend toward the freshly-integrated one. Also refreshes each dynamic body's
+    // Linear/AngularVelocity and the finite-difference LinearAcceleration — read by the inspector's
+    // Physics section and (for LastStepMs) the Stats Overlay's Physics section.
     public void StepFixed(float dt)
     {
         foreach (var rb in _tracked)
@@ -190,15 +204,23 @@ public sealed class PhysicsSystem : IDisposable
             rb.PrevRotation = rb.CurrRotation;
         }
 
+        var sw = Stopwatch.StartNew();
         _simulation.Timestep(dt);
+        LastStepMs = (float)sw.Elapsed.TotalMilliseconds;
 
         foreach (var rb in _tracked)
         {
-            var pose = _simulation.Bodies[_dynamics[rb]].Pose;
+            var body = _simulation.Bodies[_dynamics[rb]];
+            var pose = body.Pose;
             rb.CurrRotation = pose.Orientation;
             // Undo the centre offset applied at registration so the Transform origin, not the
             // collider centre, is what we write back.
             rb.CurrPosition = pose.Position - Vector3.Transform(rb.CenterOffset, pose.Orientation);
+
+            var linearVelocity = body.Velocity.Linear;
+            rb.LinearAcceleration = (linearVelocity - rb.LinearVelocity) / dt;
+            rb.LinearVelocity     = linearVelocity;
+            rb.AngularVelocity    = body.Velocity.Angular;
         }
     }
 
