@@ -28,7 +28,6 @@ public sealed class EntityInspectorSection : ISection
     // Lazily built once (the registry doesn't change at runtime) — see HierarchyPanel's
     // identical pattern for the "+ Add" model/material pickers.
     private string[]? _materialIds;
-    private int _selectedMaterial;
 
     public EntityInspectorSection(ResourceSystem resourceSystem, EntitySetLoader entitySetLoader)
     {
@@ -148,7 +147,6 @@ public sealed class EntityInspectorSection : ISection
         using var s = Widgets.Section("Material");
         if (!s.Open) return;
 
-        DrawMaterialPicker(e);
         Widgets.Vec2Row("UV Scale",  e.UvScale,  v => e.UvScale  = v, 0.01f);
         Widgets.Vec2Row("UV Offset", e.UvOffset, v => e.UvOffset = v, 0.01f);
 
@@ -163,7 +161,11 @@ public sealed class EntityInspectorSection : ISection
             ImGui.PopStyleColor();
         }
 
-        ImGui.Spacing();
+        // Per-slot ids, not lazily cached like the raw registry list below — which *entity* (and
+        // therefore which slot currently points at which id) changes with selection, unlike the
+        // registry itself. Cheap: a handful of slots, recomputed once per open-section draw.
+        var materialIds = _materialIds ??= _resourceSystem.MaterialIds.ToArray();
+        var slotIds = _entitySetLoader.GetMaterialIdsPerSlot(e);
 
         for (var i = 0; i < e.Materials.Count; i++)
         {
@@ -172,7 +174,22 @@ public sealed class EntityInspectorSection : ISection
 
             ImGui.PushID(i);
 
-            SyncSelectedMaterial(e);
+            // One visually distinct sub-header per mesh slot (the mesh's own name from the source
+            // file when it has one, e.g. "Bark"/"Leaves" for a tree — falls back to a slot number
+            // for code-generated or unnamed meshes) — this, plus the per-slot picker right under
+            // it, is what makes a multi-material entity's slots (a tree's bark vs. leaves, say)
+            // actually distinguishable and independently editable, rather than one undifferentiated
+            // block of property rows with no indication which slot they belong to.
+            var meshName = e.Model != null && i < e.Model.Meshes.Count ? e.Model.Meshes[i].Name : "";
+            ImGui.SeparatorText(string.IsNullOrEmpty(meshName) ? $"Slot {i}" : meshName);
+
+            if (materialIds.Length > 0)
+            {
+                var selected = slotIds[i] is { } id ? Math.Max(0, Array.IndexOf(materialIds, id)) : 0;
+                if (Widgets.ComboRow("Asset", ref selected, materialIds))
+                    _entitySetLoader.SetMaterialSlot(e, index, materialIds[selected]);
+            }
+
             Widgets.ColorRow4("Base Color", mat.Color, v => EditMaterial(e, scene, index, m => m.Color = v));
             Widgets.SliderRow("Roughness", mat.RoughnessScalar, v => EditMaterial(e, scene, index, m => m.RoughnessScalar = v), 0f, 1f, 0.5f);
             Widgets.SliderRow("Metallic",  mat.MetallicScalar,  v => EditMaterial(e, scene, index, m => m.MetallicScalar  = v), 0f, 1f, 0.1f);
@@ -204,33 +221,6 @@ public sealed class EntityInspectorSection : ISection
 
             ImGui.PopID();
         }
-    }
-
-    // Reassigns every mesh slot to a different material asset at once — see
-    // EntitySetLoader.SetMaterial for why this is uniform rather than per-slot. The per-slot
-    // rows below still work afterward, now tweaking whichever material was just applied. Applies
-    // immediately on selection (same as the Light Type combo below), not behind a separate
-    // confirm step.
-    private void DrawMaterialPicker(Entity e)
-    {
-        var materialIds = _materialIds ??= _resourceSystem.MaterialIds.ToArray();
-        if (materialIds.Length == 0) return;
-
-        if (Widgets.ComboRow("Material", ref _selectedMaterial, materialIds))
-            _entitySetLoader.SetMaterial(e, materialIds[_selectedMaterial]);
-    }
-
-    // Keeps _selectedMaterial pointed at whatever's actually authored on the entity, rather than
-    // whatever was last picked in a *different* entity's combo — otherwise switching selection
-    // shows index 0 (or the previous entity's index) until the user re-picks something.
-    private void SyncSelectedMaterial(Entity e)
-    {
-        var materialIds = _materialIds ??= _resourceSystem.MaterialIds.ToArray();
-        if (_entitySetLoader.GetMaterialId(e) is not { } materialId) return;
-
-        var idx = Array.IndexOf(materialIds, materialId);
-        if (idx >= 0) 
-            _selectedMaterial = idx;
     }
 
     // AO isn't checked here — ResourceSystem.LoadMaterial always assigns it a fallback

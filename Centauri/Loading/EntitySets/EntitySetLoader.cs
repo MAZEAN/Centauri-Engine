@@ -202,42 +202,88 @@ public class EntitySetLoader
         }
     }
 
-    // Reassigns every mesh slot on the entity to the given material id — a uniform "change
-    // material" rather than per-slot (an entity with multiple distinct materials per mesh can't
-    // have a single id round-trip each slot's own id independently; the schema only knows a
-    // material *asset's* id/path, not which id an already-resolved Material came from — see
-    // ToDefinition). Updates the tracked source so Save() persists the new binding as a plain
-    // "material" (clearing any prior multi-slot "materials" binding, since that's no longer what
-    // the live entity reflects) instead of silently reverting to the old material next load.
-    public void SetMaterial(Entity entity, string materialId)
+    // Reassigns exactly one mesh slot's material asset, leaving every other slot exactly as it
+    // was — the entity-level equivalent of EditMaterial's per-slot scalar edits below, but for
+    // swapping the *asset* itself rather than tweaking a property on the currently-assigned one.
+    // Rebuilds the entity's full per-slot id list (GetMaterialIdsPerSlot) so the other slots'
+    // *bindings* survive the round-trip through EntityDefinition even though only one changed;
+    // collapses back down to the compact singular "material" field when every slot ends up
+    // wanting the same id, so a simple single-material entity's saved JSON doesn't grow a
+    // needless full-length "materials" array just because one of its (identical) slots got
+    // re-picked.
+    public void SetMaterialSlot(Entity entity, int slotIndex, string materialId)
     {
-        var material = _resourceSystem.GetMaterial(materialId);
-        for (var i = 0; i < entity.Materials.Count; i++)
-            entity.SetMaterial(i, material);
+        if ((uint)slotIndex >= (uint)entity.Materials.Count) return;
+
+        entity.SetMaterial(slotIndex, _resourceSystem.GetMaterial(materialId));
 
         // ShaderBatcher.GetBatches caches its groupings by Scene.Revision — without this, a
         // swapped material never actually renders: the entity is still drawn against whichever
         // Batch it was grouped into before the swap, and DrawMesh shades from that Batch's own
         // captured Materials snapshot, not from re-reading entity.Materials each frame. Scalar
-        // property edits (EditMaterial below) don't need this because MakeMaterialUnique already
-        // calls it once, the first time a shared material is cloned — after that, further edits
-        // mutate the same (now-unique) instance in place, which the stale Batch snapshot already
-        // points at too. A full reference swap to a *different* Material has no such shared
-        // instance to fall back on, so every call needs its own rebuild.
+        // property edits (EditMaterial in the inspector) don't need this because
+        // MakeMaterialUnique already calls it once, the first time a shared material is cloned —
+        // after that, further edits mutate the same (now-unique) instance in place, which the
+        // stale Batch snapshot already points at too. A full reference swap to a *different*
+        // Material has no such shared instance to fall back on, so every call needs its own
+        // rebuild.
         _scene.MarkDirty();
 
         if (!_sources.TryGetValue(entity, out var source)) return;
 
-        source.Material  = materialId;
-        source.Materials = null;
+        var ids = GetMaterialIdsPerSlot(entity);
+        // A slot with no resolvable id at all (no binding anywhere in the chain — see
+        // GetMaterialIdsPerSlot) can't be represented in the schema's "materials" array, which
+        // only holds real ids; falling back to the id just picked is the least surprising choice
+        // (that slot was rendering the engine's flat-white DefaultMaterial before this edit
+        // anyway, so "changing" it here isn't a real content loss).
+        ids[slotIndex] = materialId;
+        for (var i = 0; i < ids.Length; i++)
+            ids[i] ??= materialId;
+
+        if (ids.Distinct().Count() == 1)
+        {
+            source.Material  = ids[0];
+            source.Materials = null;
+        }
+        else
+        {
+            source.Material  = null;
+            source.Materials = new MaterialBinding { Indexed = ids! };
+        }
     }
 
-    // The material id currently authored for this entity (kept in sync by SetMaterial above) —
-    // lets the inspector's material picker default to the entity's actual current selection
-    // instead of always starting at index 0. Null for untracked entities (e.g. the environment's
-    // own "sun") or ones with no single-id binding (multi-slot "materials", never set here).
-    public string? GetMaterialId(Entity entity) =>
-        _sources.TryGetValue(entity, out var source) ? source.Material : null;
+    // The material id currently authored for each of the entity's mesh slots, mirroring
+    // EntityFactory.ResolveMaterials's own binding-priority chain exactly (entity's own binding,
+    // else its singular "material", else the placed model's own default binding) but returning
+    // ids instead of resolved Material objects — used both to seed the inspector's per-slot
+    // combos and, in SetMaterialSlot above, to carry every *other* slot's current id forward into
+    // a freshly-rebuilt binding. A slot is null when nothing in the chain resolves it (falls back
+    // to ResourceSystem.DefaultMaterial at load time, which has no id of its own). Untracked
+    // entities (e.g. the environment's own "sun") return an all-null array.
+    public string?[] GetMaterialIdsPerSlot(Entity entity)
+    {
+        var count = entity.Materials.Count;
+        var ids = new string?[count];
+        if (!_sources.TryGetValue(entity, out var source)) return ids;
+
+        var modelDef = !string.IsNullOrEmpty(source.Model) ? _resourceSystem.GetModelDefinition(source.Model) : null;
+        var binding = source.Materials
+                      ?? (!string.IsNullOrEmpty(source.Material) ? new MaterialBinding { Indexed = [source.Material] } : null)
+                      ?? modelDef?.Materials;
+
+        for (var i = 0; i < count; i++)
+        {
+            var meshName = entity.Model?.Meshes[i].Name;
+            ids[i] = binding?.Named is { } named && !string.IsNullOrEmpty(meshName) && named.TryGetValue(meshName, out var byName)
+                ? byName
+                : binding?.Indexed is { Length: > 0 } indexed
+                    ? indexed[Math.Min(i, indexed.Length - 1)]
+                    : null;
+        }
+
+        return ids;
+    }
 
     // Keeps the tracked EntityDefinition's Components list in sync with a live RigidBody edit
     // (inspector "Physics" section: attach, detach, or change Kind/Shape/Mass) — the same
