@@ -50,7 +50,7 @@
 * [x] Improve tree models
 * [ ] Automated tests
 * [x] Scene save/serialization
-* [ ] Transform hierarchy in scene format
+* [x] Transform hierarchy in scene format (authoring foundation — see Docs/Documentation/TransformHierarchy.md; Outliner tree view / world-preserving reparent still open)
 * [x] Local-light shadows (spot only — see Docs/Documentation/LocalShadows.md)
 * [ ] Better clouds
 * [ ] wind (hierarchy) & leaves (orientation)

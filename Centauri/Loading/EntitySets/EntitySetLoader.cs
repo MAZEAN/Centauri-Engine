@@ -59,9 +59,46 @@ public class EntitySetLoader
         foreach (var (path, def) in definitions)
         {
             _knownFiles.Add(path);
+
+            // Two passes: every entity in the file must exist before any "parent" reference can
+            // resolve, since a child is free to appear earlier in the file than its parent (JSON
+            // array order isn't required to be a topological order) — see WireHierarchy.
+            var built = new List<(EntityDefinition def, Entity entity)>(def.Entities.Count);
             foreach (var e in def.Entities)
-                AddFromDefinition(e, path);
+                built.Add((e, AddFromDefinition(e, path)));
+
+            WireHierarchy(built);
         }
+    }
+
+    // Resolves each entity's "parent" (if any) against the other entities *from the same file*
+    // only — cross-file parenting isn't supported, since load order between files isn't a
+    // guaranteed topological order the way order within one file's own array is (EntitySetPaths
+    // load in config order, but a later file's entities may load before an earlier file's, e.g.
+    // via DefaultEntitySetPath). First match wins if names collide (names aren't required to be
+    // unique elsewhere in this schema either). Doesn't touch Position/Scale/Rotation — those stay
+    // exactly as authored, now interpreted as local-to-the-new-parent rather than local-to-world
+    // (see EntityDefinition.Parent's own comment).
+    private static void WireHierarchy(List<(EntityDefinition def, Entity entity)> built)
+    {
+        Dictionary<string, Entity>? byName = null;
+
+        foreach (var (def, entity) in built)
+        {
+            if (string.IsNullOrEmpty(def.Parent)) continue;
+
+            byName ??= BuildNameIndex(built);
+            if (byName.TryGetValue(def.Parent, out var parent))
+                entity.Transform.Parent = parent.Transform;
+        }
+    }
+
+    private static Dictionary<string, Entity> BuildNameIndex(List<(EntityDefinition def, Entity entity)> built)
+    {
+        var byName = new Dictionary<string, Entity>();
+        foreach (var (_, entity) in built)
+            byName.TryAdd(entity.Name, entity);   // first match wins on a name collision
+        return byName;
     }
 
     // Discards every entity *this loader* is responsible for and reloads from disk — an easy way
@@ -105,13 +142,15 @@ public class EntitySetLoader
                ?? throw new Exception($"Failed to deserialize entity set file: {path}");
     }
 
-    private void AddFromDefinition(EntityDefinition e, string sourcePath)
+    private Entity AddFromDefinition(EntityDefinition e, string sourcePath)
     {
         var entity = _factory.Build(e);
 
         _scene.AddEntity(entity);
         _sources[entity] = e;
         _fileOf[entity]  = sourcePath;
+
+        return entity;
     }
 
     // Adds a brand-new entity (no prior EntityDefinition) placing the given model id — the
@@ -136,6 +175,31 @@ public class EntitySetLoader
         _knownFiles.Add(_config.Render.DefaultEntitySetPath);
 
         return entity;
+    }
+
+    // Live re-parent from the Inspector's Hierarchy section. parent = null moves the entity to
+    // the scene root. Transform.Parent's own cycle guard (assigning an entity as its own
+    // descendant's ancestor) throws — caught here and reported as a no-op rather than propagating
+    // into the render loop, since the inspector can't easily pre-validate every combo selection
+    // against every other entity's current subtree before the user picks it. Position/Scale/
+    // Rotation are left exactly as they are — no world-position-preserving compensation, same as
+    // the load-time wiring (see EntityDefinition.Parent's comment); the entity visibly jumps if
+    // its local transform wasn't already authored relative to the new parent. Doesn't write
+    // source.Parent directly — ToDefinition re-derives it live from entity.Transform.Parent at
+    // Save() time instead of trusting a cached name here, since the live Transform graph is the
+    // actual source of truth (and could in principle be changed by something other than this
+    // method — a cached copy would just be one more thing that could drift out of sync).
+    public bool SetParent(Entity entity, Entity? parent)
+    {
+        try
+        {
+            entity.Transform.Parent = parent?.Transform;
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;   // would create a cycle — Transform.Parent already refused it
+        }
     }
 
     // Reassigns every mesh slot on the entity to the given material id — a uniform "change
@@ -208,9 +272,16 @@ public class EntitySetLoader
     }
 
     // Removes an entity the editor created/loaded — drops its save tracking too, so a deleted
-    // entity doesn't reappear on the next Save() of whichever file it belonged to.
+    // entity doesn't reappear on the next Save() of whichever file it belonged to. Any children
+    // are promoted to the scene root first (Transform.Parent = null) rather than cascade-deleted
+    // or left pointing at a disposed entity's Transform — Entity.Dispose() doesn't clear
+    // Transform, so a still-linked child would keep computing a valid (just orphaned-from-the-
+    // scene) WorldMatrix through it, which is more surprising than an explicit unparent.
     public void DeleteEntity(Entity entity)
     {
+        foreach (var child in entity.Transform.Children.ToList())
+            child.Parent = null;
+
         _scene.RemoveEntity(entity);
         entity.Dispose();
         _sources.Remove(entity);
@@ -257,7 +328,22 @@ public class EntitySetLoader
             Components = source.Components,
             TriplanarOverride      = source.TriplanarOverride,
             TriplanarScaleOverride = source.TriplanarScaleOverride,
+            Parent    = t.Parent is { } p ? FindTrackedOwner(p)?.Name : null,
         };
+    }
+
+    // Reverse lookup for ToDefinition: given a Transform known to be some tracked entity's
+    // Parent, find which entity that is, so it can be written back out by name (the schema has no
+    // other stable handle — see EntityDefinition.Parent). O(n) over tracked entities; fine at this
+    // engine's scene scale (same tradeoff Scene.Pick/FindComponent already make). Null if the
+    // parent is untracked here (e.g. the environment's own "sun" — parenting to it isn't
+    // supported, same as every other untracked-entity edge case in this loader).
+    private Entity? FindTrackedOwner(Transform transform)
+    {
+        foreach (var candidate in _sources.Keys)
+            if (ReferenceEquals(candidate.Transform, transform))
+                return candidate;
+        return null;
     }
 
     private static LightDefinition ToDefinition(Light l) => l switch
