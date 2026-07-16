@@ -177,13 +177,7 @@ public class MainRenderer : IDisposable
                 continue;
             }
 
-            _instances.Add(
-                new InstanceData(
-                    entity.Transform.WorldMatrix,
-                    entity.UvScale,
-                    entity.UvOffset
-                )
-           );
+            _instances.Add(new InstanceData(entity.Transform.WorldMatrix));
         }
 
         return _instances.Count;

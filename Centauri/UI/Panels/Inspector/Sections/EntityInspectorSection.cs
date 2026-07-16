@@ -147,20 +147,6 @@ public sealed class EntityInspectorSection : ISection
         using var s = Widgets.Section("Material");
         if (!s.Open) return;
 
-        Widgets.Vec2Row("UV Scale",  e.UvScale,  v => e.UvScale  = v, 0.01f);
-        Widgets.Vec2Row("UV Offset", e.UvOffset, v => e.UvOffset = v, 0.01f);
-
-        // UvScale/UvOffset only affect texture-sampled shading (fUv in the fragment shader) — a
-        // material with no bound texture maps has nothing for them to tile/shift, so dragging
-        // these does nothing visible even though it's working correctly. Flag that explicitly
-        // instead of leaving it looking broken.
-        if (!HasAnyTexture(e))
-        {
-            ImGui.PushStyleColor(ImGuiCol.Text, ImGui.GetStyle().Colors[(int)ImGuiCol.TextDisabled]);
-            ImGui.TextWrapped("No texture maps bound - UV mapping has no visible effect.");
-            ImGui.PopStyleColor();
-        }
-
         // Per-slot ids, not lazily cached like the raw registry list below — which *entity* (and
         // therefore which slot currently points at which id) changes with selection, unlike the
         // registry itself. Cheap: a handful of slots, recomputed once per open-section draw.
@@ -181,13 +167,32 @@ public sealed class EntityInspectorSection : ISection
             // actually distinguishable and independently editable, rather than one undifferentiated
             // block of property rows with no indication which slot they belong to.
             var meshName = e.Model != null && i < e.Model.Meshes.Count ? e.Model.Meshes[i].Name : "";
+            ImGui.PushStyleColor(ImGuiCol.Text, ColorPalette.White);
             ImGui.SeparatorText(string.IsNullOrEmpty(meshName) ? $"Slot {i}" : meshName);
+            ImGui.PopStyleColor();
 
             if (materialIds.Length > 0)
             {
                 var selected = slotIds[i] is { } id ? Math.Max(0, Array.IndexOf(materialIds, id)) : 0;
                 if (Widgets.ComboRow("Asset", ref selected, materialIds))
                     _entitySetLoader.SetMaterialSlot(e, index, materialIds[selected]);
+            }
+
+            // Per-slot, not entity-level — each mesh slot's texture tiles/shifts independently
+            // now (Material.UvScale/UvOffset, applied as a per-draw-call uniform — see
+            // ShaderUniformBinder.UploadMaterial), matching every other per-slot property below.
+            Widgets.Vec2Row("UV Scale",  mat.UvScale,  v => EditMaterial(e, scene, index, m => m.UvScale  = v), 0.01f);
+            Widgets.Vec2Row("UV Offset", mat.UvOffset, v => EditMaterial(e, scene, index, m => m.UvOffset = v), 0.01f);
+
+            // UvScale/UvOffset only affect texture-sampled shading (fUv in the fragment shader) —
+            // a slot with no bound texture maps has nothing for them to tile/shift, so dragging
+            // these does nothing visible even though it's working correctly. Flag that explicitly
+            // instead of leaving it looking broken.
+            if (!HasAnyTexture(mat))
+            {
+                ImGui.PushStyleColor(ImGuiCol.Text, ImGui.GetStyle().Colors[(int)ImGuiCol.TextDisabled]);
+                ImGui.TextWrapped("No texture maps bound - UV mapping has no visible effect.");
+                ImGui.PopStyleColor();
             }
 
             Widgets.ColorRow4("Base Color", mat.Color, v => EditMaterial(e, scene, index, m => m.Color = v));
@@ -226,14 +231,9 @@ public sealed class EntityInspectorSection : ISection
     // AO isn't checked here — ResourceSystem.LoadMaterial always assigns it a fallback
     // DefaultTexture when the .mat file doesn't set one, so it's never actually null (unlike
     // the other maps), and would defeat this check for every untextured material.
-    private static bool HasAnyTexture(Entity e)
-    {
-        foreach (var mat in e.Materials)
-            if (mat is { Albedo: not null } or { Normal: not null } or { Roughness: not null }
-                     or { Metallic: not null } or { Height: not null })
-                return true;
-        return false;
-    }
+    private static bool HasAnyTexture(Material mat) =>
+        mat is { Albedo: not null } or { Normal: not null } or { Roughness: not null }
+             or { Metallic: not null } or { Height: not null };
 
     private static void DrawLight(Entity e)
     {

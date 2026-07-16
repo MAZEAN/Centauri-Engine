@@ -111,6 +111,8 @@ public sealed class ShaderUniformBinder
         shader.SetUniform("uMetallicScalar",  mat.MetallicScalar);
         shader.SetUniform("uTranslucency",    mat.Translucency);
         shader.SetUniform("uColor",           mat.Color);
+        shader.SetUniform("uUvScale",         mat.UvScale);
+        shader.SetUniform("uUvOffset",        mat.UvOffset);
         shader.SetUniform("uFoliage",         mat.TwoSided ? 1 : 0);
         shader.SetUniform("uWind",            mat.Wind ? 1 : 0);
         shader.SetUniform("uTriplanar",       mat.Triplanar ? 1 : 0);

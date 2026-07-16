@@ -9,10 +9,14 @@ layout (location = 0) in vec3 vPos;
 layout (location = 1) in vec3 vNormal;
 layout (location = 2) in vec2 vUv;
 layout (location = 4) in mat4 iModel;   // per-instance world transform (occupies 4..7)
-layout (location = 8) in vec4 iUvScaleOffset; // xy = UV scale, zw = UV offset (match lit pass)
 
 uniform mat4 uView;
 uniform mat4 uProjection;
+
+// Per-material UV tiling — a uniform (set per submesh, see GeometryPrepass's own SetMeshState),
+// not a per-instance attribute. Must match the lit pass's uUvScale/uUvOffset.
+uniform vec2 uUvScale;
+uniform vec2 uUvOffset;
 
 uniform int   uWind;        // 1 = foliage sway (must match the lit/depth passes)
 uniform float uTime;        // seconds, latched once per frame
@@ -70,7 +74,7 @@ void main()
     vec3 worldN = normalize(normalMatrix * vNormal);
 
     vViewNormal = mat3(uView) * worldN;             // world -> view space
-    fUv         = vUv * iUvScaleOffset.xy + iUvScaleOffset.zw;
+    fUv         = vUv * uUvScale + uUvOffset;
 
     vec4 worldPos = iModel * vec4(vPos, 1.0);
     if (uWind == 1)

@@ -254,7 +254,7 @@ public sealed class SpotShadowMapper : IDisposable
                 groups[model] = list = new List<InstanceData>();
 
             _materials[model] = entity.Materials;
-            list.Add(new InstanceData(entity.Transform.WorldMatrix, entity.UvScale, entity.UvOffset));
+            list.Add(new InstanceData(entity.Transform.WorldMatrix));
         }
     }
 

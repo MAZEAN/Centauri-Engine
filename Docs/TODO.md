@@ -61,7 +61,6 @@
 * [ ] Hosek-Wilkie sky algorithm
 * [ ] Full raymarched volumetric clouds
 * [x] Replace MSAA
-* [ ] Link leaves to branches in the wind
 
 ---
 

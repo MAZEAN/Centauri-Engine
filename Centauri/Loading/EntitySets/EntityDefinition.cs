@@ -11,8 +11,6 @@ public class EntityDefinition
     [JsonPropertyName("position")] public float[] Position { get; set; } = [0f, 0f, 0f];
     [JsonPropertyName("scale")]    public float[] Scale    { get; set; } = [1f, 1f, 1f];
     [JsonPropertyName("rotation")] public float[]? Rotation { get; set; }
-    [JsonPropertyName("uvScale")]  public float[] UvScale  { get; set; } = [1f, 1f];
-    [JsonPropertyName("uvOffset")] public float[] UvOffset { get; set; } = [0f, 0f];
     [JsonPropertyName("enabled")]  public bool    Enabled  { get; set; } = true;
 
     [JsonPropertyName("light")]    public LightDefinition? Light { get; set; }

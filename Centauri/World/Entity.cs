@@ -15,9 +15,7 @@ public class Entity : IDisposable
     public bool    Enabled { get; set; } = true;
     public Model?  Model    { get; }
     public Light?  Light    { get; set; }
-    public Vector2 UvScale  { get; set; } = Vector2.One;
-    public Vector2 UvOffset { get; set; } = Vector2.Zero;
-    
+
     // Materials
     private readonly Material?[] _materials;
     private readonly bool[]      _ownsMaterial;   // per-submesh copy-on-write tracking

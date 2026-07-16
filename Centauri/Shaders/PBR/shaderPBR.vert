@@ -15,10 +15,15 @@ layout (location = 1) in vec3 vNormal;   // surface direction at vertex
 layout (location = 2) in vec2 vUv;       // texture coordinate
 layout (location = 3) in vec3 vTangent;  // tangent direction, for normal mapping
 layout (location = 4) in mat4 iModel;          // entity world transform (occupies 4..7)
-layout (location = 8) in vec4 iUvScaleOffset;
 
 uniform mat4 uView;         // camera transform — moves world relative to camera
 uniform mat4 uProjection;   // perspective — makes far things smaller
+
+// Per-material UV tiling (ShaderUniformBinder.UploadMaterial) — a uniform, not a per-instance
+// vertex attribute, so each mesh slot of a multi-material entity can tile independently. See
+// Material.UvScale/UvOffset's own comment.
+uniform vec2 uUvScale;
+uniform vec2 uUvOffset;
 
 uniform int   uWind;        // 1 = foliage sway (must match the prepass/depth passes)
 uniform float uTime;        // seconds, latched once per frame
@@ -81,7 +86,7 @@ void main()
     vec4 viewPos  = uView * worldPos;
     fViewDepth    = -viewPos.z;
 
-    fUv         = vUv * iUvScaleOffset.xy + iUvScaleOffset.zw;
+    fUv         = vUv * uUvScale + uUvOffset;
     fFragPos    = worldPos.xyz;
     fInstanceOrigin = iModel[3].xyz;
 

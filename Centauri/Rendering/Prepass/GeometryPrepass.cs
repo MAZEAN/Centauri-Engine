@@ -1,5 +1,6 @@
 namespace Centauri.Rendering.Prepass;
 
+using System.Numerics;
 using Silk.NET.OpenGL;
 
 using World;
@@ -90,7 +91,7 @@ public sealed class GeometryPrepass : IDisposable
         {
             if (!entity.Enabled || !culling.IsVisible(entity)) continue;
 
-            _instanceData.Add(new InstanceData(entity.Transform.WorldMatrix, entity.UvScale, entity.UvOffset));
+            _instanceData.Add(new InstanceData(entity.Transform.WorldMatrix));
         }
         
         if (_instanceData.Count == 0) return;
@@ -115,6 +116,10 @@ public sealed class GeometryPrepass : IDisposable
     private void SetMeshState(Material? material)
     {
         _shader.SetUniform("uWind", material is { Wind: true } ? 1 : 0);
+        // Must match the lit pass's own per-material UV tiling (ShaderUniformBinder.UploadMaterial)
+        // so this pass's depth/normal/material buffers sample alpha-tested foliage at the same UVs.
+        _shader.SetUniform("uUvScale",  material?.UvScale  ?? Vector2.One);
+        _shader.SetUniform("uUvOffset", material?.UvOffset ?? Vector2.Zero);
         BindMaterial(material);
         
         if (material is { TwoSided: true, Albedo: { } albedo })

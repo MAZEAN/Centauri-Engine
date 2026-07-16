@@ -19,6 +19,16 @@ public class Material
     public float MetallicScalar  { get; set; } = 0.1f;
     public float Translucency   { get; set; } = 0f;
 
+    // Per-material (via MakeMaterialUnique, same clone-on-write as every other field here) UV
+    // tiling — was previously a per-Entity property applied uniformly to every mesh slot through
+    // the instance buffer; moved here so a multi-material entity (e.g. a tree's bark vs. leaves)
+    // can tile each slot's texture independently, matching how every other per-slot property in
+    // this class already works. Applied in the vertex shader (fUv = vUv * uUvScale + uUvOffset)
+    // as a per-draw-call uniform now, not a per-instance vertex attribute — see
+    // ShaderUniformBinder.UploadMaterial and GeometryPrepass/ZPrepass's own SetMeshState.
+    public Vector2 UvScale  { get; set; } = Vector2.One;
+    public Vector2 UvOffset { get; set; } = Vector2.Zero;
+
     public bool TwoSided { get; set; } = false;
     public bool Wind { get; set; } = false;
 
@@ -57,6 +67,8 @@ public class Material
         RoughnessScalar = RoughnessScalar,
         MetallicScalar  = MetallicScalar,
         Translucency   = Translucency,
+        UvScale        = UvScale,
+        UvOffset       = UvOffset,
         TwoSided       = TwoSided,
         Wind           = Wind,
         Triplanar      = Triplanar,

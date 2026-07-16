@@ -36,10 +36,8 @@ public class EntityFactory
 
         return new Entity(model, materials, light)
         {
-            Name     = e.Name,
-            UvScale  = new Vector2(e.UvScale[0],  e.UvScale[1]),
-            UvOffset = new Vector2(e.UvOffset[0], e.UvOffset[1]),
-            Enabled  = e.Enabled
+            Name    = e.Name,
+            Enabled = e.Enabled
         };
     }
 

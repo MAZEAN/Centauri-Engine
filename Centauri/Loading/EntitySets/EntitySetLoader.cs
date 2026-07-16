@@ -367,8 +367,6 @@ public class EntitySetLoader
             Position  = [t.Position.X, t.Position.Y, t.Position.Z],
             Scale     = [t.Scale.X, t.Scale.Y, t.Scale.Z],
             Rotation  = [t.EulerAngles.X, t.EulerAngles.Y, t.EulerAngles.Z],
-            UvScale   = [entity.UvScale.X, entity.UvScale.Y],
-            UvOffset  = [entity.UvOffset.X, entity.UvOffset.Y],
             Enabled   = entity.Enabled,
             Light     = entity.Light is { } l ? ToDefinition(l) : null,
             Components = source.Components,

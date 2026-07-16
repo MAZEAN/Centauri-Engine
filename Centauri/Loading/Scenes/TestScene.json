@@ -11,8 +11,7 @@
       "material": "CobbleStoneFloor",
       "position": [-3, 1, 0],
       "scale":    [1, 0.2, 1],
-      "rotation": [0, 0, -45],
-      "uvScale":  [1.0, 0.4]
+      "rotation": [0, 0, -45]
     },
     {
       "name":     "Dragon",
@@ -24,8 +23,7 @@
       "model":    "Cube",
       "material": "ChessTiles",
       "position": [0, -2, 0],
-      "scale":    [100, 1, 100],
-      "uvScale":  [10.0, 10.0]
+      "scale":    [100, 1, 100]
     },
     { "name": "Tree1",
       "model": "Tree",

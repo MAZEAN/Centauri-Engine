@@ -73,7 +73,6 @@ public class Mesh : IDisposable
 
         for (uint col = 0; col < 4; col++)
             _vao.InstancedAttribute(4 + col, 4, InstanceData.Floats, (int)(col * 4)); // mat4 columns
-        _vao.InstancedAttribute(8, 4, InstanceData.Floats, 16);                       // uv scale/offset
 
         _gl.BindVertexArray(0);
         _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);

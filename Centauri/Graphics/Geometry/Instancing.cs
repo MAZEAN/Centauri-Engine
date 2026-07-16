@@ -4,22 +4,25 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using Silk.NET.OpenGL;
 
-// Per-instance vertex data streamed to the GPU for instanced draws: the world matrix
-// (consumed as a mat4 across attribute locations 4–7) plus UV tiling packed into a vec4
-// (location 8). Layout must match Mesh.ConfigureInstancing and shaderPBR.vert.
+// Per-instance vertex data streamed to the GPU for instanced draws: just the world matrix
+// (consumed as a mat4 across attribute locations 4–7). Layout must match
+// Mesh.ConfigureInstancing and shaderPBR.vert/zprepass.vert/prepass.vert.
+//
+// UV tiling used to live here too (a vec4 at location 8), but that made it a per-*instance*
+// value shared by every mesh slot of an entity — moved to Material.UvScale/UvOffset, uploaded as
+// a per-draw-call uniform instead (ShaderUniformBinder.UploadMaterial), so a multi-material
+// entity's slots can tile independently. See Material.cs's own comment on those fields.
 [StructLayout(LayoutKind.Sequential)]
 public readonly struct InstanceData
 {
-    public const int Floats = 20;               // mat4 (16) + vec4 (4)
+    public const int Floats = 16;               // mat4
     public const int Bytes  = Floats * sizeof(float);
 
     public readonly Matrix4x4 Model;
-    public readonly Vector4   UvScaleOffset;     // xy = scale, zw = offset
 
-    public InstanceData(Matrix4x4 model, Vector2 uvScale, Vector2 uvOffset)
+    public InstanceData(Matrix4x4 model)
     {
-        Model         = model;
-        UvScaleOffset = new Vector4(uvScale.X, uvScale.Y, uvOffset.X, uvOffset.Y);
+        Model = model;
     }
 }
 
