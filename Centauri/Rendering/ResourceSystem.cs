@@ -347,7 +347,9 @@ public class ResourceSystem : IDisposable
             Triplanar      = def.Triplanar,
             TriplanarScale = def.TriplanarScale,
             ParallaxScale  = def.ParallaxScale,
-            ParallaxEnabled = def.ParallaxEnabled
+            ParallaxEnabled = def.ParallaxEnabled,
+            UvScale  = def.UvScale  is { Length: 2 } s ? new Vector2(s[0], s[1]) : Vector2.One,
+            UvOffset = def.UvOffset is { Length: 2 } o ? new Vector2(o[0], o[1]) : Vector2.Zero,
         };
     }
 

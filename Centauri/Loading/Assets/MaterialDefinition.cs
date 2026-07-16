@@ -35,4 +35,16 @@ public class MaterialDefinition
     [JsonPropertyName("triplanarScale")] public float  TriplanarScale { get; set; } = 1f;
     [JsonPropertyName("parallaxScale")]  public float  ParallaxScale  { get; set; } = 0.05f;
     [JsonPropertyName("parallaxEnabled")] public bool  ParallaxEnabled { get; set; } = true;
+
+    // The material's own default UV tiling — was previously only settable per-entity
+    // (EntityDefinition.UvScale/UvOffset, removed once UV tiling moved to being a per-mesh-slot
+    // Material property; see Material.cs's own comment on why). This is the authorable
+    // replacement: a material asset's natural default tiling (e.g. a tileable floor texture
+    // wanting to repeat 10x across a large plane) belongs on the material, same as Color/
+    // RoughnessScalar/Triplanar above. An individual placement can still override it live via
+    // the Inspector's per-slot UV Scale/Offset rows (MakeMaterialUnique clone-on-write, same as
+    // every other per-slot scalar) — that override just isn't persisted back to this file yet,
+    // consistent with every other per-slot property edit.
+    [JsonPropertyName("uvScale")]  public float[]? UvScale  { get; set; }
+    [JsonPropertyName("uvOffset")] public float[]? UvOffset { get; set; }
 }
