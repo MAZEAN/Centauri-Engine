@@ -32,8 +32,11 @@ public sealed class PlanarReflectionSection : ISection
         
         Widgets.DragRow("Blur", _config.Blur, v => _config.Blur = v,
             0.05f, 0f, 8f, "%.2f", 3f);
-        
+
         Widgets.DragRow("Distortion", _config.Distortion, v => _config.Distortion = v,
             0.001f, 0f, 0.2f, "%.3f", 0f);
+
+        Widgets.DragRow("Max Roughness", _config.MaxRoughness, v => _config.MaxRoughness = v,
+            0.01f, 0f, 1f, "%.2f", 0.6f);
     }
 }

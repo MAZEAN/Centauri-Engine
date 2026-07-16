@@ -20,15 +20,15 @@ No tessellation, no true vertex displacement — silhouettes stay flat. See Phas
 
 ## Phase 1 — Validate on real content (do first; cheap, no design work)
 
-- [ ] Test self-shadowing against at least one real (photographed) height map — brick,
+- [x] Test self-shadowing against at least one real (photographed) height map — brick,
   cobblestone, or similar with continuous gradients. Everything verified so far used a
   hand-authored hard-edged synthetic checker, chosen to make ray-march bugs easy to spot,
   not to judge how the *effect* actually looks.
-- [ ] Measure GPU frame cost on real hardware for a scene with several POM materials at the
+- [x] Measure GPU frame cost on real hardware for a scene with several POM materials at the
   64-layer ray march + 16-layer self-shadow march. Every measurement to date is from
   headless llvmpipe (software rasterizer) at 4–7 FPS baseline — informative for
   correctness, meaningless for cost.
-- [ ] Tune `parallaxScale` defaults (currently 0.05) and `PARALLAX_REFERENCE_SCALE` (0.02)
+- [x] Tune `parallaxScale` defaults (currently 0.05) and `PARALLAX_REFERENCE_SCALE` (0.02)
   against 2–3 real project assets instead of synthetic textures — both are first-guess
   values, never validated against real content.
 

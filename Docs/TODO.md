@@ -26,6 +26,7 @@
 * [ ] Displacement mapping (Parallax Occlusion Mapping (POM)) + self-shadowing
 * [ ] Audio
 * [ ] Skeletal animation / skinning
+* [ ] Automated tests
 
 ## Enhancements
 
@@ -56,6 +57,8 @@
 * [ ] wind (hierarchy) & leaves (orientation)
 * [ ] GL 3.3 → 4.3 upgrade (context bump done; feature adoption trigger-gated — see Docs/Roadmaps/GL4_UPGRADE.md)
 * [ ] Morph the add entity menu to resemble blender's (Shift + A)
+* [ ] Skybox rotation (specifically night)
+* [ ] Make UI elements writeable not just draggable
 
 ## Optional
 * [ ] Hosek-Wilkie sky algorithm

@@ -48,6 +48,7 @@ public sealed class PlanarReflectionPass : IDisposable
     public float Intensity   => _config.Intensity;
     public float Distortion  => _config.Distortion;
     public float Blur        => _config.Blur;
+    public float MaxRoughness => _config.MaxRoughness;
 
     public PlanarReflectionPass(GL gl, PlanarReflectionConfig config, MainRenderer main,
         SkyboxRenderer skybox, uint width, uint height, uint samples)

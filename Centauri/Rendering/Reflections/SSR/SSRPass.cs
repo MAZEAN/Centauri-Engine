@@ -294,6 +294,7 @@ public sealed class SSRPass : IDisposable
         _resolve.SetUniform("uPlanarIntensity",  planar.Intensity);
         _resolve.SetUniform("uPlanarDistortion", planar.Distortion);
         _resolve.SetUniform("uPlanarBlur",       planar.Blur);
+        _resolve.SetUniform("uPlanarMaxRoughness", planar.MaxRoughness);
 
         Bind(TextureUnit.Texture0, _history[_write].ColorTextures[0]);
         Bind(TextureUnit.Texture1, gBuffer.Depth);

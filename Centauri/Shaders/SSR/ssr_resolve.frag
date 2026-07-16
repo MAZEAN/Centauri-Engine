@@ -6,6 +6,11 @@ out vec4 FragColor;
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Width of the roughness fade below uPlanarMaxRoughness. Planar is full-strength up to
+// (uPlanarMaxRoughness - band) and gone by uPlanarMaxRoughness.
+const float PLANAR_ROUGHNESS_FADE_BAND = 0.15;
+
+
 uniform sampler2D   uSsr;       // blurred reflection: rgb = reflected radiance, a = confidence
 uniform sampler2D   uDepth;     // prepass depth
 uniform sampler2D   uNormal;    // prepass view-space normal, encoded to [0,1]
@@ -40,6 +45,7 @@ uniform float     uPlanarHeight;
 uniform float     uPlanarIntensity;
 uniform float     uPlanarDistortion;
 uniform float     uPlanarBlur;
+uniform float     uPlanarMaxRoughness;   // planar fades out above this; rougher surfaces fall back to IBL
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -83,7 +89,14 @@ vec3 applyPlanar(vec3 targetSpec, vec3 worldPos, vec3 N, vec3 W, float roughness
     vec3  Nworld     = normalize(mat3(uInvView) * N);
     float heightMask = 1.0 - smoothstep(0.15, 0.35, abs(worldPos.y - uPlanarHeight));
     float faceMask   = smoothstep(0.7, 0.95, Nworld.y);
-    float planarMask = heightMask * faceMask;
+    // Planar is a sharp, single-mip mirror; only smooth reflectors (water / wet ground) should
+    // read it. Rough surfaces would show the full-detail sun disc and object silhouettes a
+    // prefiltered environment map correctly dissolves into a low-frequency glow — the tent blur
+    // below can't fake that convolution — so fade planar out with roughness and let those pixels
+    // keep the roughness-filtered IBL/probe/SSR reflection already in targetSpec.
+    float roughMask  = 1.0 - smoothstep(uPlanarMaxRoughness - PLANAR_ROUGHNESS_FADE_BAND,
+                                        uPlanarMaxRoughness, roughness);
+    float planarMask = heightMask * faceMask * roughMask;
     if (planarMask <= 0.0) return targetSpec;
 
     vec2 duv = Nworld.xz * uPlanarDistortion;   // 0 for a perfectly flat plane

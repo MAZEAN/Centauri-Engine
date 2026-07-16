@@ -270,7 +270,8 @@ public class RenderingSystem : IDisposable
             Height:     _planar.PlaneHeight,
             Intensity:  _planar.Intensity,
             Distortion: _planar.Distortion,
-            Blur:       _planar.Blur
+            Blur:       _planar.Blur,
+            MaxRoughness: _planar.MaxRoughness
         );
         return (iblInputs, planarInputs);
     }

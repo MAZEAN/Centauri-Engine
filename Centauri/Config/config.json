@@ -94,6 +94,7 @@
     "intensity": 1.0,
     "blur": 3.0,
     "distortion": 0.0,
+    "maxRoughness": 0.6,
     "halfResolution": true
   },
   "shadows": {

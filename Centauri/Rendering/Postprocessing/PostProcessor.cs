@@ -38,7 +38,8 @@ public readonly record struct PlanarResolveInputs (
     float Height,
     float Intensity,
     float Distortion,
-    float Blur
+    float Blur,
+    float MaxRoughness
 );
 
 public readonly record struct CompositeRequest(

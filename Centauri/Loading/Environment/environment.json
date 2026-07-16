@@ -21,7 +21,7 @@
   ],
   "skybox": [
     { "name": "Day", "panorama": "Assets/Textures/Sky/DaySky.exr", "exposure": 0.5, "blackLevel": 0.02, "active": true },
-    { "name": "Night", "panorama": "Assets/Textures/Sky/NightSky.exr", "exposure": 0.5, "blackLevel": 0.01, "active": false }
+    { "name": "Night", "panorama": "Assets/Textures/Sky/NightSkyV2.exr", "exposure": 0.5, "blackLevel": 0.01, "active": false }
   ],
   "sun": {
     "name":     "Sun",
