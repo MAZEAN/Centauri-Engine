@@ -181,8 +181,10 @@ public sealed class EntityInspectorSection : ISection
             // Per-slot, not entity-level — each mesh slot's texture tiles/shifts independently
             // now (Material.UvScale/UvOffset, applied as a per-draw-call uniform — see
             // ShaderUniformBinder.UploadMaterial), matching every other per-slot property below.
-            Widgets.Vec2Row("UV Scale",  mat.UvScale,  v => EditMaterial(e, scene, index, m => m.UvScale  = v), 0.01f);
-            Widgets.Vec2Row("UV Offset", mat.UvOffset, v => EditMaterial(e, scene, index, m => m.UvOffset = v), 0.01f);
+            Widgets.Vec2Row("UV Scale",  mat.UvScale,  v => EditMaterial(e, scene, index, m => m.UvScale  = v),
+                0.01f, "%.3f", Vector2.One);
+            Widgets.Vec2Row("UV Offset", mat.UvOffset, v => EditMaterial(e, scene, index, m => m.UvOffset = v),
+                0.01f, "%.3f", Vector2.Zero);
 
             // UvScale/UvOffset only affect texture-sampled shading (fUv in the fragment shader) —
             // a slot with no bound texture maps has nothing for them to tile/shift, so dragging

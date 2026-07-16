@@ -129,14 +129,20 @@ internal static class Widgets
     }
 
     // Single packed row (ImGui.DragFloat2), unlike Vec3Rows' three separate axis lines — right
-    // for a pair that's always edited together and doesn't need per-axis reset (UV scale/offset
-    // have no "Authored" baseline to reset to, unlike Transform).
-    public static void Vec2Row(string label, Vector2 v, Action<Vector2> set, float speed, string fmt = "%.3f")
+    // for a pair that's always edited together and doesn't need a per-axis reset, just a single
+    // whole-vector one (right-click, same gesture DragRow/SliderRow use) when a sensible baseline
+    // exists — e.g. Material.UvScale/UvOffset's own defaults (1,1)/(0,0), "no tiling override".
+    public static void Vec2Row(string label, Vector2 v, Action<Vector2> set, float speed, string fmt = "%.3f", Vector2? reset = null)
     {
         RowLabel(label);
 
         var id = "##" + label;
-        if (ImGui.DragFloat2(id, ref v, speed, 0f, 0f, fmt))
+        var changed = ImGui.DragFloat2(id, ref v, speed, 0f, 0f, fmt);
+
+        if (reset is { } r)
+            changed |= ResetMenu(id, ref v, r);
+
+        if (changed)
             set(v);
     }
 
@@ -197,15 +203,29 @@ internal static class Widgets
     
     private static bool ResetMenu(string id, ref float v, float reset)
     {
-        if (!ImGui.BeginPopupContextItem(id)) 
+        if (!ImGui.BeginPopupContextItem(id))
             return false;
-        
+
         var hit = ImGui.MenuItem("Reset");
-        if (hit) 
+        if (hit)
             v = reset;
-        
+
         ImGui.EndPopup();
-        
+
+        return hit;
+    }
+
+    private static bool ResetMenu(string id, ref Vector2 v, Vector2 reset)
+    {
+        if (!ImGui.BeginPopupContextItem(id))
+            return false;
+
+        var hit = ImGui.MenuItem("Reset");
+        if (hit)
+            v = reset;
+
+        ImGui.EndPopup();
+
         return hit;
     }
 
