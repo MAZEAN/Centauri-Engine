@@ -191,9 +191,21 @@ public class ResourceSystem : IDisposable
     }
 
     // Every model/material id this project's Assets/ knows about, for UI that lets you pick
-    // one to place (the Outliner's "add entity" flow) rather than typing a path/id by hand.
+    // one to place (the Outliner's "add entity" flow, the Inspector's per-slot material picker)
+    // rather than typing a path/id by hand. Materials under a path segment starting with '_'
+    // (e.g. Assets/Materials/_base/organic_pbr.mat) are excluded here — those are internal/
+    // template materials meant only to be inherited from via "extends", not placed directly —
+    // but still fully resolvable by id or "extends" (ResolveMaterialPath doesn't filter them),
+    // so BuildMaterialRegistry still indexes them same as everything else.
     public IEnumerable<string> ModelIds    => _modelRegistry.Keys.OrderBy(k => k);
-    public IEnumerable<string> MaterialIds => _materialRegistry.Keys.OrderBy(k => k);
+    public IEnumerable<string> MaterialIds =>
+        _materialRegistry
+            .Where(kv => !IsHiddenAssetPath(kv.Value))
+            .Select(kv => kv.Key)
+            .OrderBy(k => k);
+
+    private static bool IsHiddenAssetPath(string relativePath) =>
+        relativePath.Split('/').Any(segment => segment.StartsWith('_'));
 
     public void PreloadEnvironment(EnvironmentDefinition def)
     {
@@ -290,10 +302,38 @@ public class ResourceSystem : IDisposable
                 PathResolver.Resolve(key[(split + OpacityKeyMarker.Length)..]));
     }
 
-    private MaterialDefinition ReadMaterialDef(string idOrPath) =>
-        ResolveMaterialJson(idOrPath, [])
+    private MaterialDefinition ReadMaterialDef(string idOrPath)
+    {
+        var def = ResolveMaterialJson(idOrPath, [])
             .Deserialize<MaterialDefinition>(JsonDefaults.Options)
-        ?? throw new Exception($"Failed to deserialize material '{idOrPath}'.");
+            ?? throw new Exception($"Failed to deserialize material '{idOrPath}'.");
+
+        ApplyTexturePathPrefix(def);
+        return def;
+    }
+
+    // Prefixes every bare-filename texture field with MaterialDefinition.Path — see that
+    // field's own comment. Applied once, right after deserialization, so PreloadEntities and
+    // LoadMaterial (the two consumers of a MaterialDefinition's texture fields) both see
+    // fully-resolved paths without either needing to know "path" exists.
+    private static void ApplyTexturePathPrefix(MaterialDefinition def)
+    {
+        if (string.IsNullOrEmpty(def.Path)) return;
+
+        var basePath = def.Path.EndsWith('/') ? def.Path : def.Path + "/";
+
+        def.Albedo    = Prefix(def.Albedo);
+        def.Normal    = Prefix(def.Normal);
+        def.Roughness = Prefix(def.Roughness);
+        def.Metallic  = Prefix(def.Metallic);
+        def.AO        = Prefix(def.AO);
+        def.Height    = Prefix(def.Height);
+        def.Opacity   = Prefix(def.Opacity);
+        return;
+
+        string? Prefix(string? value) =>
+            value is { Length: > 0 } && !value.Contains('/') ? basePath + value : value;
+    }
 
     // Resolves "extends" by merging the parent's JSON object with this one's at the raw node
     // level — fields the child doesn't mention simply aren't in its JsonObject, so they pass

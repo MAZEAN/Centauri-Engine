@@ -17,6 +17,9 @@ public class MaterialDefinition
 
     [JsonPropertyName("name")]     public string Name { get; set; } = "Default";
     [JsonPropertyName("shader")]    public string Shader { get; set; } = "";
+    // level rather than by name.
+    [JsonPropertyName("path")]      public string? Path { get; set; }
+
     [JsonPropertyName("albedo")]    public string? Albedo    { get; set; }
     [JsonPropertyName("normal")]    public string? Normal    { get; set; }
     [JsonPropertyName("roughness")] public string? Roughness { get; set; }
