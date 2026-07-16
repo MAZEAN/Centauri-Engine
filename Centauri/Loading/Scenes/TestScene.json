@@ -61,7 +61,7 @@
     {
       "name":     "Sphere5",
       "model":    "Sphere",
-      "material": "Onyx",
+      "material": "CastleWall",
       "position": [1, 3, -1]
     },
     {
