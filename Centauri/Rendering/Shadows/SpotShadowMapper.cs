@@ -7,10 +7,7 @@ using Config;
 using World;
 using World.Collections;
 using Utils.Misc;
-using Graphics.Resources;
-using Graphics.Resources.Materials;
 using Graphics.Geometry;
-using Utils.Geometry;
 using Helper;
 using Culling;
 
@@ -26,24 +23,16 @@ using Culling;
 // contact-hardening in this pass (unlike CSM): a fixed PCF radius keeps the per-light cost and
 // the config surface small; ShadowArray's "raw" uncompared copy it'd need is therefore never
 // synced/bound here, only ever the compare-mode texture.
-public sealed class SpotShadowMapper : IDisposable
+public sealed class SpotShadowMapper : ShadowCasterRenderer
 {
     private const float SlopeBias    = 3.0f;   // spot frustums are steeper than CSM's ortho slices
     private const float ConstantBias = 6.0f;
     private const float NearPlane    = 0.05f;
 
-    private readonly GL _gl;
-    private readonly AppConfig _config;
-    private readonly InstanceBuffer _instances;
-    private readonly Profiling.GPUProfiler _profiler;
-
     private ShadowArray _atlas;
-    private readonly GLShader _depth;
-    private readonly Frustum _cull = new();
 
     private readonly Dictionary<Model, List<InstanceData>>[] _solidBySlot;
     private readonly Dictionary<Model, List<InstanceData>>[] _twoSidedBySlot;
-    private readonly Dictionary<Model, IReadOnlyList<Material?>> _materials = new();
     private readonly HashSet<Entity> _visible = new();
 
     // Stable slot assignment: a light keeps the same atlas layer frame-to-frame for as long as
@@ -65,17 +54,10 @@ public sealed class SpotShadowMapper : IDisposable
     public int  ActiveSlots { get; private set; }
 
     public SpotShadowMapper(GL gl, AppConfig config, InstanceBuffer instances, Profiling.GPUProfiler profiler)
+        : base(gl, config, instances, profiler)
     {
-        _gl = gl;
-        _config = config;
-        _instances = instances;
-        _profiler = profiler;
-
         var maxSlots = config.SpotShadows.MaxShadowSpots;
         _atlas = new ShadowArray(gl, config.SpotShadows.Size, maxSlots);
-        _depth = new GLShader(gl,
-            PathResolver.Resolve("Shaders/Shadow/depth.vert"),
-            PathResolver.Resolve("Shaders/Shadow/depth.frag"));
 
         _solidBySlot    = new Dictionary<Model, List<InstanceData>>[maxSlots];
         _twoSidedBySlot = new Dictionary<Model, List<InstanceData>>[maxSlots];
@@ -101,17 +83,17 @@ public sealed class SpotShadowMapper : IDisposable
         Active = false;
         ActiveSlots = 0;
 
-        var maxSlots = _config.SpotShadows.MaxShadowSpots;
-        if (!_config.SpotShadows.Enabled)
+        var maxSlots = Config.SpotShadows.MaxShadowSpots;
+        if (!Config.SpotShadows.Enabled)
         {
             _slotOf.Clear();
             return;
         }
 
-        if (_atlas.Size != _config.SpotShadows.Size)
+        if (_atlas.Size != Config.SpotShadows.Size)
         {
             _atlas.Dispose();
-            _atlas = new ShadowArray(_gl, _config.SpotShadows.Size, maxSlots);
+            _atlas = new ShadowArray(Gl, Config.SpotShadows.Size, maxSlots);
             Array.Clear(_slotSnapshot);   // fresh, empty atlas — every slot must redraw
         }
 
@@ -125,17 +107,17 @@ public sealed class SpotShadowMapper : IDisposable
         AssignSlots(selected);
 
         SetRenderState();
-        _depth.Use();
-        _depth.SetUniform("uAlbedo", 0);
-        _depth.SetUniform("uFoliageAlphaCutoff", _config.Foliage.AlphaCutoff);
-        ShaderUniformBinder.UploadWind(_depth, _config.Foliage);
+        Depth.Use();
+        Depth.SetUniform("uAlbedo", 0);
+        Depth.SetUniform("uFoliageAlphaCutoff", Config.Foliage.AlphaCutoff);
+        ShaderUniformBinder.UploadWind(Depth, Config.Foliage);
 
         var totalCasters = culling.EntityCount;
 
         // One profiler zone around every slot this frame actually redraws — opened unconditionally
         // (like ShadowMapper's own zones) rather than only when redrewAny, so a frame that redraws
         // nothing still reports a real (near-zero) GPU time instead of vanishing from the graph.
-        using (_profiler.Measure("SpotShadows"))
+        using (Profiler.Measure("SpotShadows"))
         using (Profiling.Tracy.Scope("SpotShadowMapper.Draw"))
         {
             foreach (var s in selected)
@@ -154,17 +136,17 @@ public sealed class SpotShadowMapper : IDisposable
 
                 _slotSnapshot[slot] = snapshot;
 
-                _cull.Update(matrix);
+                Cull.Update(matrix);
                 _visible.Clear();
-                culling.CullInto(_cull, _visible);
+                culling.CullInto(Cull, _visible);
                 stats.ShadowCulled += totalCasters - _visible.Count;
 
                 BucketCasters(_visible, _solidBySlot[slot], _twoSidedBySlot[slot]);
 
                 _atlas.BindLayer(slot, clear: true);
-                _depth.SetUniform("uLightMatrix", matrix);
+                Depth.SetUniform("uLightMatrix", matrix);
 
-                SetSolidRenderState();
+                SetSolidRenderState(SlopeBias, ConstantBias);
                 DrawGroups(_solidBySlot[slot], ref stats);
                 ResetSolidRenderState();
 
@@ -206,7 +188,7 @@ public sealed class SpotShadowMapper : IDisposable
     // someone else.
     private void AssignSlots(List<LightingSystem.ActiveSpot> selected)
     {
-        var maxSlots = _config.SpotShadows.MaxShadowSpots;
+        var maxSlots = Config.SpotShadows.MaxShadowSpots;
         var stillSelected = new HashSet<SpotLight>();
         foreach (var s in selected) stillSelected.Add(s.Light);
 
@@ -239,87 +221,9 @@ public sealed class SpotShadowMapper : IDisposable
         return view * proj;
     }
 
-    private void BucketCasters(HashSet<Entity> visible,
-        Dictionary<Model, List<InstanceData>> solid, Dictionary<Model, List<InstanceData>> twoSided)
-    {
-        foreach (var list in solid.Values) list.Clear();
-        foreach (var list in twoSided.Values) list.Clear();
-
-        foreach (var entity in visible)
-        {
-            if (entity.Model is not { } model) continue;
-
-            var groups = entity.AnyTwoSided ? twoSided : solid;
-            if (!groups.TryGetValue(model, out var list))
-                groups[model] = list = new List<InstanceData>();
-
-            _materials[model] = entity.Materials;
-            list.Add(new InstanceData(entity.Transform.WorldMatrix));
-        }
-    }
-
-    private void DrawGroups(Dictionary<Model, List<InstanceData>> groups, ref FrameStats stats)
-    {
-        foreach (var (model, list) in groups)
-        {
-            if (list.Count == 0) continue;
-            _instances.Upload(list);
-            stats.ShadowCasters += list.Count;
-
-            var materials = _materials[model];
-            for (var i = 0; i < model.Meshes.Count; i++)
-            {
-                SetCasterAlphaTest(i < materials.Count ? materials[i] : null);
-
-                var mesh = model.Meshes[i];
-                mesh.ConfigureInstancing(_instances.Handle);
-                mesh.DrawInstanced(list.Count);
-            }
-        }
-    }
-
-    private void SetCasterAlphaTest(Material? material)
-    {
-        _depth.SetUniform("uWind", material is { Wind: true } ? 1 : 0);
-        if (material is { TwoSided: true, Albedo: { } albedo })
-        {
-            _depth.SetUniform("uAlphaTest", 1);
-            _gl.ActiveTexture(TextureUnit.Texture0);
-            _gl.BindTexture(TextureTarget.Texture2D, albedo.Handle);
-        }
-        else
-        {
-            _depth.SetUniform("uAlphaTest", 0);
-        }
-    }
-
-    private void SetSolidRenderState()
-    {
-        _gl.Enable(EnableCap.CullFace);
-        _gl.CullFace(TriangleFace.Front);
-        _gl.Enable(EnableCap.PolygonOffsetFill);
-        _gl.PolygonOffset(SlopeBias, ConstantBias);
-    }
-
-    private void ResetSolidRenderState()
-    {
-        _gl.Disable(EnableCap.PolygonOffsetFill);
-        _gl.Disable(EnableCap.CullFace);
-    }
-
-    private void SetRenderState() => _gl.Enable(EnableCap.CullFace);
-
-    private void ResetRenderState()
-    {
-        _gl.Disable(EnableCap.PolygonOffsetFill);
-        _gl.CullFace(TriangleFace.Back);
-        _gl.Enable(EnableCap.CullFace);
-        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-    }
-
-    public void Dispose()
+    public override void Dispose()
     {
         _atlas.Dispose();
-        _depth.Dispose();
+        base.Dispose();
     }
 }
