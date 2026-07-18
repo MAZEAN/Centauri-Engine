@@ -10,28 +10,20 @@ using Simulation.Physics;
 
 // Loads zero or more EntitySetDefinition files (AppConfig's Render.EntitySetPaths, plus
 // Render.DefaultEntitySetPath if it exists — see EffectivePaths) into the scene, and can write
-// them back out. Each file keeps its own identity end to end: every live Entity remembers both
-// the EntityDefinition it was built from and which file that came from (_sources / _fileOf), so
-// Save() always has an unambiguous, correct destination for it — including entities added at
-// runtime via CreateEntity(), which are attributed to Render.DefaultEntitySetPath until saved
-// once, at which point that file starts existing on disk like any other set and (from then on)
-// loads automatically too, without needing to be added to EntitySetPaths by hand.
+// them back out. Each file keeps its own identity end to end: every live Entity's tracking entry
+// (TrackedEntitySet) remembers both the EntityDefinition it was built from and which file that
+// came from, so Save() always has an unambiguous, correct destination for it — including
+// entities added at runtime via CreateEntity(), which are attributed to
+// Render.DefaultEntitySetPath until saved once, at which point that file starts existing on disk
+// like any other set and (from then on) loads automatically too, without needing to be added to
+// EntitySetPaths by hand.
 public class EntitySetLoader
 {
     private readonly ResourceSystem _resourceSystem;
     private readonly Scene _scene;
     private readonly AppConfig _config;
     private readonly EntityFactory _factory;
-
-    private readonly Dictionary<Entity, EntityDefinition> _sources = new();
-    private readonly Dictionary<Entity, string> _fileOf = new();
-
-    // Every file ever loaded (or written to via CreateEntity's DefaultEntitySetPath) this
-    // session, independent of whether it currently has any live entities — Save() needs this so
-    // deleting the *last* entity that came from a file still rewrites that file (as now-empty),
-    // instead of silently leaving its stale on-disk content untouched because nothing in
-    // _scene.Entities maps to it anymore.
-    private readonly HashSet<string> _knownFiles = new();
+    private readonly TrackedEntitySet _tracked = new();
 
     public EntitySetLoader(ResourceSystem resourceSystem, Scene scene, AppConfig config)
     {
@@ -58,68 +50,36 @@ public class EntitySetLoader
 
         foreach (var (path, def) in definitions)
         {
-            _knownFiles.Add(path);
+            _tracked.MarkFileKnown(path);
 
             // Two passes: every entity in the file must exist before any "parent" reference can
             // resolve, since a child is free to appear earlier in the file than its parent (JSON
-            // array order isn't required to be a topological order) — see WireHierarchy.
+            // array order isn't required to be a topological order) — see EntityHierarchyWiring.
             var built = new List<(EntityDefinition def, Entity entity)>(def.Entities.Count);
             foreach (var e in def.Entities)
                 built.Add((e, AddFromDefinition(e, path)));
 
-            WireHierarchy(built);
+            EntityHierarchyWiring.Wire(built);
         }
-    }
-
-    // Resolves each entity's "parent" (if any) against the other entities *from the same file*
-    // only — cross-file parenting isn't supported, since load order between files isn't a
-    // guaranteed topological order the way order within one file's own array is (EntitySetPaths
-    // load in config order, but a later file's entities may load before an earlier file's, e.g.
-    // via DefaultEntitySetPath). First match wins if names collide (names aren't required to be
-    // unique elsewhere in this schema either). Doesn't touch Position/Scale/Rotation — those stay
-    // exactly as authored, now interpreted as local-to-the-new-parent rather than local-to-world
-    // (see EntityDefinition.Parent's own comment).
-    private static void WireHierarchy(List<(EntityDefinition def, Entity entity)> built)
-    {
-        Dictionary<string, Entity>? byName = null;
-
-        foreach (var (def, entity) in built)
-        {
-            if (string.IsNullOrEmpty(def.Parent)) continue;
-
-            byName ??= BuildNameIndex(built);
-            if (byName.TryGetValue(def.Parent, out var parent))
-                entity.Transform.Parent = parent.Transform;
-        }
-    }
-
-    private static Dictionary<string, Entity> BuildNameIndex(List<(EntityDefinition def, Entity entity)> built)
-    {
-        var byName = new Dictionary<string, Entity>();
-        foreach (var (_, entity) in built)
-            byName.TryAdd(entity.Name, entity);   // first match wins on a name collision
-        return byName;
     }
 
     // Discards every entity *this loader* is responsible for and reloads from disk — an easy way
     // back to the last saved state (or the original authored one, if nothing's been saved yet)
-    // when live edits went somewhere you didn't want. Only removes entities tracked in _sources,
-    // not Scene.Entities wholesale — the environment's own entities (e.g. its "sun", added
-    // directly by EnvironmentLoader) aren't ours to touch and must survive a reset. Re-derives
-    // EffectivePaths from scratch rather than reusing _knownFiles, so a file that only just
-    // started existing on disk (DefaultEntitySetPath, written by a Save() earlier this session)
-    // is picked up too.
+    // when live edits went somewhere you didn't want. Only removes tracked entities, not
+    // Scene.Entities wholesale — the environment's own entities (e.g. its "sun", added directly
+    // by EnvironmentLoader) aren't ours to touch and must survive a reset. Re-derives
+    // EffectivePaths from scratch rather than reusing the tracked file list, so a file that only
+    // just started existing on disk (DefaultEntitySetPath, written by a Save() earlier this
+    // session) is picked up too.
     public void Reset()
     {
-        foreach (var entity in _sources.Keys.ToList())
+        foreach (var entity in _tracked.Entities.ToList())
         {
             _scene.RemoveEntity(entity);
             entity.Dispose();
         }
 
-        _sources.Clear();
-        _fileOf.Clear();
-        _knownFiles.Clear();
+        _tracked.Clear();
         LoadAll();
     }
 
@@ -147,8 +107,7 @@ public class EntitySetLoader
         var entity = _factory.Build(e);
 
         _scene.AddEntity(entity);
-        _sources[entity] = e;
-        _fileOf[entity]  = sourcePath;
+        _tracked.Track(entity, e, sourcePath);
 
         return entity;
     }
@@ -170,9 +129,7 @@ public class EntitySetLoader
         var entity = _factory.Build(def);
 
         _scene.AddEntity(entity);
-        _sources[entity] = def;
-        _fileOf[entity]  = _config.Render.DefaultEntitySetPath;
-        _knownFiles.Add(_config.Render.DefaultEntitySetPath);
+        _tracked.Track(entity, def, _config.Render.DefaultEntitySetPath);
 
         return entity;
     }
@@ -229,7 +186,7 @@ public class EntitySetLoader
         // rebuild.
         _scene.MarkDirty();
 
-        if (!_sources.TryGetValue(entity, out var source)) return;
+        if (!_tracked.TryGetSource(entity, out var source)) return;
 
         var ids = GetMaterialIdsPerSlot(entity);
         // A slot with no resolvable id at all (no binding anywhere in the chain — see
@@ -265,7 +222,7 @@ public class EntitySetLoader
     {
         var count = entity.Materials.Count;
         var ids = new string?[count];
-        if (!_sources.TryGetValue(entity, out var source)) return ids;
+        if (!_tracked.TryGetSource(entity, out var source)) return ids;
 
         var modelDef = !string.IsNullOrEmpty(source.Model) ? _resourceSystem.GetModelDefinition(source.Model) : null;
         var binding = source.Materials
@@ -293,7 +250,7 @@ public class EntitySetLoader
     // untracked entities (e.g. the environment's own "sun") are a no-op, same as SetMaterial.
     public void SyncRigidBodyDefinition(Entity entity, RigidBody? rb)
     {
-        if (!_sources.TryGetValue(entity, out var source)) return;
+        if (!_tracked.TryGetSource(entity, out var source)) return;
 
         var components = source.Components ??= new List<ComponentDefinition>();
         var existing = components.FirstOrDefault(
@@ -330,22 +287,21 @@ public class EntitySetLoader
 
         _scene.RemoveEntity(entity);
         entity.Dispose();
-        _sources.Remove(entity);
-        _fileOf.Remove(entity);
+        _tracked.Untrack(entity);
     }
 
     // Writes every known file back out (grouping live entities by file), one EntitySetDefinition
     // per file — composing several sets together at load time never collapses them into one on
-    // save. Iterates _knownFiles rather than deriving the file list from _scene.Entities, so
+    // save. Iterates the tracked file list rather than deriving it from _scene.Entities, so
     // deleting the *last* entity a file had still rewrites it as empty instead of leaving its
     // stale on-disk content untouched (nothing would otherwise map to that file anymore).
     public void Save()
     {
         var byFile = _scene.Entities
-            .Where(e => _fileOf.ContainsKey(e))
-            .ToLookup(e => _fileOf[e]);
+            .Where(e => _tracked.FileOf(e) is not null)
+            .ToLookup(e => _tracked.FileOf(e));
 
-        foreach (var file in _knownFiles)
+        foreach (var file in _tracked.KnownFiles)
         {
             var outDef = new EntitySetDefinition { Entities = byFile[file].Select(ToDefinition).ToList() };
             var json = JsonSerializer.Serialize(outDef, JsonDefaults.Options);
@@ -355,73 +311,9 @@ public class EntitySetLoader
 
     private EntityDefinition ToDefinition(Entity entity)
     {
-        var source = _sources[entity];
-        var t = entity.Transform;
-
-        return new EntityDefinition
-        {
-            Name      = entity.Name,
-            Model     = source.Model,
-            Material  = source.Material,
-            Materials = source.Materials,
-            Position  = [t.Position.X, t.Position.Y, t.Position.Z],
-            Scale     = [t.Scale.X, t.Scale.Y, t.Scale.Z],
-            Rotation  = [t.EulerAngles.X, t.EulerAngles.Y, t.EulerAngles.Z],
-            Enabled   = entity.Enabled,
-            Light     = entity.Light is { } l ? ToDefinition(l) : null,
-            Components = source.Components,
-            TriplanarOverride      = source.TriplanarOverride,
-            TriplanarScaleOverride = source.TriplanarScaleOverride,
-            Parent    = t.Parent is { } p ? FindTrackedOwner(p)?.Name : null,
-        };
+        _tracked.TryGetSource(entity, out var source);
+        var parentName = entity.Transform.Parent is { } p ? _tracked.FindOwner(p)?.Name : null;
+        
+        return EntityDefinitionWriter.Write(entity, source, parentName);
     }
-
-    // Reverse lookup for ToDefinition: given a Transform known to be some tracked entity's
-    // Parent, find which entity that is, so it can be written back out by name (the schema has no
-    // other stable handle — see EntityDefinition.Parent). O(n) over tracked entities; fine at this
-    // engine's scene scale (same tradeoff Scene.Pick/FindComponent already make). Null if the
-    // parent is untracked here (e.g. the environment's own "sun" — parenting to it isn't
-    // supported, same as every other untracked-entity edge case in this loader).
-    private Entity? FindTrackedOwner(Transform transform)
-    {
-        foreach (var candidate in _sources.Keys)
-            if (ReferenceEquals(candidate.Transform, transform))
-                return candidate;
-        return null;
-    }
-
-    private static LightDefinition ToDefinition(Light l) => l switch
-    {
-        DirectionalLight d => new LightDefinition
-        {
-            Type = "directional",
-            Enabled = d.Enabled,
-            Color = [d.Color.X, d.Color.Y, d.Color.Z],
-            Intensity = d.Intensity,
-            Direction = [d.Direction.X, d.Direction.Y, d.Direction.Z]
-        },
-        SpotLight sp => new LightDefinition
-        {
-            Type = "spot",
-            Enabled = sp.Enabled,
-            Color = [sp.Color.X, sp.Color.Y, sp.Color.Z],
-            Intensity = sp.Intensity,
-            Direction = [sp.Direction.X, sp.Direction.Y, sp.Direction.Z],
-            InnerCutoff = sp.InnerCutoff,
-            OuterCutoff = sp.OuterCutoff,
-            CastsShadow = sp.CastsShadow,
-            Range = sp.Range
-        },
-        PointLight p => new LightDefinition
-        {
-            Type = "point",
-            Enabled = p.Enabled,
-            Color = [p.Color.X, p.Color.Y, p.Color.Z],
-            Intensity = p.Intensity,
-            Constant = p.Constant,
-            Linear = p.Linear,
-            Quadratic = p.Quadratic
-        },
-        _ => throw new ArgumentOutOfRangeException(nameof(l), l, "Unknown light type.")
-    };
 }
