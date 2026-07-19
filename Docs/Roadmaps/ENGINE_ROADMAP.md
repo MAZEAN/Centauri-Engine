@@ -23,7 +23,7 @@ the repo after the physics, local-light-shadow, GL 4.3 context-bump, and asset-o
 | `Input/` | ~320 | ~2% |
 
 Plus 39 shader files. Zero test projects. Zero CI (`.github/` doesn't exist). The whole repo's
-commit history spans about a week — this is a young, fast-moving project, not a mature one with
+commit history spans about 8 weeks — this is a young, fast-moving project, not a mature one with
 accumulated cruft; the imbalance below is "where effort actually went first," not decay.
 
 **The renderer is the engine.** Forward+ prepass, CSM + PCSS + spot-light shadows, SSR, planar
@@ -31,7 +31,7 @@ reflections, reflection probes, GTAO, TAA, procedural sky/clouds/IBL, bloom, aut
 with self-shadowing, triplanar projection, wind, and a working Tracy + GPU-timer profiling
 pipeline — all in ~45% of the codebase, most of it well-organized (small, single-purpose pass
 classes; the shadow-mapper duplication that did creep in was just deduped). This is genuinely
-ahead of where a week-old solo engine "should" be.
+ahead of where an 8-week-old solo engine "should" be.
 
 **Everything content-facing is thin by comparison.** `World/Components/Component.cs` defines a
 real per-entity behavior extensibility point — and `RigidBody` is its only concrete subclass.
@@ -69,19 +69,27 @@ Right now correctness is verified by eyeballing headless screenshots and hoping 
 regressed. That doesn't scale past one person's attention, and it's the one gap that makes every
 other phase riskier than it needs to be.
 
-- [ ] **Automated tests.** A real xunit/nunit project, formalizing the throwaway
-  standalone-console-project pattern already used ad hoc this session (`CascadeBuilder` math,
-  `Model.Decode()`) into something that runs on every change instead of only when someone
-  remembers to write a scratch harness. Start with pure-CPU logic that needs no GL context —
-  cascade fitting, material `extends` merge, hierarchy wiring, UV/path resolution — before
-  reaching for anything render-output-based.
+- [x] **Automated tests — foundation landed.** `Centauri.Tests` (xunit, `ProjectReference` to
+  `Centauri.csproj`, `InternalsVisibleTo` for internal-only algorithms) formalizes the throwaway
+  standalone-console-project pattern this session used ad hoc into something that runs on every
+  change instead of only when someone remembers to write a scratch harness. Covered so far:
+  `CascadeBuilder` (determinism, cascade-count clamping, monotonic splits, array-reuse) and
+  `EntityHierarchyWiring` (parent resolution, missing/duplicate names, declaration-order
+  independence) — both pure-CPU, no GL context needed. Each test was spot-checked against a
+  deliberately broken version of the logic it covers to confirm it actually fails, not just
+  passes vacuously. Still open: material `extends` merge, UV/path resolution, and anything
+  render-output-based (lower priority — needs a GL context, so waits for either a genuine need or
+  the CI row below to make headless rendering routinely available).
 - [ ] **CI.** Build + run the test suite on every push. `HeadlessCapture` + Xvfb/llvmpipe already
   proves the engine can boot and render without a display — wiring that into CI as a "does it
   still boot and produce a frame" smoke test is a small extension of infrastructure that already
-  exists, not new invention.
+  exists, not new invention. Deliberately not started alongside the tests above — see the
+  session's own delivery workflow (patches reviewed and applied by hand, not pushed directly);
+  standing up CI is a repo/hosting decision, not just code, worth its own explicit go-ahead.
 
 **Exit criteria:** a broken build or an obviously-wrong render (crash, black frame, shader
-compile failure) is caught by CI before it's caught by a person.
+compile failure) is caught by CI before it's caught by a person. (Partially met: `dotnet test`
+now catches logic regressions locally; the "before it's caught by a person" part needs the CI row.)
 
 ### Phase 1 — Editor usability (unlocks using the engine for anything beyond this session)
 

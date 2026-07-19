@@ -26,4 +26,11 @@
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
     </ItemGroup>
+
+    <!-- Lets Centauri.Tests exercise internal-only algorithms (e.g. EntityHierarchyWiring)
+         directly instead of either making them public just for testability or duplicating
+         their logic in the test project. -->
+    <ItemGroup>
+        <InternalsVisibleTo Include="Centauri.Tests" />
+    </ItemGroup>
 </Project>

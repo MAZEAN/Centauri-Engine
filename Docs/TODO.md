@@ -26,7 +26,7 @@
 * [ ] Displacement mapping (Parallax Occlusion Mapping (POM)) + self-shadowing
 * [ ] Audio
 * [ ] Skeletal animation / skinning
-* [ ] Automated tests
+* [x] Automated tests (foundation — `Centauri.Tests` xunit project; see Docs/Roadmaps/ENGINE_ROADMAP.md Phase 0)
 
 ## Enhancements
 
@@ -49,7 +49,7 @@
 * [ ] Keybindings
 * [x] UI improvements (DPI-scaling etc.)
 * [x] Improve tree models
-* [ ] Automated tests
+* [x] Automated tests (foundation — see Features section above; CI still open)
 * [x] Scene save/serialization
 * [x] Transform hierarchy in scene format (authoring foundation — see Docs/Documentation/TransformHierarchy.md; Outliner tree view / world-preserving reparent still open)
 * [x] Local-light shadows (spot only — see Docs/Documentation/LocalShadows.md)
