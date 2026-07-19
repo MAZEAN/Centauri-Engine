@@ -33,12 +33,18 @@ targets pure-CPU logic. Runs in well under a second.
 |---|---|---|
 | `Shadows/CascadeBuilderTests.cs` | `Rendering/Shadows/CascadeBuilder.cs` | Cascade-count clamping to `[1, MaxCascades]`, strictly-increasing split depths, the `reuse`-array optimization (same/different instance as appropriate), **determinism** for identical inputs (bit-identical `Matrix`/`Radius`/`DepthRange`), no non-finite output. |
 | `Loading/EntityHierarchyWiringTests.cs` | `Loading/EntitySets/EntityHierarchyWiring.cs` | Parent resolution by name, a null/empty `Parent` field being a no-op, an unresolvable parent name not throwing, first-match-wins on duplicate names, and declaration-order independence (a child listed before its own parent in the source array still resolves — this is *why* `Wire` runs as a second pass after every entity in a file already exists). |
+| `Rendering/MaterialRegistryTests.cs` | `Rendering/MaterialRegistry.cs` | `extends` inheritance (a child inheriting fields it doesn't set, overriding ones it does, merging correctly through a multi-level chain), cycle detection (both direct A↔B and self-referencing), and `.mat` `path` texture-prefixing (bare filenames get prefixed, already-qualified paths are left alone, no `path` field means no rewriting at all). |
+| `World/TransformTests.cs` | `World/Transform.cs` | The re-parent cycle guard (self-parent, an indirect ancestor cycle, and that a *rejected* cycle leaves the graph exactly as it was — no partial mutation), re-parenting correctly removing from the old parent's `Children`, no duplicate-children on a same-parent no-op, `WorldMatrix` composing correctly through a parent chain, and — the one most prone to "works until it doesn't" bugs — that `WorldMatrix` actually recomputes after the *parent* moves even when the child's value was already cached once. |
 
-Both targets were picked because they're exactly the kind of logic CLAUDE.md's standalone-harness
-note calls out: pure C#/`System.Numerics`, no GL, no window — `CascadeBuilder` takes a `Camera`
-and `AppConfig` (both plain objects, no GL-backed state) and returns a `Cascade[]`;
-`EntityHierarchyWiring.Wire` takes `(EntityDefinition, Entity)` pairs and links `Transform.Parent`
-references, and `new Entity()`/`new Transform()` need no GL context either.
+All four targets were picked because they're exactly the kind of logic CLAUDE.md's
+standalone-harness note calls out (pure C#, no GL, no window) *and* sit behind a real past or
+easily-reachable bug: the `MaterialRegistry` suite exercises the exact merge/prefix machinery
+behind this repo's own `uvScale`-stopped-round-tripping regression and the `extends`/`path`
+features that followed it; `Transform`'s cycle guard and dirty-flag cache are the foundation the
+whole entity-hierarchy feature sits on, with the highest blast radius of anything covered so far
+if either ever regressed silently. Every suite in this table was spot-checked by deliberately
+breaking the logic it covers and confirming the expected tests go red (see each's own commit
+message for exactly what was broken and which tests caught it) before being trusted.
 
 ## 3. Project structure and conventions
 
@@ -97,21 +103,26 @@ the real engine and produce a screenshot to inspect. That path is slow (seconds 
 driver overhead even under llvmpipe) and currently manual/ad hoc per change — formalizing *that*
 into something `dotnet test` can drive is future work, not started here (see §5).
 
-Material `extends` inheritance (`MaterialRegistry.ResolveJson`) and UV/path resolution
-(`ApplyTexturePathPrefix`) are both still pure-CPU and GL-free, just not covered yet — good next
-additions to this project rather than the headless path, since they need real temp `.mat` files
-on disk but no GL context at all (`Directory.CreateTempSubdirectory()` + `File.WriteAllText` in a
-test fixture, cleaned up in `Dispose`).
+`MaterialRegistry`'s file-based tests (`extends` merge, texture-path prefixing) show the pattern
+for anything else that needs real files on disk but no GL context: `Directory.CreateTempSubdirectory()`
++ `File.WriteAllText` in the test class, `Directory.Delete(recursive: true)` in `Dispose` (xunit
+disposes a non-static test class instance after every test method, so this cleans up per-test, not
+just per-suite).
 
 ## 5. Known limitations / next steps
 
 - **No CI.** `.github/` doesn't exist — nothing runs this project automatically on push yet.
   Deliberately not bundled with the tests themselves; see `Docs/Roadmaps/ENGINE_ROADMAP.md` Phase
   0 for why (a repo/hosting decision, not just code).
-- **Coverage is a seed, not a target.** Two suites exist because they were the two most
-  self-contained, highest-value pure-logic pieces at hand when this project was created — not
-  because everything else is already covered. `ENGINE_ROADMAP.md` Phase 0 lists what's next
-  (material `extends` merge, UV/path resolution).
+- **Coverage is a seed, not a target.** Four suites exist because they were the highest-value
+  pure-logic pieces identified so far (two picked for being self-contained and GL-free, two more
+  picked for sitting behind a real past regression or having the highest blast radius in the
+  entity/hierarchy system) — not because everything else is already covered. Other strong
+  candidates not yet done: `ModelRegistry` (mirrors `MaterialRegistry`'s duplicate-id detection),
+  `ShadowCache.CanReuse`/`CanReuseStaleFit` (the temporal-reuse logic `CascadeBuilder`'s tests
+  don't touch), and `PhysicsSystem`'s already-manually-verified cases from
+  `Docs/Documentation/PhysicsEngine.md` §6 (BEPU is pure-managed, no GL, so these are portable to
+  `Centauri.Tests` too — just heavier to set up than the four suites here).
 - **No render-output testing.** See §4's "what doesn't fit here" — this is a real gap (the
   renderer is the largest, most actively-changing part of the engine, per `ENGINE_ROADMAP.md`'s
   own line-count survey), just not one this project's current shape is meant to close.
