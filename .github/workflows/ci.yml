@@ -75,11 +75,8 @@ jobs:
             xvfb libgl1-mesa-dri libglx-mesa0 \
             libx11-6 libxrandr2 libxinerama1 libxcursor1 libxi6 libxext6
 
-      # TEMPORARY: Debug, not Release, for this job only — see the "Headless boot + render"
-      # step's comment. Revert to Release once the real failure is identified and fixed; this
-      # is a diagnostic build, not the intended steady-state config.
-      - name: Build (Debug, diagnostic)
-        run: dotnet build Centauri-Engine.sln -c Debug
+      - name: Build (Release)
+        run: dotnet build Centauri-Engine.sln -c Release
 
       # Boots the engine exactly as configured in the checked-in Config/config.json (the real
       # default environment + entity sets, not a throwaway scene), renders a handful of frames,
@@ -89,27 +86,24 @@ jobs:
       # dev environments shipping a reduced Assets/), point CENTAURI_HEADLESS_FRAMES/the
       # environment path at a minimal scene instead of skipping this job outright.
       #
-      # DIAGNOSTIC BUILD, SEE ABOVE: two prior attempts at fixing this job's
-      # "PlatformNotSupportedException: Couldn't find a suitable window platform" both installed
-      # extra packages/args (X11 client libs, then forcing Xvfb's RandR extension on) and
-      # *neither actually changed the failure* — identical exception, effectively identical
-      # timing, on the next run. Reading Silk.NET.Windowing.Glfw's actual source
-      # (GlfwPlatform.cs, IsApplicable) shows why neither guess could have told us anything:
-      # IsApplicable only tries `GLFW.Glfw.GetApi()` (loading the native GLFW library) and
-      # swallows whatever exception that throws — the *real* underlying error is only printed
-      # via `#if DEBUG`, which a `-c Release` build compiles out entirely. So every fix attempt
-      # against the Release build was guessing blind. This run is Debug specifically so that
-      # `Console.WriteLine($"Can't load GLFW: {ex}")` actually fires and the real exception
-      # (e.g. a genuinely missing native asset vs. an X11-symbol resolution failure vs.
-      # something else) shows up in this step's log — read that before changing anything else
-      # here.
+      # DIAGNOSTIC IN PROGRESS: two prior fix attempts (X11 client libs, then forcing Xvfb's
+      # RandR extension on) neither changed the failure — identical exception on the next run
+      # both times. A follow-up attempt to switch *our* build to Debug so Silk.NET.Windowing.
+      # Glfw's own `#if DEBUG` diagnostic would fire was also a dead end: that `#if DEBUG` is
+      # baked into Silk.NET's own precompiled NuGet package at *their* build time (Release, like
+      # any published package) — our project's build config has no effect on it. CENTAURI_GLFW_
+      # DIAG=1 (see Program.cs) instead probes the same native GLFW load directly in our own
+      # code, so the real exception (missing native asset vs. an unresolved transitive symbol vs.
+      # something else) actually reaches this step's log — read that before changing anything
+      # else here.
       - name: Headless boot + render
         env:
           CENTAURI_HEADLESS_FRAMES: '10'
           CENTAURI_SCREENSHOT_PATH: '${{ runner.temp }}/smoke-test.png'
+          CENTAURI_GLFW_DIAG: '1'
         run: >
           xvfb-run -a --server-args="-screen 0 1920x1080x24 +extension RANDR +extension GLX"
-          dotnet run --project Centauri/Centauri.csproj -c Debug --no-build
+          dotnet run --project Centauri/Centauri.csproj -c Release --no-build
 
       - name: Verify a screenshot was produced
         run: test -s "${{ runner.temp }}/smoke-test.png"
