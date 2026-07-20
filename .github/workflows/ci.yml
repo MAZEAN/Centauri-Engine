@@ -75,8 +75,11 @@ jobs:
             xvfb libgl1-mesa-dri libglx-mesa0 \
             libx11-6 libxrandr2 libxinerama1 libxcursor1 libxi6 libxext6
 
-      - name: Build (Release)
-        run: dotnet build Centauri-Engine.sln -c Release
+      # TEMPORARY: Debug, not Release, for this job only — see the "Headless boot + render"
+      # step's comment. Revert to Release once the real failure is identified and fixed; this
+      # is a diagnostic build, not the intended steady-state config.
+      - name: Build (Debug, diagnostic)
+        run: dotnet build Centauri-Engine.sln -c Debug
 
       # Boots the engine exactly as configured in the checked-in Config/config.json (the real
       # default environment + entity sets, not a throwaway scene), renders a handful of frames,
@@ -86,21 +89,27 @@ jobs:
       # dev environments shipping a reduced Assets/), point CENTAURI_HEADLESS_FRAMES/the
       # environment path at a minimal scene instead of skipping this job outright.
       #
-      # --server-args forces the RandR extension on explicitly: `xvfb-run -a` with no args
-      # doesn't reliably start Xvfb with RandR enabled on every Xvfb build, and GLFW's Linux
-      # monitor-enumeration path (WindowManager.FindMonitor -> Silk.NET.Windowing.Monitor.
-      # GetMonitors) requires the X *server* to advertise RandR, not just the client library
-      # being installed (see the previous commit's fix for that half of this) — a documented
-      # GLFW+Xvfb gotcha. Without this, GLFW's X11 backend fails to initialize with
-      # "PlatformNotSupportedException: Couldn't find a suitable window platform" even though
-      # the display itself is otherwise working.
+      # DIAGNOSTIC BUILD, SEE ABOVE: two prior attempts at fixing this job's
+      # "PlatformNotSupportedException: Couldn't find a suitable window platform" both installed
+      # extra packages/args (X11 client libs, then forcing Xvfb's RandR extension on) and
+      # *neither actually changed the failure* — identical exception, effectively identical
+      # timing, on the next run. Reading Silk.NET.Windowing.Glfw's actual source
+      # (GlfwPlatform.cs, IsApplicable) shows why neither guess could have told us anything:
+      # IsApplicable only tries `GLFW.Glfw.GetApi()` (loading the native GLFW library) and
+      # swallows whatever exception that throws — the *real* underlying error is only printed
+      # via `#if DEBUG`, which a `-c Release` build compiles out entirely. So every fix attempt
+      # against the Release build was guessing blind. This run is Debug specifically so that
+      # `Console.WriteLine($"Can't load GLFW: {ex}")` actually fires and the real exception
+      # (e.g. a genuinely missing native asset vs. an X11-symbol resolution failure vs.
+      # something else) shows up in this step's log — read that before changing anything else
+      # here.
       - name: Headless boot + render
         env:
           CENTAURI_HEADLESS_FRAMES: '10'
           CENTAURI_SCREENSHOT_PATH: '${{ runner.temp }}/smoke-test.png'
         run: >
           xvfb-run -a --server-args="-screen 0 1920x1080x24 +extension RANDR +extension GLX"
-          dotnet run --project Centauri/Centauri.csproj -c Release --no-build
+          dotnet run --project Centauri/Centauri.csproj -c Debug --no-build
 
       - name: Verify a screenshot was produced
         run: test -s "${{ runner.temp }}/smoke-test.png"
