@@ -86,24 +86,38 @@ jobs:
       - name: Build (Release)
         run: dotnet build Centauri-Engine.sln -c Release
 
-      # Boots the engine exactly as configured in the checked-in Config/config.json (the real
-      # default environment + entity sets, not a throwaway scene), renders a handful of frames,
-      # and saves a screenshot — a crash, an unhandled exception, or a shader compile failure
-      # fails this step. This depends on the repo's actual Assets/ tree being present (skybox
-      # HDRIs etc.) — if a future checkout trims those (see CLAUDE.md's own note on sandboxed
-      # dev environments shipping a reduced Assets/), point CENTAURI_HEADLESS_FRAMES/the
-      # environment path at a minimal scene instead of skipping this job outright.
-      #
-      # DIAGNOSTIC IN PROGRESS: two prior fix attempts (X11 client libs, then forcing Xvfb's
-      # RandR extension on) neither changed the failure — identical exception on the next run
-      # both times. A follow-up attempt to switch *our* build to Debug so Silk.NET.Windowing.
-      # Glfw's own `#if DEBUG` diagnostic would fire was also a dead end: that `#if DEBUG` is
-      # baked into Silk.NET's own precompiled NuGet package at *their* build time (Release, like
-      # any published package) — our project's build config has no effect on it. CENTAURI_GLFW_
-      # DIAG=1 (see Program.cs) instead probes the same native GLFW load directly in our own
-      # code, so the real exception (missing native asset vs. an unresolved transitive symbol vs.
-      # something else) actually reaches this step's log — read that before changing anything
-      # else here.
+      # /Centauri/Assets/* is entirely gitignored (see .gitignore) — it never exists in any
+      # checkout, CI included, regardless of runner/OS. The checked-in default config.json
+      # points at the real environment (skybox EXRs under Assets/Textures/Sky) and TestScene.json
+      # (models resolved through the Assets/Objects .model registry), so booting it as-is always
+      # fails here with "CannotOpenFile"/"Unknown model" — confirmed by the first real run after
+      # the GLFW native-load fix below got the engine past window/GL creation. This patches the
+      # *runner's* checked-out config.json only (never committed — same "throwaway scene, don't
+      # commit the swap" pattern CLAUDE.md's "Headless / CI rendering" section documents for local
+      # use) to point at ci-smoke-environment.json instead: a minimal environment with a camera
+      # and a sun (procedural sky/IBL needs a real DirectionalLight to read a direction from) but
+      # an empty skybox list, plus an empty entity set list — nothing it references lives under
+      # the gitignored Assets/ tree, so this boots on a bare checkout.
+      - name: Point config at a CI-safe environment (no gitignored Assets/ dependency)
+        run: |
+          python3 - <<'PY'
+          import json
+
+          path = "Centauri/Config/config.json"
+          with open(path) as f:
+              cfg = json.load(f)
+
+          cfg["render"]["environmentPath"] = "Loading/Environment/ci-smoke-environment.json"
+          cfg["render"]["entitySetPaths"] = []
+
+          with open(path, "w") as f:
+              json.dump(cfg, f, indent=2)
+          PY
+
+      # Renders a handful of frames of that minimal scene and saves a screenshot — a crash, an
+      # unhandled exception, or a shader compile failure fails this step. CENTAURI_GLFW_DIAG=1
+      # (see Program.cs) is left on for one more run to confirm the native GLFW load succeeds
+      # here the same way it did on the run that first surfaced the Assets/ gitignore issue.
       - name: Headless boot + render
         env:
           CENTAURI_HEADLESS_FRAMES: '10'

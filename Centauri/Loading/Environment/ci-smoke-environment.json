@@ -1,0 +1,17 @@
+{
+  "cameras": [
+    { "name": "Main", "position": [0, 0, 3], "up": "Y", "yaw": -90, "pitch": 0, "active": true, "primary": true }
+  ],
+  "skybox": [],
+  "sun": {
+    "name":     "Sun",
+    "position": [0, 0, 0],
+    "light": {
+      "type":      "directional",
+      "direction": [-0.2, -1.0, -0.3],
+      "color":     [1.0, 1.0, 1.0],
+      "intensity": 1.0,
+      "enabled":   true
+    }
+  }
+}
