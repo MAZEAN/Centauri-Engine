@@ -58,14 +58,22 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # xvfb (virtual display) + Mesa's llvmpipe software OpenGL driver — the same combination
-      # CLAUDE.md's "Headless / CI rendering" section documents (HeadlessCapture.cs), used
-      # throughout this repo's own manual verification all session. Confirmed elsewhere to
-      # negotiate GL 4.5 core, well above the engine's requested 4.3.
-      - name: Install Xvfb + Mesa software renderer
+      # xvfb (virtual display) + Mesa's llvmpipe software OpenGL driver, plus the X11
+      # client-side libraries GLFW itself needs (WindowManager.FindMonitor ->
+      # Silk.NET.Windowing.Monitor.GetMonitors -> GLFW monitor enumeration, which needs XRandR
+      # specifically) — GLFW ships as a bundled native lib via the Ultz.Native.GLFW NuGet
+      # package (restored automatically), but that binary still dynamically links against the
+      # system's X11/XRandR/Xinerama/Xcursor/Xi libraries, which a bare ubuntu-latest runner
+      # doesn't ship. The first real CI run failed here with "PlatformNotSupportedException:
+      # Couldn't find a suitable window platform" for exactly this reason — libgl1-mesa-dri/
+      # libglx-mesa0 alone cover GL rendering but not GLFW's own window/monitor-management
+      # dependencies.
+      - name: Install Xvfb + Mesa software renderer + X11 client libs
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends xvfb libgl1-mesa-dri libglx-mesa0
+          sudo apt-get install -y --no-install-recommends \
+            xvfb libgl1-mesa-dri libglx-mesa0 \
+            libx11-6 libxrandr2 libxinerama1 libxcursor1 libxi6 libxext6
 
       - name: Build (Release)
         run: dotnet build Centauri-Engine.sln -c Release
