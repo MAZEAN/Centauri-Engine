@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Least-privilege default: neither job writes anything back to the repo (build+test, and a
+# screenshot artifact upload — both handled by GITHUB_TOKEN's own separate, narrower artifact
+# permission, not "contents"). Set explicitly so this holds regardless of the repo's own
+# GITHUB_TOKEN default setting.
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same branch/PR instead of letting them queue up.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build & unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Pinned to a commit SHA, not the (mutable) v4 tag — a tag can be repointed after the fact
+      # (see the tj-actions/changed-files incident, Mar 2025: a compromised maintainer token was
+      # used to retag released versions at malicious commits, silently poisoning every workflow
+      # that referenced them by tag). A SHA can't be reused this way. Comment notes which release
+      # this currently resolves to, for humans skimming the file.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore Centauri-Engine.sln
+
+      - name: Build (Release)
+        run: dotnet build Centauri-Engine.sln -c Release --no-restore
+
+      # Centauri.Tests is pure-CPU logic (CascadeBuilder, EntityHierarchyWiring,
+      # MaterialRegistry, Transform — see Docs/Documentation/Testing.md) and needs no GL
+      # context/display, so this runs on the same plain runner as the build.
+      - name: Unit tests
+        run: dotnet test Centauri.Tests/Centauri.Tests.csproj -c Release --no-build --logger "console;verbosity=normal"
+
+  headless-render-smoke-test:
+    name: Headless boot & render smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: '10.0.x'
+
+      # xvfb (virtual display) + Mesa's llvmpipe software OpenGL driver — the same combination
+      # CLAUDE.md's "Headless / CI rendering" section documents (HeadlessCapture.cs), used
+      # throughout this repo's own manual verification all session. Confirmed elsewhere to
+      # negotiate GL 4.5 core, well above the engine's requested 4.3.
+      - name: Install Xvfb + Mesa software renderer
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb libgl1-mesa-dri libglx-mesa0
+
+      - name: Build (Release)
+        run: dotnet build Centauri-Engine.sln -c Release
+
+      # Boots the engine exactly as configured in the checked-in Config/config.json (the real
+      # default environment + entity sets, not a throwaway scene), renders a handful of frames,
+      # and saves a screenshot — a crash, an unhandled exception, or a shader compile failure
+      # fails this step. This depends on the repo's actual Assets/ tree being present (skybox
+      # HDRIs etc.) — if a future checkout trims those (see CLAUDE.md's own note on sandboxed
+      # dev environments shipping a reduced Assets/), point CENTAURI_HEADLESS_FRAMES/the
+      # environment path at a minimal scene instead of skipping this job outright.
+      - name: Headless boot + render
+        env:
+          CENTAURI_HEADLESS_FRAMES: '10'
+          CENTAURI_SCREENSHOT_PATH: '${{ runner.temp }}/smoke-test.png'
+        run: xvfb-run -a dotnet run --project Centauri/Centauri.csproj -c Release --no-build
+
+      - name: Verify a screenshot was produced
+        run: test -s "${{ runner.temp }}/smoke-test.png"
+
+      - name: Upload screenshot
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: headless-smoke-test-screenshot
+          path: ${{ runner.temp }}/smoke-test.png
+          if-no-files-found: ignore

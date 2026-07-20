@@ -3,7 +3,7 @@
 A real xunit project — `Centauri.Tests/Centauri.Tests.csproj`, part of `Centauri-Engine.sln`.
 Formalizes the throwaway standalone-console-project pattern this repo used ad hoc before (see
 CLAUDE.md's own note on it) into something that runs on every change instead of only when someone
-remembers to write a scratch harness. No CI wiring yet — see §5.
+remembers to write a scratch harness. Runs in CI on every push/PR to `main` — see §5.
 
 ## 1. Run the tests
 
@@ -99,9 +99,12 @@ Anything that needs an actual GL context (shader compilation, texture decode + u
 render) isn't covered by this project and shouldn't be forced into it — `Centauri.Tests` has no
 window/Xvfb setup. For that, the existing headless pattern still applies: `CENTAURI_HEADLESS_FRAMES`
 + `CENTAURI_SCREENSHOT_PATH` + `xvfb-run` (see CLAUDE.md's "Headless / CI rendering" section) run
-the real engine and produce a screenshot to inspect. That path is slow (seconds per run, real GL
-driver overhead even under llvmpipe) and currently manual/ad hoc per change — formalizing *that*
-into something `dotnet test` can drive is future work, not started here (see §5).
+the real engine and produce a screenshot to inspect. §5's CI workflow now runs that path
+automatically as a boot/render *smoke test* (crash/exception/shader-failure detection, one
+screenshot uploaded for inspection) — but it's still not something `dotnet test` drives, and it
+doesn't assert anything about the screenshot's actual pixel content, just that rendering completed
+and produced one. Turning specific render-output checks (not just "did it crash") into real,
+`dotnet test`-driven assertions is future work, not started here.
 
 `MaterialRegistry`'s file-based tests (`extends` merge, texture-path prefixing) show the pattern
 for anything else that needs real files on disk but no GL context: `Directory.CreateTempSubdirectory()`
@@ -109,11 +112,36 @@ for anything else that needs real files on disk but no GL context: `Directory.Cr
 disposes a non-static test class instance after every test method, so this cleans up per-test, not
 just per-suite).
 
-## 5. Known limitations / next steps
+## 5. CI
 
-- **No CI.** `.github/` doesn't exist — nothing runs this project automatically on push yet.
-  Deliberately not bundled with the tests themselves; see `Docs/Roadmaps/ENGINE_ROADMAP.md` Phase
-  0 for why (a repo/hosting decision, not just code).
+`.github/workflows/ci.yml` runs on every push and pull request targeting `main`, as two
+independent jobs (so a failure in one doesn't hide a result from the other):
+
+- **`build-and-test`** — `dotnet restore`/`build`/`test`, exactly §1's commands. Plain
+  `ubuntu-latest` runner, no display needed — this is the same "no GL context" property that
+  makes everything in §2's table fast and reliable to begin with.
+- **`headless-render-smoke-test`** — installs Xvfb + Mesa's llvmpipe software OpenGL driver
+  (`libgl1-mesa-dri`/`libglx-mesa0`, the same combination CLAUDE.md's "Headless / CI rendering"
+  section documents and this session used for every manual render verification), then boots the
+  engine against the repo's actual checked-in `Config/config.json` — the real default environment
+  and entity sets, not a throwaway scene — for a handful of frames via `CENTAURI_HEADLESS_FRAMES`
+  and saves a screenshot (`CENTAURI_SCREENSHOT_PATH`), uploaded as a build artifact. A crash, an
+  unhandled exception, or a shader compile failure fails this job; a missing/empty screenshot file
+  fails it too. This depends on the repo's actual `Assets/` content (skybox HDRIs etc.) being
+  present in the checkout CI runs against — a sandboxed dev environment that ships a trimmed
+  `Assets/` (see CLAUDE.md's own note on this) isn't representative of what CI itself sees.
+
+Both jobs' exact commands were verified locally before being committed to the workflow — the
+`dotnet restore`/`build`/`test` sequence runs identically to how CI invokes it, and the
+`xvfb-run … dotnet run` + screenshot-existence check was verified end-to-end against a minimal
+scene (this sandbox's own trimmed `Assets/` can't boot the repo's real default config — see the
+job description above). What wasn't verified end-to-end here, specifically because of that
+trimmed-`Assets/` sandbox limitation, is the smoke-test job booting the *actual* default
+config/environment against the real, full `Assets/` tree — worth watching on the first real CI
+run after this lands.
+
+## 6. Known limitations / next steps
+
 - **Coverage is a seed, not a target.** Four suites exist because they were the highest-value
   pure-logic pieces identified so far (two picked for being self-contained and GL-free, two more
   picked for sitting behind a real past regression or having the highest blast radius in the
@@ -123,6 +151,8 @@ just per-suite).
   don't touch), and `PhysicsSystem`'s already-manually-verified cases from
   `Docs/Documentation/PhysicsEngine.md` §6 (BEPU is pure-managed, no GL, so these are portable to
   `Centauri.Tests` too — just heavier to set up than the four suites here).
-- **No render-output testing.** See §4's "what doesn't fit here" — this is a real gap (the
-  renderer is the largest, most actively-changing part of the engine, per `ENGINE_ROADMAP.md`'s
-  own line-count survey), just not one this project's current shape is meant to close.
+- **No real render-output testing.** §5's CI smoke test catches "does it still boot and produce a
+  frame" (crash/exception/shader-failure), but asserts nothing about the frame's actual content —
+  see §4's "what doesn't fit here." This is a real gap (the renderer is the largest,
+  most actively-changing part of the engine, per `ENGINE_ROADMAP.md`'s own line-count survey),
+  just not one this project's current shape is meant to close.

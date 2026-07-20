@@ -63,33 +63,36 @@ Phased by dependency and leverage, not by "what's easy." Each phase's exit crite
 the next — later phases assume earlier ones landed, same discipline `DISPLACEMENT.md` and
 `GL4_UPGRADE.md` already use (don't start a row speculatively; start it when its trigger is real).
 
-### Phase 0 — Safety net (do first; everything after this compounds on it)
+### Phase 0 — Safety net (do first; everything after this compounds on it) — complete
 
-Right now correctness is verified by eyeballing headless screenshots and hoping nothing silently
-regressed. That doesn't scale past one person's attention, and it's the one gap that makes every
-other phase riskier than it needs to be.
+Before this phase, correctness was verified by eyeballing headless screenshots and hoping nothing
+silently regressed — the one gap that made every other phase riskier than it needed to be. Both
+rows below are now done; see each for what's still open within them (more test coverage, watching
+the first real CI run against the full `Assets/` tree).
 
-- [x] **Automated tests — foundation landed.** `Centauri.Tests` (xunit, `ProjectReference` to
+- [x] **Automated tests — landed.** `Centauri.Tests` (xunit, `ProjectReference` to
   `Centauri.csproj`, `InternalsVisibleTo` for internal-only algorithms) formalizes the throwaway
   standalone-console-project pattern this session used ad hoc into something that runs on every
-  change instead of only when someone remembers to write a scratch harness. Covered so far:
-  `CascadeBuilder` (determinism, cascade-count clamping, monotonic splits, array-reuse) and
-  `EntityHierarchyWiring` (parent resolution, missing/duplicate names, declaration-order
-  independence) — both pure-CPU, no GL context needed. Each test was spot-checked against a
-  deliberately broken version of the logic it covers to confirm it actually fails, not just
-  passes vacuously. Still open: material `extends` merge, UV/path resolution, and anything
-  render-output-based (lower priority — needs a GL context, so waits for either a genuine need or
-  the CI row below to make headless rendering routinely available).
-- [ ] **CI.** Build + run the test suite on every push. `HeadlessCapture` + Xvfb/llvmpipe already
-  proves the engine can boot and render without a display — wiring that into CI as a "does it
-  still boot and produce a frame" smoke test is a small extension of infrastructure that already
-  exists, not new invention. Deliberately not started alongside the tests above — see the
-  session's own delivery workflow (patches reviewed and applied by hand, not pushed directly);
-  standing up CI is a repo/hosting decision, not just code, worth its own explicit go-ahead.
+  change instead of only when someone remembers to write a scratch harness. Four suites so far —
+  `CascadeBuilder`, `EntityHierarchyWiring`, `MaterialRegistry` (`extends` merge, `path`
+  texture-prefixing), `Transform` (re-parent cycle guard, `WorldMatrix` dirty-flag cache) — all
+  pure-CPU, no GL context needed, each spot-checked against a deliberately broken version of the
+  logic it covers to confirm it actually fails, not just passes vacuously. See
+  `Docs/Documentation/Testing.md` for how to run/extend it and what's still open (`ModelRegistry`,
+  `ShadowCache`, `PhysicsSystem`'s already-manually-verified cases).
+- [x] **CI — landed.** `.github/workflows/ci.yml`, two jobs on every push/PR to `main`:
+  `build-and-test` (`dotnet build`/`test`, plain runner, no display needed) and
+  `headless-render-smoke-test` (Xvfb + Mesa llvmpipe, boots the real checked-in default
+  config/environment for a few frames, uploads a screenshot, fails on crash/exception/shader
+  failure or a missing screenshot) — the exact `CENTAURI_HEADLESS_FRAMES`/`CENTAURI_SCREENSHOT_PATH`
+  pattern CLAUDE.md's "Headless / CI rendering" section already documents, now automated instead
+  of manual-per-change. See `Docs/Documentation/Testing.md` §5 for what was and wasn't verified
+  end-to-end before this landed (the smoke-test job's dependency on the repo's real `Assets/` tree
+  couldn't be dry-run in this session's own trimmed sandbox checkout — worth watching on the first
+  real run).
 
-**Exit criteria:** a broken build or an obviously-wrong render (crash, black frame, shader
-compile failure) is caught by CI before it's caught by a person. (Partially met: `dotnet test`
-now catches logic regressions locally; the "before it's caught by a person" part needs the CI row.)
+**Exit criteria — met.** A broken build, a failing test, or an obviously-wrong render (crash,
+black frame, shader compile failure) is now caught by CI before it's caught by a person.
 
 ### Phase 1 — Editor usability (unlocks using the engine for anything beyond this session)
 
