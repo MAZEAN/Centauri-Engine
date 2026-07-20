@@ -58,21 +58,29 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # xvfb (virtual display) + Mesa's llvmpipe software OpenGL driver, plus the X11
-      # client-side libraries GLFW itself needs (WindowManager.FindMonitor ->
-      # Silk.NET.Windowing.Monitor.GetMonitors -> GLFW monitor enumeration, which needs XRandR
-      # specifically) — GLFW ships as a bundled native lib via the Ultz.Native.GLFW NuGet
-      # package (restored automatically), but that binary still dynamically links against the
-      # system's X11/XRandR/Xinerama/Xcursor/Xi libraries, which a bare ubuntu-latest runner
-      # doesn't ship. The first real CI run failed here with "PlatformNotSupportedException:
-      # Couldn't find a suitable window platform" for exactly this reason — libgl1-mesa-dri/
-      # libglx-mesa0 alone cover GL rendering but not GLFW's own window/monitor-management
-      # dependencies.
-      - name: Install Xvfb + Mesa software renderer + X11 client libs
+      # xvfb (virtual display) + Mesa's llvmpipe software OpenGL driver + libglfw3, plus the
+      # X11 client-side libraries GLFW needs at runtime (libx11-6/libxrandr2/etc. — kept from
+      # earlier attempts as harmless, standard prerequisites even though they turned out not to
+      # be the actual blocker here).
+      #
+      # ACTUAL ROOT CAUSE (found via CENTAURI_GLFW_DIAG, see Program.cs): the failure was never
+      # X11/RandR at all -- `ldd` on the NuGet-bundled libglfw.so.3 shows it only link-time-
+      # depends on libc/libm, nothing X11-related. The real error is
+      # `System.IO.FileNotFoundException: Could not load from any of the possible library
+      # names!` -- .NET's native-asset resolution for the NuGet-bundled
+      # runtimes/linux-x64/native/libglfw.so.3 (present in the build output, confirmed locally)
+      # isn't finding it on this runner, for reasons not fully root-caused (tried forcing an
+      # explicit `-r linux-x64` build locally to sidestep that resolution entirely, but that
+      # changes the output layout to bin/<config>/<tfm>/linux-x64/ and breaks
+      # PathResolver.Resolve's fixed "go up 3 directories" assumption -- not worth that
+      # regression for a CI-only workaround). Installing the system libglfw3 package instead
+      # gives the native loader's OS-level dlopen fallback a real library to find, without
+      # touching the build/run commands or output layout at all.
+      - name: Install Xvfb + Mesa software renderer + GLFW + X11 client libs
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            xvfb libgl1-mesa-dri libglx-mesa0 \
+            xvfb libgl1-mesa-dri libglx-mesa0 libglfw3 \
             libx11-6 libxrandr2 libxinerama1 libxcursor1 libxi6 libxext6
 
       - name: Build (Release)
