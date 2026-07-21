@@ -13,6 +13,7 @@ using Panels.Toolbar;
 using Rendering;
 using Rendering.Profiling;
 using Loading;
+using Gizmos;
 
 // Owns the whole ImGui surface — the controller plus every panel.
 // RenderingSystem holds one of these instead of juggling them individually.
@@ -24,8 +25,11 @@ public sealed class UISystem : IDisposable
     private readonly PropertiesPanel _properties;
     private readonly HierarchyPanel _outliner;
     private readonly ViewportToolbar _toolbar;
-    
-    public bool WantsMouse    => _imGui.WantsMouseCapture;
+    private readonly TransformGizmo _gizmo;
+
+    // The gizmo isn't an ImGui window, so it doesn't set WantCaptureMouse — fold its own
+    // hover/drag state in so InputSystem suppresses viewport picking while a handle is engaged.
+    public bool WantsMouse    => _imGui.WantsMouseCapture || _gizmo.IsInteracting;
     public bool WantsKeyboard => _imGui.WantsKeyboardCapture;
 
     public UISystem(GL gl, AppConfig config, IWindow window, IInputContext input, ResourceSystem resourceSystem, EntitySetLoader entitySetLoader)
@@ -38,6 +42,7 @@ public sealed class UISystem : IDisposable
         _properties    = new PropertiesPanel(_imGui.Font, _config, resourceSystem, entitySetLoader);
         _outliner = new HierarchyPanel(_imGui.Font, resourceSystem, entitySetLoader);
         _toolbar = new ViewportToolbar(_imGui.Font, config);
+        _gizmo = new TransformGizmo();
     }
 
     public void Update(float deltaTime) => _imGui.Update(deltaTime);
@@ -59,6 +64,8 @@ public sealed class UISystem : IDisposable
                 _outliner.Render(scene);
             using (Tracy.Scope("UISystem.Render.Properties"))
                 _properties.Render(scene);
+            using (Tracy.Scope("UISystem.Render.Gizmo"))
+                _gizmo.Draw(scene, scene.Cameras.Active);
         }
 
         using (Tracy.Scope("UISystem.Render.ImGuiFlush"))

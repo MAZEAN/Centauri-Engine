@@ -35,14 +35,16 @@ targets pure-CPU logic. Runs in well under a second.
 | `Loading/EntityHierarchyWiringTests.cs` | `Loading/EntitySets/EntityHierarchyWiring.cs` | Parent resolution by name, a null/empty `Parent` field being a no-op, an unresolvable parent name not throwing, first-match-wins on duplicate names, and declaration-order independence (a child listed before its own parent in the source array still resolves — this is *why* `Wire` runs as a second pass after every entity in a file already exists). |
 | `Rendering/MaterialRegistryTests.cs` | `Rendering/MaterialRegistry.cs` | `extends` inheritance (a child inheriting fields it doesn't set, overriding ones it does, merging correctly through a multi-level chain), cycle detection (both direct A↔B and self-referencing), and `.mat` `path` texture-prefixing (bare filenames get prefixed, already-qualified paths are left alone, no `path` field means no rewriting at all). |
 | `World/TransformTests.cs` | `World/Transform.cs` | The re-parent cycle guard (self-parent, an indirect ancestor cycle, and that a *rejected* cycle leaves the graph exactly as it was — no partial mutation), re-parenting correctly removing from the old parent's `Children`, no duplicate-children on a same-parent no-op, `WorldMatrix` composing correctly through a parent chain, and — the one most prone to "works until it doesn't" bugs — that `WorldMatrix` actually recomputes after the *parent* moves even when the child's value was already cached once. |
+| `UI/TransformGizmoTests.cs` | `UI/Gizmos/TransformGizmo.cs` | The gizmo's world→screen `Project` (a front-of-camera point lands in-viewport, dead-centre framing hits the middle, a behind-camera point returns `false`, world axes map to the expected screen directions) and its `DistanceToSegment` hit-test against hand-computed geometry. The load-bearing one is the **round-trip**: `Project` a world point → screen pixel → `Camera.ScreenPointToRay` back → a ray that still passes through the original point, pinning the gizmo's *drawing* projection to the viewport's *picking* projection so handles can't drift from where clicks land. The mouse-drag interaction itself needs a live ImGui frame, so it's verified visually headless, not here. See `Docs/Documentation/Gizmos.md`. |
 
-All four targets were picked because they're exactly the kind of logic CLAUDE.md's
+These targets were picked because they're exactly the kind of logic CLAUDE.md's
 standalone-harness note calls out (pure C#, no GL, no window) *and* sit behind a real past or
 easily-reachable bug: the `MaterialRegistry` suite exercises the exact merge/prefix machinery
 behind this repo's own `uvScale`-stopped-round-tripping regression and the `extends`/`path`
 features that followed it; `Transform`'s cycle guard and dirty-flag cache are the foundation the
 whole entity-hierarchy feature sits on, with the highest blast radius of anything covered so far
-if either ever regressed silently. Every suite in this table was spot-checked by deliberately
+if either ever regressed silently; the `TransformGizmo` projection round-trip guards the exact
+sign/axis-flip class of bug that would silently desync where handles draw from where clicks land. Every suite in this table was spot-checked by deliberately
 breaking the logic it covers and confirming the expected tests go red (see each's own commit
 message for exactly what was broken and which tests caught it) before being trusted.
 
