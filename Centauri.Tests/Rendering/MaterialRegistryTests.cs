@@ -26,11 +26,20 @@ public sealed class MaterialRegistryTests : IDisposable
         return path;
     }
 
+    // A path interpolated into a JSON string *value* (as opposed to passed as a plain method
+    // argument, like ReadDefinition's own idOrPath) has to actually be valid JSON content: a raw
+    // '\' from Path.Combine's Windows-native output isn't a valid JSON escape on its own (e.g.
+    // "...\Users..." reads as an invalid \U escape) and blows up the parse. The forward-slash
+    // form is just as valid a literal path to ResolvePath as the native one, so using it here
+    // sidesteps needing real JSON-string escaping without weakening what's under test.
+    private static string AsJsonPath(string path) => path.Replace('\\', '/');
+
     [Fact]
     public void ReadDefinition_ChildInheritsFieldsItDoesNotSet()
     {
         WriteMat("base.mat", """{ "shader": "Shaders/PBR/shaderPBR", "roughnessScalar": 0.7 }""");
-        var childPath = WriteMat("child.mat", $$"""{ "extends": "{{Path.Combine(_dir, "base.mat")}}" }""");
+        var childPath = WriteMat("child.mat",
+            $$"""{ "extends": "{{AsJsonPath(Path.Combine(_dir, "base.mat"))}}" }""");
 
         var def = _registry.ReadDefinition(childPath);
 
@@ -42,7 +51,7 @@ public sealed class MaterialRegistryTests : IDisposable
     {
         WriteMat("base.mat", """{ "shader": "Shaders/PBR/shaderPBR", "roughnessScalar": 0.7 }""");
         var childPath = WriteMat("child.mat",
-            $$"""{ "extends": "{{Path.Combine(_dir, "base.mat")}}", "roughnessScalar": 0.2 }""");
+            $$"""{ "extends": "{{AsJsonPath(Path.Combine(_dir, "base.mat"))}}", "roughnessScalar": 0.2 }""");
 
         var def = _registry.ReadDefinition(childPath);
 
@@ -54,8 +63,8 @@ public sealed class MaterialRegistryTests : IDisposable
     {
         WriteMat("grandparent.mat", """{ "metallicScalar": 0.9 }""");
         var parentPath = WriteMat("parent.mat",
-            $$"""{ "extends": "{{Path.Combine(_dir, "grandparent.mat")}}", "roughnessScalar": 0.4 }""");
-        var childPath = WriteMat("child.mat", $$"""{ "extends": "{{parentPath}}" }""");
+            $$"""{ "extends": "{{AsJsonPath(Path.Combine(_dir, "grandparent.mat"))}}", "roughnessScalar": 0.4 }""");
+        var childPath = WriteMat("child.mat", $$"""{ "extends": "{{AsJsonPath(parentPath)}}" }""");
 
         var def = _registry.ReadDefinition(childPath);
 
@@ -70,8 +79,8 @@ public sealed class MaterialRegistryTests : IDisposable
     {
         var aPath = Path.Combine(_dir, "a.mat");
         var bPath = Path.Combine(_dir, "b.mat");
-        WriteMat("a.mat", $$"""{ "extends": "{{bPath}}" }""");
-        WriteMat("b.mat", $$"""{ "extends": "{{aPath}}" }""");
+        WriteMat("a.mat", $$"""{ "extends": "{{AsJsonPath(bPath)}}" }""");
+        WriteMat("b.mat", $$"""{ "extends": "{{AsJsonPath(aPath)}}" }""");
 
         var exception = Record.Exception(() => _registry.ReadDefinition(aPath));
 
@@ -83,7 +92,7 @@ public sealed class MaterialRegistryTests : IDisposable
     public void ReadDefinition_DetectsASelfReferencingCycle()
     {
         var path = Path.Combine(_dir, "self.mat");
-        WriteMat("self.mat", $$"""{ "extends": "{{path}}" }""");
+        WriteMat("self.mat", $$"""{ "extends": "{{AsJsonPath(path)}}" }""");
 
         var exception = Record.Exception(() => _registry.ReadDefinition(path));
 
