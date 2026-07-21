@@ -19,11 +19,12 @@ internal sealed class ModelRegistry
 
     public IEnumerable<string> Ids => _paths.Keys.OrderBy(k => k);
 
-    // Same convention as MaterialRegistry.ResolvePath: a literal path is used as-is, anything
-    // else is looked up by id.
+    // Same convention as MaterialRegistry.ResolvePath: a literal path (contains '/' or '\',
+    // not just Path.DirectorySeparatorChar — see that method's comment for why both) is used
+    // as-is, anything else is looked up by id.
     public string ResolvePath(string idOrPath)
     {
-        if (idOrPath.Contains('/'))
+        if (idOrPath.Contains('/') || idOrPath.Contains('\\'))
             return idOrPath;
 
         if (_paths.TryGetValue(idOrPath, out var path))
@@ -36,7 +37,7 @@ internal sealed class ModelRegistry
     // Null for a literal path or an id with no .model file (nothing to default from) — callers
     // fall back to whatever the entity itself specifies.
     public ModelDefinition? GetDefinition(string idOrPath) =>
-        !idOrPath.Contains('/') && _definitions.TryGetValue(idOrPath, out var def) ? def : null;
+        !idOrPath.Contains('/') && !idOrPath.Contains('\\') && _definitions.TryGetValue(idOrPath, out var def) ? def : null;
 
     private static (Dictionary<string, string>, Dictionary<string, ModelDefinition>) Build()
     {

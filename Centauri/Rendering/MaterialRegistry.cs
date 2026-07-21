@@ -29,12 +29,16 @@ internal sealed class MaterialRegistry
               .Select(kv => kv.Key)
               .OrderBy(k => k);
 
-    // A literal path (contains '/') is used as-is — the escape hatch for anything not under
-    // the registry, and how existing "Assets/Materials/X.mat"-style references keep working.
-    // Anything else is looked up by id.
+    // A literal path (contains a path separator) is used as-is — the escape hatch for anything
+    // not under the registry, and how existing "Assets/Materials/X.mat"-style references keep
+    // working. Checks '\' as well as '/' (not just Path.DirectorySeparatorChar, since asset
+    // paths are always authored with '/' regardless of OS — see ApplyTexturePathPrefix — but an
+    // OS-native absolute path, e.g. a Windows temp path from a test, only contains '\'): a '/'-
+    // only check misreads a genuine literal Windows path with no forward slash as a bare id and
+    // fails lookup. Anything with neither separator is looked up by id.
     public string ResolvePath(string idOrPath)
     {
-        if (idOrPath.Contains('/'))
+        if (idOrPath.Contains('/') || idOrPath.Contains('\\'))
             return idOrPath;
 
         if (_paths.TryGetValue(idOrPath, out var path))
