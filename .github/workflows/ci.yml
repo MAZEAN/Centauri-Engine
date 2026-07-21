@@ -20,9 +20,24 @@ concurrency:
 
 jobs:
   build-and-test:
-    name: Build & unit tests
-    runs-on: ubuntu-latest
+    name: Build & unit tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
+    strategy:
+      # One runner failing (e.g. an arm64-only native-asset issue) shouldn't hide results from
+      # the others — each combination's outcome is independently useful.
+      fail-fast: false
+      matrix:
+        # x64 + arm64 across Windows and Linux — both are RIDs Ultz.Native.GLFW/the rest of our
+        # native deps already ship (see Centauri.deps.json's runtimeTargets), so this is real
+        # coverage, not aspirational. macOS deliberately excluded: WindowManager.cs now requests
+        # an OpenGL 4.3 core context (see its TargetGLVersion comment) and macOS's deprecated
+        # native GL caps out at 4.1 — a mac runner would just fail here on every run for a
+        # platform gap that isn't this job's to fix.
+        # arm64 labels are the GitHub-hosted standard arm64 runners (GA'd for public repos Aug
+        # 2025, later extended to private repos too) — see
+        # https://github.blog/changelog/2025-08-07-arm64-hosted-runners-for-public-repositories-are-now-generally-available/
+        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, windows-11-arm]
     steps:
       # Pinned to a commit SHA, not the (mutable) v4 tag — a tag can be repointed after the fact
       # (see the tj-actions/changed-files incident, Mar 2025: a compromised maintainer token was
