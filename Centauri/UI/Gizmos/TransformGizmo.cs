@@ -23,10 +23,10 @@ internal sealed class TransformGizmo
     // Apparent handle length as a fraction of distance-to-camera — keeps the gizmo a roughly
     // constant on-screen size regardless of how far the selection is (a fixed world length would
     // shrink to nothing when zoomed out and swamp the screen up close).
-    private const float HandleScreenFraction = 0.14f;
+    private const float HandleScreenFraction = 0.1f;
 
-    private const float PickPixels     = 7f;   // cursor-to-axis distance that counts as a hover
-    private const float LineThickness  = 3f;
+    private const float PickPixels     = 10f;   // cursor-to-axis distance that counts as a hover
+    private const float LineThickness  = 5f;
     private const float ArrowPixels    = 13f;
     private const float CentreDotPixels = 3.5f;
 

@@ -47,28 +47,13 @@ sure I am it's a real defect vs. intended behaviour.
 - **Fix:** intersect `Rworld` with the probe AABB (`uProbeBoxMin/Max`), then sample the cubemap
   along `(hitPoint − uProbePosition)`. ~6 lines in `probeFallback`.
 
-### 3. [Med] Culling uses `Cameras.Primary`, but every geometry pass renders with `Cameras.Active`
-- **Where:** `RenderingSystem.BeginFrame` culls against `scene.Cameras.Primary`
-  (`Rendering/RenderingSystem.cs:286`); `MainRenderer`, `GeometryPrepass`, and `ZPrepass` all
-  consume that one visible set while drawing with `Cameras.Active`. Hotkey **C** cycles only
-  Active (`Input/DebugHotkeys.cs:31` → `CameraRig.Cycle` sets `_active` only).
-- **Consequence:** if Active ≠ Primary (any scene with >1 camera, after a cycle), entities inside
-  Active's frustum but outside Primary's get culled and pop out; ones in Primary but off Active's
-  screen are drawn wastefully. With the default single camera they're the same object, so it's
-  latent.
-- **Confidence:** Medium — could be a deliberate "freeze the cull camera, fly around" debug
-  feature, but there's no freeze UI and **C** looks like a normal camera switch, so it reads as
-  a footgun.
-- **Fix:** cull against Active for the render passes (keep Primary only for the culling-debug
-  overlay `DrawAllAABBs`), or make the freeze explicit.
-
-### 4. [Med] `ShaderBatcher` rebuilds on transform-only changes (batches are transform-independent)
+### 3. [Med] `ShaderBatcher` rebuilds on transform-only changes (batches are transform-independent)
 - **Where:** `Rendering/Helper/ShaderBatcher.cs:62` gates on `scene.Revision`. Batches depend only
   on model + material identity, never on transforms, yet a transform move bumps Revision (see #1)
   and forces a full rebuild (new dictionaries, `Materials.ToArray()`, sort).
 - **Fix:** key the batcher off a structural revision, not the transform-inclusive one (pairs with #1a).
 
-### 5. [Med/Low] Projection is D3D-style `[0,1]`-NDC (System.Numerics) but GL runs without `glClipControl` → ~half the depth buffer unused
+### 4. [Med/Low] Projection is D3D-style `[0,1]`-NDC (System.Numerics) but GL runs without `glClipControl` → ~half the depth buffer unused
 - **Where:** `Camera.GetProjectionMatrixRaw` uses `Matrix4x4.CreatePerspectiveFieldOfView`
   (`World/Camera.cs:139`); the code documents "near z = 0, far z = 1"
   (`Camera.cs:98-99`, `Shadows/CascadeBuilder.cs:99`). No `glClipControl`/`glDepthRange` call
@@ -85,12 +70,12 @@ sure I am it's a real defect vs. intended behaviour.
   near plane; pairs naturally with reverse-Z + float depth for the big precision win. Caveat: the
   engine advertises GL 3.3 core, so this means requiring the extension or bumping the version.
 
-### 6. [Low] `Transform` position/rotation setters have no equality guard
+### 5. [Low] `Transform` position/rotation setters have no equality guard
 - **Where:** `World/Transform.cs:44-72`. Writing an unchanged value still calls `MarkDirty`.
   Combined with #1, a *sleeping* physics body (interpolated pose bit-identical frame to frame)
   still churns Revision. `if (_position == value) return;` short-circuits the at-rest case.
 
-### 7. [Low, latent] `Entity.Transform` setter re-subscribes the entity's own handler but not the Scene's
+### 6. [Low, latent] `Entity.Transform` setter re-subscribes the entity's own handler but not the Scene's
 - **Where:** `World/Entity.cs:34-44` moves `OnTransformChanged` to the new transform, but
   `Scene.AddEntity` subscribed `MarkDirty` to the *old* one (`World/Scene.cs:40`). Nothing
   reassigns `entity.Transform` today (grep is clean), so it's latent — but the asymmetry means a
