@@ -118,4 +118,44 @@ public sealed class TransformGizmoTests
 
         Assert.Equal(expected, d, tolerance: 1e-4f);
     }
+
+    // --- ComposeWorldRotation: the rotate gizmo composes a world-axis delta onto the grabbed
+    //     orientation. These pin the (easy-to-get-backwards) quaternion multiplication order to the
+    //     geometry: a world-axis rotation must act in the *world* frame regardless of the object's
+    //     current orientation. ---
+
+    private static void AssertVectorsClose(Vector3 expected, Vector3 actual)
+    {
+        Assert.True((expected - actual).Length() < 1e-4f, $"expected {expected}, got {actual}");
+    }
+
+    [Fact]
+    public void ComposeWorldRotation_FromIdentity_IsAPlainAxisAngle()
+    {
+        // +90° about world Y sends +Z to +X (right-hand rule).
+        var q = TransformGizmo.ComposeWorldRotation(Quaternion.Identity, Vector3.UnitY, MathF.PI / 2f);
+        AssertVectorsClose(Vector3.UnitX, Vector3.Transform(Vector3.UnitZ, q));
+    }
+
+    [Fact]
+    public void ComposeWorldRotation_AppliesTheDeltaInTheWorldFrame_NotTheObjectFrame()
+    {
+        // Start already rotated +90° about world X: that sends +Y to +Z.
+        var start = Quaternion.CreateFromAxisAngle(Vector3.UnitX, MathF.PI / 2f);
+        AssertVectorsClose(Vector3.UnitZ, Vector3.Transform(Vector3.UnitY, start));
+
+        // Now add +90° about world Y. It must act in world space: +Z then goes to +X, so the
+        // object's +Y ends up at +X. (If the delta were applied in the object's local frame instead,
+        // this would land somewhere else — that's exactly the bug this guards against.)
+        var composed = TransformGizmo.ComposeWorldRotation(start, Vector3.UnitY, MathF.PI / 2f);
+        AssertVectorsClose(Vector3.UnitX, Vector3.Transform(Vector3.UnitY, composed));
+    }
+
+    [Fact]
+    public void ComposeWorldRotation_ZeroAngle_LeavesTheStartUntouched()
+    {
+        var start = Quaternion.CreateFromYawPitchRoll(0.6f, -0.3f, 1.1f);
+        var composed = TransformGizmo.ComposeWorldRotation(start, Vector3.UnitZ, 0f);
+        Assert.True(Quaternion.Dot(start, composed) > 0.9999f);
+    }
 }

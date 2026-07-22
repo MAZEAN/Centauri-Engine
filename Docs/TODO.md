@@ -59,6 +59,8 @@
 * [ ] Morph the add entity menu to resemble blender's (Shift + A)
 * [ ] Skybox rotation (specifically night)
 * [ ] Make UI elements writeable not just draggable
+* [ ] Panning like blender
+* [ ] 
 
 ## Optional
 * [ ] Hosek-Wilkie sky algorithm

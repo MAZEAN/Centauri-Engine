@@ -1,9 +1,9 @@
 # Viewport Gizmos (`UI/Gizmos/`)
 
 Interactive transform handles drawn over the selected entity in the viewport — the first
-Phase-1 editor-usability item from `Docs/Roadmaps/ENGINE_ROADMAP.md`. Currently: a **translate**
-gizmo (`UI/Gizmos/TransformGizmo.cs`). Rotate/scale are designed-for but not yet built (see
-§4).
+Phase-1 editor-usability item from `Docs/Roadmaps/ENGINE_ROADMAP.md`. `UI/Gizmos/TransformGizmo.cs`
+covers all three modes — **translate / rotate / scale**, switched with **W / E / R** — on one
+shared project → hit-test → drag scaffold.
 
 ## 1. Why not ImGuizmo
 
@@ -20,7 +20,7 @@ The roadmap named ImGuizmo (the usual Dear ImGui pairing). We deliberately didn'
   already have every piece needed (full camera matrices, `Camera.ScreenPointToRay`, `Transform`,
   and ImGui's foreground draw list for a 2D overlay).
 
-So the gizmo is ~200 lines of our own projection + hit-test + drag math instead.
+So the gizmo is our own projection + hit-test + drag math instead.
 
 ## 2. How it works
 
@@ -28,14 +28,41 @@ So the gizmo is ~200 lines of our own projection + hit-test + drag math instead.
 **only in Edit mode with a selection** (the same block that renders the Outliner/Properties). It:
 
 1. Takes the selected entity's world position (`Transform.WorldPosition`) as the gizmo origin.
-2. Projects the origin and three axis endpoints (world ±X/Y/Z, a distance-scaled length so the
-   gizmo stays a roughly constant on-screen size) to screen space with the **raw** projection
-   (`GetViewMatrix() * GetProjectionMatrixRaw()` — raw so the handles don't inherit the scene's
-   TAA jitter).
-3. Draws the arrows + a centre dot into `ImGui.GetForegroundDrawList()` — a pure 2D overlay, **no
-   GL render-graph involvement, no new pass**.
-4. Runs all interaction off ImGui's own IO mouse state during that same frame (hover-test →
-   click-to-grab → drag → release), so `InputSystem` needs to know nothing about it.
+2. Projects the origin and each handle (three axis endpoints for translate/scale, three rings for
+   rotate — sized by a distance-scaled world length so the gizmo stays a roughly constant on-screen
+   size) to screen space with the **raw** projection (`GetViewMatrix() * GetProjectionMatrixRaw()` —
+   raw so the handles don't inherit the scene's TAA jitter).
+3. Draws into `ImGui.GetForegroundDrawList()` — a pure 2D overlay, **no GL render-graph
+   involvement, no new pass**.
+4. Runs all interaction off ImGui's own IO mouse **and keyboard** state during that same frame
+   (mode switch → hover-test → click-to-grab → drag → release), so `InputSystem` needs to know
+   nothing about it.
+
+### Modes and axis frames
+
+- **Translate** (`W`) — three arrows along the **world** X/Y/Z; drag slides `Transform.Position`
+  along the grabbed axis.
+- **Rotate** (`E`) — three rings, one per **world** axis, each sampled to a projected polyline so
+  its perspective ellipse is hit-tested and drawn correctly (not faked as a flat circle); drag
+  spins the orientation about that world axis.
+- **Scale** (`R`) — three box-tipped handles along the object's **local** basis (its world-rotated
+  X/Y/Z), because `Transform.Scale` is local — a world-axis scale of a rotated object isn't
+  representable by it. Drag multiplies that local axis's scale. (For an unrotated object the local
+  basis equals the world axes, so it looks like translate with box tips.)
+
+Mode switching reads `W`/`E`/`R` off ImGui IO, gated on no text field wanting the keyboard and no
+modifier held (so `Ctrl+Shift+R`'s scene-reset doesn't also trip scale mode), and is ignored
+mid-drag. `DebugHotkeys` (M/C/B/N/G) and camera fly (WASD, Fly-mode only) don't overlap.
+
+### Rotate: keeping the inspector coherent
+
+Rotate composes an arbitrary world-axis delta onto the grabbed orientation
+(`ComposeWorldRotation` — a world rotation *pre*-multiplies in System.Numerics' convention, pinned
+by a test) and writes it via **`Transform.SetRotation`**, which also refreshes the `EulerAngles`
+cache the inspector's Rotation rows display and edit from. Without that refresh the inspector would
+show a stale angle and its next drag would snap the object back to it. The quaternion→euler
+extraction matches `CreateFromYawPitchRoll`'s Y·X·Z convention and pins roll to 0 at the ±90° pitch
+gimbal; it's round-trip tested (rebuild a quaternion from the cached euler, assert same orientation).
 
 ### Coordinate conventions
 
@@ -45,7 +72,7 @@ perspective divide, and the same NDC→screen Y-flip. This agreement is **load-b
 two ever disagreed, handles would render in one place and respond to the cursor in another. The
 test suite pins them together (§3).
 
-### Dragging, parent-aware
+### Dragging, parent-aware (translate)
 
 On grab, the reference geometry (start mouse pos, the origin's start world position, the axis's
 screen direction, and a world-units-per-pixel scale) is **frozen** so the mapping doesn't drift as
@@ -74,26 +101,36 @@ can't steal that panel's clicks.
 
 ## 3. Tests
 
-`Centauri.Tests/UI/TransformGizmoTests.cs` — the projection and hit-test are pure math (no
-ImGui/GL), reachable via `internal` + `InternalsVisibleTo`. Covers:
+The pure math (no ImGui/GL) is reachable via `internal` + `InternalsVisibleTo`:
 
+`Centauri.Tests/UI/TransformGizmoTests.cs`:
 - A front-of-camera point landing inside the viewport (and dead-centre framing hitting the middle).
 - A behind-camera point returning `false` (w ≤ 0).
 - World axes mapping to the expected screen directions (+X right, +Y *up* = screen-Y down).
-- **The round-trip invariant**: a world point → `Project` → screen pixel → `ScreenPointToRay` →
-  a ray that passes back through the original point. This is the one that catches a silent
-  sign/axis flip between drawing and picking.
+- **The projection round-trip**: a world point → `Project` → screen pixel → `ScreenPointToRay` →
+  a ray that passes back through the original point. Catches a silent sign/axis flip between
+  drawing and picking.
 - `DistanceToSegment` against hand-computed geometry (on-segment, perpendicular, past either end).
+- **`ComposeWorldRotation`** — that a world-axis delta acts in the *world* frame regardless of the
+  object's current orientation. This one *caught the bug* it guards: the initial `start * delta`
+  multiply order was backwards for System.Numerics and the test failed until it was flipped to
+  `delta * start`.
 
-Interaction (the actual mouse drag) isn't unit-tested — it needs a live ImGui IO frame — but was
-verified visually headless (force Edit mode + auto-select, render, confirm handles land on the
-selection; that scaffolding is env-var-gated and not committed).
+`Centauri.Tests/World/TransformTests.cs`:
+- **`SetRotation` euler coherence** — across a range of angles (and at the pitch gimbal), rebuild a
+  quaternion from the euler the setter cached and assert it's the same orientation (|dot| ≈ 1),
+  which sidesteps the many-valid-triples ambiguity of comparing angles directly.
 
-## 4. Extending to rotate / scale
+Interaction (the actual mouse drag) isn't unit-tested — it needs a live ImGui IO frame — but the
+**drawing** of all three modes was verified visually headless (force Edit mode + auto-select + a
+non-trivial rotation, render each mode, confirm handles/rings land on the selection and scale's
+handles follow the tilted local basis; that scaffolding is env-var-gated and not committed). The
+drag **feel/sign** for rotate and scale — which genuinely can't be exercised without a cursor —
+rests on the math + tests above and is worth an interactive sanity-check.
 
-The `Draw` → project-origin → per-axis project/hit-test/drag scaffold is mode-agnostic. Rotate
-wants screen-space arcs and an angular drag (cross-product sign off the origin) instead of arrows
-and a linear delta; scale reuses the translate arrows almost verbatim but multiplies
-`Transform.Scale` along the axis instead of adding to `Position`. A mode enum + a hotkey to switch
-(W/E/R is the Blender-ish convention) is the natural next step, plus a local-vs-world toggle (the
-current gizmo is world-axis only).
+## 4. Possible extensions
+
+- A **local-vs-world toggle** for translate/rotate (currently world-only; scale is always local).
+- **Snapping** (hold a modifier to quantize to fixed translate/rotate/scale increments).
+- A **plane handle** (the little quad between two axes) to translate/scale in a plane at once.
+- **Uniform scale** via the centre handle (drag scales all three axes together).

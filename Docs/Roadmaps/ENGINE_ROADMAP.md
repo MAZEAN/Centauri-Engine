@@ -38,9 +38,8 @@ real per-entity behavior extensibility point — and `RigidBody` is its only con
 Physics colliders are box/sphere only, no kinematic bodies, no per-material friction/restitution.
 There's no audio subsystem, no skeletal animation, no terrain, no water, no LOD/impostor system,
 no texture streaming or compression (every texture decodes to full-resolution RGBA8/RGB16F on
-load — see `GLTexture.Decode`). The editor's viewport gizmos cover translate only (a
-self-implemented handle — see Phase 1 below and `Docs/Documentation/Gizmos.md`; rotate/scale and
-numeric-only editing for everything past position still stand), and there's no multi-select, no
+load — see `GLTexture.Decode`). The editor has viewport gizmos (translate/rotate/scale, W/E/R —
+self-implemented; see Phase 1 below and `Docs/Documentation/Gizmos.md`) but no multi-select, no
 undo/redo, no drag-and-drop asset placement. `EntitySetLoader.Save()` doesn't round-trip material property
 overrides or camera/skybox edits (documented in-code, not a bug — just unbuilt).
 
@@ -101,13 +100,14 @@ The renderer has no shortage of knobs; almost none of them are reachable without
 JSON by hand or dragging a number field to the value you want. This is the actual ceiling on
 "can someone build a scene in this," independent of how good the renderer itself is.
 
-- [~] **Viewport gizmos** (translate/rotate/scale handles). Numeric drag rows don't substitute for
-  this past trivial placements. **Translate landed** — `UI/Gizmos/TransformGizmo.cs`,
-  self-implemented (screen-space overlay via ImGui's foreground draw list + our own
-  projection/hit-test/drag on the existing camera math) rather than ImGuizmo, to avoid adding a
-  per-RID native binary the 4-way CI matrix + headless job would all need; see
-  `Docs/Documentation/Gizmos.md` §1 for the full rationale and §4 for the rotate/scale extension
-  path (still to do).
+- [x] **Viewport gizmos** (translate/rotate/scale handles) — **done**. `UI/Gizmos/TransformGizmo.cs`,
+  all three modes switched with W/E/R, self-implemented (screen-space overlay via ImGui's foreground
+  draw list + our own projection/hit-test/drag on the existing camera math) rather than ImGuizmo, to
+  avoid adding a per-RID native binary the 4-way CI matrix + headless job would all need; see
+  `Docs/Documentation/Gizmos.md` §1 for the rationale and §4 for optional extensions
+  (local/world toggle, snapping, plane/uniform handles). One caveat: the rotate/scale drag *feel* is
+  math-and-test-backed but couldn't be exercised without a cursor headless — worth an interactive
+  sanity check.
 - [ ] **Undo/redo.** Currently the only "undo" is `EntitySetLoader.Reset()` — discard every live
   edit and reload from disk. A real undo stack (even a coarse one — snapshot/diff per edit
   gesture) is table stakes for an editor.

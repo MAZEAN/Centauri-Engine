@@ -137,6 +137,57 @@ public class Transform
         );
     }
 
+    // Sets an arbitrary orientation (e.g. from the rotate gizmo, which composes a world-axis
+    // delta that isn't a single euler component) while keeping the EulerAngles cache the inspector
+    // displays and edits from coherent — otherwise the inspector's Rotation rows would show a stale
+    // value and its next drag would snap the object back to it. The extracted angles are one valid
+    // (pitch, yaw, roll) that reproduces `rotation`; near a ±90° pitch gimbal there are many, and
+    // roll is pinned to 0 there (see ToEulerDegrees).
+    public void SetRotation(Quaternion rotation)
+    {
+        Rotation = rotation;                        // normalizes + marks dirty (existing setter)
+        EulerAngles = ToEulerDegrees(_rotation);
+    }
+
+    // Inverse of CreateFromYawPitchRoll's Y(yaw)·X(pitch)·Z(roll) convention, via the rotation
+    // matrix. System.Numerics matrices are row-vector (v' = v·M), so the column-vector element
+    // Mc[r][c] used in the classic extraction below is m.M{c+1}{r+1} (a transpose).
+    private static Vector3 ToEulerDegrees(Quaternion q)
+    {
+        var m = Matrix4x4.CreateFromQuaternion(Quaternion.Normalize(q));
+
+        // Column-vector elements of R = Ry(yaw)·Rx(pitch)·Rz(roll):
+        //   Mc[1][2] = -sin(pitch),  Mc[0][2] = sy·cp,  Mc[2][2] = cy·cp,
+        //   Mc[1][0] = cp·sr,        Mc[1][1] = cp·cr.
+        var mc12 = m.M32; // -sin(pitch)
+        var mc02 = m.M31; //  sy·cp
+        var mc22 = m.M33; //  cy·cp
+        var mc10 = m.M12; //  cp·sr
+        var mc11 = m.M22; //  cp·cr
+
+        var pitch = MathF.Asin(Math.Clamp(-mc12, -1f, 1f));
+
+        float yaw, roll;
+        if (MathF.Abs(mc12) < 0.99999f)
+        {
+            yaw  = MathF.Atan2(mc02, mc22);
+            roll = MathF.Atan2(mc10, mc11);
+        }
+        else
+        {
+            // Gimbal lock (pitch ≈ ±90°): yaw and roll rotate about the same screen axis, so their
+            // split is arbitrary — pin roll to 0 and fold everything into yaw. Mc[0][0]=cy, Mc[2][0]=-sy
+            // once sr=0/cr=1, i.e. m.M11 and m.M13.
+            yaw  = MathF.Atan2(-m.M13, m.M11);
+            roll = 0f;
+        }
+
+        return new Vector3(
+            float.RadiansToDegrees(pitch),
+            float.RadiansToDegrees(yaw),
+            float.RadiansToDegrees(roll));
+    }
+
     // checks if this transform is an ancestor of the given node
     private bool IsAncestorOf(Transform node)
     {

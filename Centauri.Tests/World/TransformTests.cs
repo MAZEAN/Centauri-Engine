@@ -139,4 +139,50 @@ public class TransformTests
         Assert.Contains(childA, parent.Children);
         Assert.Contains(childB, parent.Children);
     }
+
+    // SetRotation (used by the rotate gizmo, which composes an arbitrary world-axis delta) must keep
+    // the EulerAngles cache the inspector displays/edits from coherent with the quaternion. Rather
+    // than compare extracted angles directly (many valid triples exist, and gimbal cases are
+    // ambiguous), round-trip through rotations: the euler SetRotation cached must rebuild the same
+    // orientation. |dot| ≈ 1 means "same rotation" (q and -q are the same orientation).
+    [Theory]
+    [InlineData(0f, 0f, 0f)]
+    [InlineData(30f, 45f, 0f)]
+    [InlineData(-20f, 120f, 60f)]
+    [InlineData(15f, -170f, -80f)]
+    [InlineData(89f, 10f, 5f)]   // near — but not at — the pitch gimbal
+    public void SetRotation_KeepsEulerAnglesCoherentWithTheQuaternion(float pitch, float yaw, float roll)
+    {
+        var q = Quaternion.CreateFromYawPitchRoll(
+            float.DegreesToRadians(yaw), float.DegreesToRadians(pitch), float.DegreesToRadians(roll));
+
+        var t = new Transform();
+        t.SetRotation(q);
+
+        // Rebuild a quaternion from the euler the setter cached; it must be the same orientation.
+        var e = t.EulerAngles; // (pitch, yaw, roll) in degrees
+        var rebuilt = Quaternion.CreateFromYawPitchRoll(
+            float.DegreesToRadians(e.Y), float.DegreesToRadians(e.X), float.DegreesToRadians(e.Z));
+
+        Assert.True(MathF.Abs(Quaternion.Dot(Quaternion.Normalize(q), rebuilt)) > 0.9999f,
+            $"euler {e} rebuilt to a different orientation than the source quaternion");
+    }
+
+    [Fact]
+    public void SetRotation_AtThePitchGimbal_StillReproducesTheOrientation()
+    {
+        // pitch = +90° is the degenerate case ToEulerDegrees special-cases (roll pinned to 0).
+        var q = Quaternion.CreateFromYawPitchRoll(
+            float.DegreesToRadians(40f), float.DegreesToRadians(90f), float.DegreesToRadians(25f));
+
+        var t = new Transform();
+        t.SetRotation(q);
+
+        var e = t.EulerAngles;
+        var rebuilt = Quaternion.CreateFromYawPitchRoll(
+            float.DegreesToRadians(e.Y), float.DegreesToRadians(e.X), float.DegreesToRadians(e.Z));
+
+        Assert.True(MathF.Abs(Quaternion.Dot(Quaternion.Normalize(q), rebuilt)) > 0.999f,
+            $"gimbal euler {e} rebuilt to a different orientation");
+    }
 }
