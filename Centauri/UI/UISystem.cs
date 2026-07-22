@@ -26,6 +26,7 @@ public sealed class UISystem : IDisposable
     private readonly HierarchyPanel _outliner;
     private readonly ViewportToolbar _toolbar;
     private readonly TransformGizmo _gizmo;
+    private readonly GizmoModeBar _gizmoModeBar;
 
     // The gizmo isn't an ImGui window, so it doesn't set WantCaptureMouse — fold its own
     // hover/drag state in so InputSystem suppresses viewport picking while a handle is engaged.
@@ -43,6 +44,7 @@ public sealed class UISystem : IDisposable
         _outliner = new HierarchyPanel(_imGui.Font, resourceSystem, entitySetLoader);
         _toolbar = new ViewportToolbar(_imGui.Font, config);
         _gizmo = new TransformGizmo();
+        _gizmoModeBar = new GizmoModeBar(_imGui.Font, _gizmo);
     }
 
     public void Update(float deltaTime) => _imGui.Update(deltaTime);
@@ -66,6 +68,8 @@ public sealed class UISystem : IDisposable
                 _properties.Render(scene);
             using (Tracy.Scope("UISystem.Render.Gizmo"))
                 _gizmo.Draw(scene, scene.Cameras.Active);
+            using (Tracy.Scope("UISystem.Render.GizmoModeBar"))
+                _gizmoModeBar.Render();
         }
 
         using (Tracy.Scope("UISystem.Render.ImGuiFlush"))

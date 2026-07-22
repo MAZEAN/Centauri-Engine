@@ -1,9 +1,19 @@
 # Viewport Gizmos (`UI/Gizmos/`)
 
 Interactive transform handles drawn over the selected entity in the viewport — the first
-Phase-1 editor-usability item from `Docs/Roadmaps/ENGINE_ROADMAP.md`. `UI/Gizmos/TransformGizmo.cs`
-covers all three modes — **translate / rotate / scale**, switched with **W / E / R** — on one
+Phase-1 editor-usability item from `Docs/Roadmaps/ENGINE_ROADMAP.md`. All three modes —
+**translate / rotate / scale**, switched with **W / E / R** or the on-screen mode bar — on one
 shared project → hit-test → drag scaffold.
+
+`UI/Gizmos/` is split by responsibility:
+
+- **`TransformGizmo`** — the interaction coordinator: mode, hover/drag state, turning mouse motion
+  into `Transform` edits.
+- **`GizmoMath`** — pure geometry (projection, segment/ring hit-tests, plane basis, world-rotation
+  compose, the rotate-drag angle map). No ImGui/GL/state; this is what the unit tests target.
+- **`GizmoDraw`** — everything touching the ImGui foreground draw list (arrows, scale boxes, rings,
+  centre dot, axis colours), handed already-computed screen geometry.
+- **`GizmoModeBar`** — the bottom-centre icon strip (see §2).
 
 ## 1. Why not ImGuizmo
 
@@ -52,7 +62,12 @@ So the gizmo is our own projection + hit-test + drag math instead.
 
 Mode switching reads `W`/`E`/`R` off ImGui IO, gated on no text field wanting the keyboard and no
 modifier held (so `Ctrl+Shift+R`'s scene-reset doesn't also trip scale mode), and is ignored
-mid-drag. `DebugHotkeys` (M/C/B/N/G) and camera fly (WASD, Fly-mode only) don't overlap.
+mid-drag. `DebugHotkeys` (M/C/B/N/G) and camera fly (WASD, Fly-mode only) don't overlap. A
+**`GizmoModeBar`** (bottom-centre of the viewport) mirrors this: three vector-drawn icon buttons
+(Move / Rotate / Scale) that highlight the active mode and set it on click — the same
+`TransformGizmo.ActiveMode` the keys drive. Bottom-centre because the left column is the
+StatsOverlay and the right is the Outliner/Properties; icons are drawn with draw-list primitives
+since no icon font is loaded.
 
 ### Rotate: keeping the inspector coherent
 
@@ -63,6 +78,19 @@ cache the inspector's Rotation rows display and edit from. Without that refresh 
 show a stale angle and its next drag would snap the object back to it. The quaternion→euler
 extraction matches `CreateFromYawPitchRoll`'s Y·X·Z convention and pins roll to 0 at the ±90° pitch
 gimbal; it's round-trip tested (rebuild a quaternion from the cached euler, assert same orientation).
+
+### Rotate: the drag→angle mapping (why not exact atan2)
+
+The obvious map — the angle the cursor has swept *around* the gizmo centre,
+`atan2(cur−centre) − atan2(grab−centre)` — tracks a cursor circling the pivot perfectly but
+decelerates hard on the straight drags people actually do: as the cursor pulls away from the centre
+the effective radius grows, so each pixel turns the object less and less. `RotationAngleDelta`
+instead uses the **linear (first-order) approximation** of that map, frozen at the grab: since the
+derivative of `atan2` along the tangent is `cross(radialHat, ·)/radius`, this keeps the *initial*
+rate and sign identical while staying constant-rate as the drag grows. Radial motion contributes
+nothing and a radius floor stops a grab near the centre from becoming hypersensitive; `RotateGain`
+is a one-number feel knob. Trade-off: a cursor circling the pivot no longer tracks 1:1 past large
+angles (re-grab to continue), which is the far less common gesture.
 
 ### Coordinate conventions
 
@@ -101,9 +129,9 @@ can't steal that panel's clicks.
 
 ## 3. Tests
 
-The pure math (no ImGui/GL) is reachable via `internal` + `InternalsVisibleTo`:
+The pure math now lives in `GizmoMath` (no ImGui/GL), reachable via `internal` + `InternalsVisibleTo`:
 
-`Centauri.Tests/UI/TransformGizmoTests.cs`:
+`Centauri.Tests/UI/TransformGizmoTests.cs` (targets `GizmoMath`):
 - A front-of-camera point landing inside the viewport (and dead-centre framing hitting the middle).
 - A behind-camera point returning `false` (w ≤ 0).
 - World axes mapping to the expected screen directions (+X right, +Y *up* = screen-Y down).
@@ -115,6 +143,9 @@ The pure math (no ImGui/GL) is reachable via `internal` + `InternalsVisibleTo`:
   object's current orientation. This one *caught the bug* it guards: the initial `start * delta`
   multiply order was backwards for System.Numerics and the test failed until it was flipped to
   `delta * start`.
+- **`RotationAngleDelta`** — that the rotate-drag mapping is *linear* in the tangential distance
+  (2×/3× the travel → 2×/3× the angle, none of the atan2 taper), ignores radial motion, agrees with
+  the exact map for small drags, and honours sign/gain.
 
 `Centauri.Tests/World/TransformTests.cs`:
 - **`SetRotation` euler coherence** — across a range of angles (and at the pitch gimbal), rebuild a

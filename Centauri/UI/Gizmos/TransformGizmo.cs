@@ -19,7 +19,7 @@ using Common;
 internal sealed class TransformGizmo
 {
     private enum Axis { None, X, Y, Z }
-    private enum Mode { Translate, Rotate, Scale }
+    internal enum Mode { Translate, Rotate, Scale }
 
     // Apparent handle length as a fraction of distance-to-camera — keeps the gizmo a roughly
     // constant on-screen size regardless of how far the selection is (a fixed world length would
@@ -58,6 +58,15 @@ internal sealed class TransformGizmo
     // True while the cursor is over a handle or a drag is in progress — InputSystem folds this into
     // WantsMouse so a click on the gizmo doesn't also re-pick/deselect underneath it.
     public bool IsInteracting => _drag != Axis.None || _hover != Axis.None;
+
+    // The active transform mode. W/E/R set it directly (HandleModeSwitch); the GizmoModeBar reads
+    // it to highlight the current tool and writes it when a tool button is clicked — a mid-drag
+    // change is harmless (the drag holds the mouse; the switch takes effect on release).
+    internal Mode ActiveMode
+    {
+        get => _mode;
+        set => _mode = value;
+    }
 
     public void Draw(Scene scene, Camera camera)
     {
