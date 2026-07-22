@@ -30,7 +30,7 @@ public sealed class TransformGizmoTests
     private static Vector2 ProjectViaGizmo(Camera cam, Vector3 world)
     {
         var viewProj = cam.GetViewMatrix() * cam.GetProjectionMatrixRaw();
-        Assert.True(TransformGizmo.Project(world, viewProj, Viewport, out var screen));
+        Assert.True(GizmoMath.Project(world, viewProj, Viewport, out var screen));
         return screen;
     }
 
@@ -55,7 +55,7 @@ public sealed class TransformGizmoTests
 
         // Behind the camera (further along +Z than the eye) has w <= 0 after view*proj.
         var viewProj = cam.GetViewMatrix() * cam.GetProjectionMatrixRaw();
-        Assert.False(TransformGizmo.Project(new Vector3(0, 0, 10), viewProj, Viewport, out _));
+        Assert.False(GizmoMath.Project(new Vector3(0, 0, 10), viewProj, Viewport, out _));
     }
 
     [Fact]
@@ -114,7 +114,7 @@ public sealed class TransformGizmoTests
         var a = new Vector2(0f, 0f);
         var b = new Vector2(10f, 0f);
 
-        var d = TransformGizmo.DistanceToSegment(new Vector2(px, py), a, b);
+        var d = GizmoMath.DistanceToSegment(new Vector2(px, py), a, b);
 
         Assert.Equal(expected, d, tolerance: 1e-4f);
     }
@@ -133,7 +133,7 @@ public sealed class TransformGizmoTests
     public void ComposeWorldRotation_FromIdentity_IsAPlainAxisAngle()
     {
         // +90° about world Y sends +Z to +X (right-hand rule).
-        var q = TransformGizmo.ComposeWorldRotation(Quaternion.Identity, Vector3.UnitY, MathF.PI / 2f);
+        var q = GizmoMath.ComposeWorldRotation(Quaternion.Identity, Vector3.UnitY, MathF.PI / 2f);
         AssertVectorsClose(Vector3.UnitX, Vector3.Transform(Vector3.UnitZ, q));
     }
 
@@ -147,7 +147,7 @@ public sealed class TransformGizmoTests
         // Now add +90° about world Y. It must act in world space: +Z then goes to +X, so the
         // object's +Y ends up at +X. (If the delta were applied in the object's local frame instead,
         // this would land somewhere else — that's exactly the bug this guards against.)
-        var composed = TransformGizmo.ComposeWorldRotation(start, Vector3.UnitY, MathF.PI / 2f);
+        var composed = GizmoMath.ComposeWorldRotation(start, Vector3.UnitY, MathF.PI / 2f);
         AssertVectorsClose(Vector3.UnitX, Vector3.Transform(Vector3.UnitY, composed));
     }
 
@@ -155,7 +155,7 @@ public sealed class TransformGizmoTests
     public void ComposeWorldRotation_ZeroAngle_LeavesTheStartUntouched()
     {
         var start = Quaternion.CreateFromYawPitchRoll(0.6f, -0.3f, 1.1f);
-        var composed = TransformGizmo.ComposeWorldRotation(start, Vector3.UnitZ, 0f);
+        var composed = GizmoMath.ComposeWorldRotation(start, Vector3.UnitZ, 0f);
         Assert.True(Quaternion.Dot(start, composed) > 0.9999f);
     }
 
@@ -170,9 +170,9 @@ public sealed class TransformGizmoTests
     [Fact]
     public void RotationAngleDelta_IsLinearInTangentialDistance_NoDeceleration()
     {
-        var phi1 = TransformGizmo.RotationAngleDelta(RadialHat, 1f / R, new Vector2(0f, R),      sign: 1f, gain: 1f);
-        var phi2 = TransformGizmo.RotationAngleDelta(RadialHat, 1f / R, new Vector2(0f, 2f * R), sign: 1f, gain: 1f);
-        var phi3 = TransformGizmo.RotationAngleDelta(RadialHat, 1f / R, new Vector2(0f, 3f * R), sign: 1f, gain: 1f);
+        var phi1 = GizmoMath.RotationAngleDelta(RadialHat, 1f / R, new Vector2(0f, R),      sign: 1f, gain: 1f);
+        var phi2 = GizmoMath.RotationAngleDelta(RadialHat, 1f / R, new Vector2(0f, 2f * R), sign: 1f, gain: 1f);
+        var phi3 = GizmoMath.RotationAngleDelta(RadialHat, 1f / R, new Vector2(0f, 3f * R), sign: 1f, gain: 1f);
 
         // Exactly proportional — 2×/3× the tangential travel gives 2×/3× the angle, with none of the
         // atan2 taper (which would give atan2(2,1)/atan2(1,1) ≈ 1.41× for the second step, not 2×).
@@ -184,7 +184,7 @@ public sealed class TransformGizmoTests
     public void RotationAngleDelta_IgnoresRadialMotion()
     {
         // Moving straight out along the radius (no tangential component) must not rotate anything.
-        var phi = TransformGizmo.RotationAngleDelta(RadialHat, 1f / R, new Vector2(50f, 0f), sign: 1f, gain: 1f);
+        var phi = GizmoMath.RotationAngleDelta(RadialHat, 1f / R, new Vector2(50f, 0f), sign: 1f, gain: 1f);
         Assert.Equal(0f, phi, tolerance: 1e-6f);
     }
 
@@ -194,7 +194,7 @@ public sealed class TransformGizmoTests
         // For a small tangential step the linearisation should agree with the exact atan2 change,
         // so the drag feels identical at the start (it only diverges — helpfully — as it grows).
         const float smallDy = 2f;
-        var phi   = TransformGizmo.RotationAngleDelta(RadialHat, 1f / R, new Vector2(0f, smallDy), sign: 1f, gain: 1f);
+        var phi   = GizmoMath.RotationAngleDelta(RadialHat, 1f / R, new Vector2(0f, smallDy), sign: 1f, gain: 1f);
         var exact = MathF.Atan2(smallDy, R);
         Assert.Equal(exact, phi, tolerance: 1e-3f);
     }
@@ -202,9 +202,9 @@ public sealed class TransformGizmoTests
     [Fact]
     public void RotationAngleDelta_SignAndGainScaleTheResult()
     {
-        var basePhi = TransformGizmo.RotationAngleDelta(RadialHat, 1f / R, new Vector2(0f, R), sign: 1f, gain: 1f);
+        var basePhi = GizmoMath.RotationAngleDelta(RadialHat, 1f / R, new Vector2(0f, R), sign: 1f, gain: 1f);
         Assert.True(basePhi > 0f);
-        Assert.Equal(-basePhi, TransformGizmo.RotationAngleDelta(RadialHat, 1f / R, new Vector2(0f, R), sign: -1f, gain: 1f), tolerance: 1e-6f);
-        Assert.Equal(2f * basePhi, TransformGizmo.RotationAngleDelta(RadialHat, 1f / R, new Vector2(0f, R), sign: 1f, gain: 2f), tolerance: 1e-6f);
+        Assert.Equal(-basePhi, GizmoMath.RotationAngleDelta(RadialHat, 1f / R, new Vector2(0f, R), sign: -1f, gain: 1f), tolerance: 1e-6f);
+        Assert.Equal(2f * basePhi, GizmoMath.RotationAngleDelta(RadialHat, 1f / R, new Vector2(0f, R), sign: 1f, gain: 2f), tolerance: 1e-6f);
     }
 }
