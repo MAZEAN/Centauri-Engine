@@ -158,4 +158,53 @@ public sealed class TransformGizmoTests
         var composed = TransformGizmo.ComposeWorldRotation(start, Vector3.UnitZ, 0f);
         Assert.True(Quaternion.Dot(start, composed) > 0.9999f);
     }
+
+    // --- RotationAngleDelta: the rotate-drag mapping. The whole point of it (vs. the exact
+    //     atan2-around-centre map) is that it stays constant-rate instead of decelerating on a
+    //     straight drag — so the load-bearing property is linearity in the tangential distance. ---
+
+    // grab at (R, 0) around a centre at the origin: radialHat = +X, so tangential motion is along Y.
+    private const float R = 100f;
+    private static readonly Vector2 RadialHat = Vector2.UnitX;
+
+    [Fact]
+    public void RotationAngleDelta_IsLinearInTangentialDistance_NoDeceleration()
+    {
+        var phi1 = TransformGizmo.RotationAngleDelta(RadialHat, 1f / R, new Vector2(0f, R),      sign: 1f, gain: 1f);
+        var phi2 = TransformGizmo.RotationAngleDelta(RadialHat, 1f / R, new Vector2(0f, 2f * R), sign: 1f, gain: 1f);
+        var phi3 = TransformGizmo.RotationAngleDelta(RadialHat, 1f / R, new Vector2(0f, 3f * R), sign: 1f, gain: 1f);
+
+        // Exactly proportional — 2×/3× the tangential travel gives 2×/3× the angle, with none of the
+        // atan2 taper (which would give atan2(2,1)/atan2(1,1) ≈ 1.41× for the second step, not 2×).
+        Assert.Equal(2f * phi1, phi2, tolerance: 1e-5f);
+        Assert.Equal(3f * phi1, phi3, tolerance: 1e-5f);
+    }
+
+    [Fact]
+    public void RotationAngleDelta_IgnoresRadialMotion()
+    {
+        // Moving straight out along the radius (no tangential component) must not rotate anything.
+        var phi = TransformGizmo.RotationAngleDelta(RadialHat, 1f / R, new Vector2(50f, 0f), sign: 1f, gain: 1f);
+        Assert.Equal(0f, phi, tolerance: 1e-6f);
+    }
+
+    [Fact]
+    public void RotationAngleDelta_MatchesTheExactAngleMapForSmallDrags()
+    {
+        // For a small tangential step the linearisation should agree with the exact atan2 change,
+        // so the drag feels identical at the start (it only diverges — helpfully — as it grows).
+        const float smallDy = 2f;
+        var phi   = TransformGizmo.RotationAngleDelta(RadialHat, 1f / R, new Vector2(0f, smallDy), sign: 1f, gain: 1f);
+        var exact = MathF.Atan2(smallDy, R);
+        Assert.Equal(exact, phi, tolerance: 1e-3f);
+    }
+
+    [Fact]
+    public void RotationAngleDelta_SignAndGainScaleTheResult()
+    {
+        var basePhi = TransformGizmo.RotationAngleDelta(RadialHat, 1f / R, new Vector2(0f, R), sign: 1f, gain: 1f);
+        Assert.True(basePhi > 0f);
+        Assert.Equal(-basePhi, TransformGizmo.RotationAngleDelta(RadialHat, 1f / R, new Vector2(0f, R), sign: -1f, gain: 1f), tolerance: 1e-6f);
+        Assert.Equal(2f * basePhi, TransformGizmo.RotationAngleDelta(RadialHat, 1f / R, new Vector2(0f, R), sign: 1f, gain: 2f), tolerance: 1e-6f);
+    }
 }

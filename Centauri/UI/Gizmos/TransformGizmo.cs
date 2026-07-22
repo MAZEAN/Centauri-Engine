@@ -37,6 +37,15 @@ internal sealed class TransformGizmo
     private const float ScaleSensitivity = 0.01f; // per-pixel fractional change when dragging scale
     private const float MinScale         = 1e-3f;
 
+    // Rotate feel. The drag maps the mouse to a rotation via the *linear* (first-order)
+    // approximation of the angle-around-centre map, frozen at the grab point — see
+    // GizmoMath.RotationAngleDelta / ApplyRotateDrag for why (the exact atan2 map decelerates
+    // drastically as a straight drag pulls away from the centre). Gain 1 keeps the initial
+    // sensitivity identical to that exact map; the radius floor stops a grab near the centre from
+    // becoming hypersensitive.
+    private const float RotateGain           = 1f;
+    private const float MinRotateRadiusPixels = 8f;
+
     private Mode _mode  = Mode.Translate;
     private Axis _hover = Axis.None;
     private Axis _drag  = Axis.None;
@@ -52,8 +61,8 @@ internal sealed class TransformGizmo
     private Vector3    _dragStartScale;      // scale
     private Quaternion _dragStartRot;        // rotate
     private Vector3    _dragRotAxis;         // rotate: world axis being spun about
-    private Vector2    _dragRingCentre;      // rotate: screen-space gizmo origin
-    private float      _dragStartAngle;      // rotate: atan2 of (mouse - centre) at grab
+    private Vector2    _dragRotRadialHat;    // rotate: unit centre→grab screen direction, frozen
+    private float      _dragRotInvRadius;    // rotate: 1 / (grab distance from centre), frozen
     private float      _dragRotSign;         // rotate: screen→world handedness for this axis
 
     // True while the cursor is over a handle or a drag is in progress — InputSystem folds this into
@@ -221,35 +230,45 @@ internal sealed class TransformGizmo
             }
 
             if (_hover != Axis.None && ImGui.IsMouseClicked(ImGuiMouseButton.Left))
-            {
-                var i = (int)_hover - 1;
-                _drag           = _hover;
-                _dragStartRot   = t.Rotation;
-                _dragRotAxis    = axes[i];
-                _dragRingCentre = oScreen;
-                _dragStartAngle = MathF.Atan2(mouse.Y - oScreen.Y, mouse.X - oScreen.X);
-                
-                // Screen atan2 grows clockwise (screen Y is down); a positive right-handed turn about
-                // the axis looks CCW when the axis points toward the camera and CW when it points away
-                // — so the sign that keeps the drag matching the grabbed ring is sign(camForward·axis).
-                _dragRotSign    = MathF.Sign(Vector3.Dot(camera.Forward, axes[i]));
-                if (_dragRotSign == 0f) 
-                    _dragRotSign = 1f;
-            }
+                BeginRotateDrag(t, camera, mouse, oScreen, axes);
         }
 
         if (_drag != Axis.None)
         {
             if (ImGui.IsMouseDown(ImGuiMouseButton.Left))
-            {
-                var angle = MathF.Atan2(mouse.Y - _dragRingCentre.Y, mouse.X - _dragRingCentre.X);
-                var phi   = (angle - _dragStartAngle) * _dragRotSign;
-                t.SetRotation(ComposeWorldRotation(_dragStartRot, _dragRotAxis, phi));
-            }
-            else _drag = Axis.None;
+                ApplyRotateDrag(t, mouse);
+            else
+                _drag = Axis.None;
         }
 
         DrawRings(origin, axes, worldLen, viewProj, viewport, oScreen);
+    }
+
+    private void BeginRotateDrag(Transform t, Camera camera, Vector2 mouse, Vector2 oScreen, ReadOnlySpan<Vector3> axes)
+    {
+        var i      = (int)_hover - 1;
+        var radial = mouse - oScreen;
+        var radius = MathF.Max(radial.Length(), Widgets.Scale(MinRotateRadiusPixels));
+
+        _drag             = _hover;
+        _dragStartRot     = t.Rotation;
+        _dragRotAxis      = axes[i];
+        _dragStartMouse   = mouse;
+        _dragRotRadialHat = radial / radius;
+        _dragRotInvRadius = 1f / radius;
+
+        // Screen atan2 grows clockwise (screen Y is down); a positive right-handed turn about the
+        // axis looks CCW when the axis points toward the camera and CW when it points away — so the
+        // sign that keeps the drag matching the grabbed ring is sign(camForward·axis).
+        _dragRotSign = MathF.Sign(Vector3.Dot(camera.Forward, axes[i]));
+        if (_dragRotSign == 0f)
+            _dragRotSign = 1f;
+    }
+
+    private void ApplyRotateDrag(Transform t, Vector2 mouse)
+    {
+        var phi = RotationAngleDelta(_dragRotRadialHat, _dragRotInvRadius, mouse - _dragStartMouse, _dragRotSign, RotateGain);
+        t.SetRotation(ComposeWorldRotation(_dragStartRot, _dragRotAxis, phi));
     }
 
     // ---- shared hit-test ----------------------------------------------------------------------
@@ -416,6 +435,21 @@ internal sealed class TransformGizmo
     {
         var delta = Quaternion.CreateFromAxisAngle(SafeNormalize(axis, Vector3.UnitY), angleRad);
         return Quaternion.Normalize(delta * start);
+    }
+
+    // Rotation angle (radians) for a rotate drag, as the *linear* first-order approximation of the
+    // exact angle-around-centre map, frozen at the grab point. The exact map, atan2(cur−centre) −
+    // atan2(grab−centre), tracks a cursor circling the centre perfectly but decelerates hard on a
+    // straight drag: the effective radius grows as the cursor pulls away, so each pixel turns less
+    // and less. Linearising at the grab keeps the *initial* rate and sign identical (the derivative
+    // of atan2 along the tangent is cross(radialHat, ·)/radius) while staying constant-rate for the
+    // straight drags people actually do. `radialHat` is the unit centre→grab direction and
+    // `invRadius` = 1/|grab−centre|; the 2-D cross with the mouse delta is the signed tangential
+    // distance. `sign` carries the screen→world handedness, `gain` is a feel multiplier.
+    internal static float RotationAngleDelta(Vector2 radialHat, float invRadius, Vector2 mouseDelta, float sign, float gain)
+    {
+        var tangential = radialHat.X * mouseDelta.Y - radialHat.Y * mouseDelta.X; // 2-D cross
+        return sign * gain * tangential * invRadius;
     }
 
     private Vector4 ColorFor(Axis axis)
