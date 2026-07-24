@@ -79,7 +79,7 @@ internal sealed class StatsOverlay
             Row("Grid",     $"{stats.GridColumns}x{stats.GridRows} ({stats.GridCells})");
             Row("Occupied", stats.GridOccupied.ToString());
             Row("Visited",  stats.GridVisited.ToString());
-        }, defaultOpen:false);
+        });
 
         Section("Shadows", ColorPalette.Blue, () =>
         {
@@ -91,7 +91,7 @@ internal sealed class StatsOverlay
                 ? stats.ShadowCulled / (float)stats.ShadowTotal * 100f
                 : 0f;
             Row("Ratio", $"{Widgets.Float(ratio)} %");
-        }, defaultOpen:false);
+        });
 
         Section("Instancing", ColorPalette.Green, () =>
         {
@@ -102,7 +102,7 @@ internal sealed class StatsOverlay
             RowColored("Saved", $"{Widgets.Float(stats.DrawCallReduction)} %",
                 stats.DrawCallReduction > 0f ? ColorPalette.Green : ColorPalette.White);
             Row("Two-Sided", $"{stats.TwoSidedEntities}/{stats.RenderableEntities} ({Widgets.Float(stats.TwoSidedPercent)} %)");
-        }, defaultOpen:false);
+        });
 
         if (_config.Physics.Enabled)
         {
@@ -112,7 +112,7 @@ internal sealed class StatsOverlay
                 Row("Static Bodies",  stats.PhysicsStaticBodies.ToString());
                 Row("Steps/Frame",    stats.PhysicsStepsThisFrame.ToString());
                 Row("Step Time",      $"{Widgets.Float(stats.PhysicsStepMsThisFrame, 3)} ms");
-            }, defaultOpen:false);
+            });
         }
 
         var cam = scene.Cameras.Active;
@@ -124,13 +124,13 @@ internal sealed class StatsOverlay
             Row("Yaw",   Widgets.SignedFloat(cam.Yaw));
             Row("Pitch", Widgets.SignedFloat(cam.Pitch));
             Row("Zoom",  Widgets.Float(cam.Zoom));
-        }, defaultOpen:false);
+        });
 
         Section("Config", ColorPalette.Purple, () =>
         {
             ConfigRow("VSync",   _config.Window.EnableVSync);
             ConfigRow("Culling", _config.Debug.EnableCulling);
-        }, defaultOpen:false);
+        });
     }
 
     private static void Section(string title, Vector4 accent, Action rows, bool defaultOpen = true)
@@ -138,7 +138,6 @@ internal sealed class StatsOverlay
         var open = Widgets.BeginPanel(title, accent, defaultOpen);   // colored, collapsible header
         if (open)
             rows();
-
         Widgets.EndPanel(open);
     }
 
