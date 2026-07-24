@@ -5,6 +5,7 @@ using System.Numerics;
 
 using World;
 using Common;
+using Layout;
 using Rendering;
 using Loading;
 
@@ -14,21 +15,13 @@ using Loading;
 // The "+" row composes a new entity from the project's registered models and materials (see
 // ResourceSystem.ModelIds/MaterialIds) via EntitySetLoader.CreateEntity; Delete removes the
 // selection. Changing an existing entity's material lives in EntityInspectorSection instead.
-public sealed class HierarchyPanel
+// Docked into EditorLayout's Outliner rect (see EditorLayout.cs), stacked directly above
+// PropertiesPanel — the two touch with no gap, part of the Edit workspace's exact tiling.
+internal sealed class HierarchyPanel
 {
-    private const float Width      = 300f;
-    private const float Padding    = 10f;
-    private const float BgAlpha    = 0.85f;
-    private const float BaseHeight = 260f;
-
-    // Cross-referenced by PropertiesPanel to stack beneath this one — a property (not a const)
-    // since it needs Widgets.FontScale, set at runtime once the UI font is known.
-    public static float Height => Widgets.Scale(BaseHeight);
-
     private readonly ImFontPtr _font;
     private readonly ResourceSystem _resourceSystem;
     private readonly EntitySetLoader _entitySetLoader;
-    private const ImGuiWindowFlags Flags = Widgets.PanelBase;
 
     // Lazily built once (the registry doesn't change at runtime) rather than allocating a
     // fresh sorted array from ResourceSystem.ModelIds every frame just to feed the combo.
@@ -48,11 +41,11 @@ public sealed class HierarchyPanel
         _entitySetLoader = entitySetLoader;
     }
 
-    public void Render(Scene scene)
+    public void Render(Scene scene, LayoutRect rect)
     {
-        SetupWindow();
+        PanelHost.Place(rect, bgAlpha: 1.0f);
 
-        if (!ImGui.Begin("Outliner", Flags))
+        if (!ImGui.Begin("Outliner", PanelHost.DockedFlags))
         {
             ImGui.End();
             return;
@@ -141,18 +134,4 @@ public sealed class HierarchyPanel
         { Model: not null }         => "[Mesh]",
         _                           => "[Empty]"
     };
-
-    private static void SetupWindow()
-    {
-        var viewport = ImGui.GetMainViewport();
-        var padding  = Widgets.Scale(Padding);
-
-        var anchor = new Vector2(
-            viewport.WorkPos.X + viewport.WorkSize.X - padding,
-            viewport.WorkPos.Y + padding);
-
-        ImGui.SetNextWindowPos(anchor, ImGuiCond.Always, new Vector2(1f, 0f));
-        ImGui.SetNextWindowSize(new Vector2(Widgets.Scale(Width), Height), ImGuiCond.Always);
-        ImGui.SetNextWindowBgAlpha(BgAlpha);
-    }
 }

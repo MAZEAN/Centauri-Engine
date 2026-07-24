@@ -6,20 +6,17 @@ using System.Numerics;
 using World;
 using Config;
 using Common;
+using Layout;
 using Sections;
 using Rendering;
 using Loading;
 
 internal readonly record struct SectionGroup(string Name, Vector4 Accent, ISection[] Sections);
 
-public class PropertiesPanel
+// Docked into EditorLayout's Properties rect (see EditorLayout.cs), directly beneath
+// HierarchyPanel — the two touch with no gap, part of the Edit workspace's exact tiling.
+internal class PropertiesPanel
 {
-    private const float Width   = 300f;
-    private const float Padding = 10f;
-    private const float BgAlpha = 0.85f;
-
-    private const ImGuiWindowFlags Flags = Widgets.PanelBase;
-
     private readonly ImFontPtr _font;
 
     private readonly EntityInspectorSection _entitySection;
@@ -60,11 +57,11 @@ public class PropertiesPanel
         ];
     }
 
-    public void Render(Scene scene)
+    public void Render(Scene scene, LayoutRect rect)
     {
-        SetupWindow();
+        PanelHost.Place(rect, bgAlpha: 1.0f);
 
-        if (!ImGui.Begin("Properties", Flags))
+        if (!ImGui.Begin("Properties", PanelHost.DockedFlags))
         {
             ImGui.End();
             return;
@@ -97,20 +94,4 @@ public class PropertiesPanel
         }
     }
 
-    private static void SetupWindow()
-    {
-        var viewport = ImGui.GetMainViewport();
-        var padding  = Widgets.Scale(Padding);
-        var width    = Widgets.Scale(Width);
-
-        // stack beneath the outliner: outliner padding + height + a gap
-        var top = viewport.WorkPos.Y + padding + HierarchyPanel.Height + padding;
-        var anchor = new Vector2(viewport.WorkPos.X + viewport.WorkSize.X - padding, top);
-
-        ImGui.SetNextWindowPos(anchor, ImGuiCond.Always, new Vector2(1f, 0f));   // pivot top-right
-        ImGui.SetNextWindowSizeConstraints(
-            new Vector2(width, 0),
-            new Vector2(width, viewport.WorkPos.Y + viewport.WorkSize.Y - padding - top));   // fill to bottom edge
-        ImGui.SetNextWindowBgAlpha(BgAlpha);
-    }
 }

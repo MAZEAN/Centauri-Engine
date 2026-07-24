@@ -108,6 +108,12 @@ JSON by hand or dragging a number field to the value you want. This is the actua
   (local/world toggle, snapping, plane/uniform handles). One caveat: the rotate/scale drag *feel* is
   math-and-test-backed but couldn't be exercised without a cursor headless — worth an interactive
   sanity check.
+- [x] **Docked, resolution-independent editor layout** — **done**. `UI/Layout/EditorLayout.cs` +
+  three Blender-style workspaces (Edit / Performance / Viewing) switched from `TopBar`, replacing
+  the earlier floating-card panels — no panel positions itself or can overlap/gap another; the
+  performance graphs are their own panel (`PerformancePanel`) so they get real width instead of a
+  350px card; the gizmo mode bar moved to a left tool column. See
+  `Docs/Documentation/EditorLayout.md`.
 - [ ] **Undo/redo.** Currently the only "undo" is `EntitySetLoader.Reset()` — discard every live
   edit and reload from disk. A real undo stack (even a coarse one — snapshot/diff per edit
   gesture) is table stakes for an editor.

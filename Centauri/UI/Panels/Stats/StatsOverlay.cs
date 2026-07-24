@@ -7,23 +7,18 @@ using Utils.Misc;
 using World;
 using Config;
 using Common;
-using Rendering.Profiling;
-using Graphs;
+using Layout;
 
-public class StatsOverlay
+// Instantaneous engine statistics (frame time headline, renderer/culling/shadow/instancing/physics/
+// camera/config counters). The frame-time and GPU-timing *graphs* used to live here too, but they're
+// the one thing here that wants width — they're their own panel now (PerformancePanel), shown in the
+// dedicated Performance workspace where they can actually have room. See EditorLayout.cs.
+internal sealed class StatsOverlay
 {
-    private const float Width      = 350f;
-    private const float Padding    = 10f;
-    private const float BgAlpha    = 0.85f;
     private const float LabelWidth = 120f;
-    
-    private const ImGuiWindowFlags Flags = Widgets.PanelBase | ImGuiWindowFlags.NoBringToFrontOnFocus; 
 
     private readonly ImFontPtr _font;
     private readonly AppConfig _config;
-    
-    private readonly PerformanceGraph _perfGraph = new();
-    private readonly GPUTimingGraph _gpuGraph = new();
 
     public StatsOverlay(ImFontPtr font, AppConfig config)
     {
@@ -31,44 +26,36 @@ public class StatsOverlay
         _config = config;
     }
 
-    public void Render(Scene scene, FrameStats stats, IReadOnlyList<GpuTiming> gpuTimings)
+    public void Render(Scene scene, FrameStats stats, LayoutRect rect)
     {
-        _perfGraph.Push(stats.FPS, stats.FrameTime);
-        SetupWindow();
+        PanelHost.Place(rect, bgAlpha: 1.0f);
 
-        if (!ImGui.Begin("StatsOverlay", GetModeDependentFlags(_config.Input.Mode)))
+        var flags = PanelHost.DockedFlags;
+        if (_config.Input.Mode == ViewMode.Fly)
+            flags |= ImGuiWindowFlags.NoInputs; // don't eat clicks meant for camera look while flying
+
+        if (!ImGui.Begin("Statistics", flags))
         {
             ImGui.End();
             return;
         }
-        
+
         ImGui.PushFont(_font);
-        
-        DrawSections(scene, stats, gpuTimings);
+
+        DrawSections(scene, stats);
 
         ImGui.PopFont();
         ImGui.End();
     }
 
-    private void DrawSections(Scene scene, FrameStats stats, IReadOnlyList<GpuTiming> gpuTimings)
+    private void DrawSections(Scene scene, FrameStats stats)
     {
         Section("Performance", ColorPalette.Amber, () =>
         {
             Row("FPS", Widgets.Float(stats.FPS));
             Row("Frame Time", $"{Widgets.Float(stats.FrameTime)} ms");
-            _perfGraph.Draw();
-            
-            var gpu = _config.Debug.ShowGPUTimings;
-            if (ImGui.Checkbox("GPU Timings", ref gpu))
-                _config.Debug.ShowGPUTimings = gpu;
         });
 
-        if (gpuTimings.Count > 0)
-        {
-            _gpuGraph.Push(gpuTimings, stats.FrameTime);
-            Section("GPU (ms)", ColorPalette.Amber, () => _gpuGraph.Draw());
-        }
-        
         Section("Renderer", ColorPalette.Blue, () =>
         {
             Row("Draw Calls",     stats.DrawCalls.ToString());
@@ -93,7 +80,7 @@ public class StatsOverlay
             Row("Occupied", stats.GridOccupied.ToString());
             Row("Visited",  stats.GridVisited.ToString());
         }, defaultOpen:false);
-        
+
         Section("Shadows", ColorPalette.Blue, () =>
         {
             Row("Cascades", _config.Shadows.CascadeCount.ToString());
@@ -105,7 +92,7 @@ public class StatsOverlay
                 : 0f;
             Row("Ratio", $"{Widgets.Float(ratio)} %");
         }, defaultOpen:false);
-        
+
         Section("Instancing", ColorPalette.Green, () =>
         {
             Row("Batches",       stats.Batches.ToString());
@@ -116,7 +103,7 @@ public class StatsOverlay
                 stats.DrawCallReduction > 0f ? ColorPalette.Green : ColorPalette.White);
             Row("Two-Sided", $"{stats.TwoSidedEntities}/{stats.RenderableEntities} ({Widgets.Float(stats.TwoSidedPercent)} %)");
         }, defaultOpen:false);
-        
+
         if (_config.Physics.Enabled)
         {
             Section("Physics", ColorPalette.Green, () =>
@@ -146,26 +133,12 @@ public class StatsOverlay
         }, defaultOpen:false);
     }
 
-    private static void SetupWindow()
-    {
-        var viewport = ImGui.GetMainViewport();
-        var padding = Widgets.Scale(Padding);
-        var width   = Widgets.Scale(Width);
-        var anchor  = new Vector2(viewport.WorkPos.X + padding, viewport.WorkPos.Y + padding);
-
-        ImGui.SetNextWindowPos(anchor, ImGuiCond.Always, new Vector2(0f, 0f));
-        ImGui.SetNextWindowSizeConstraints(
-            new Vector2(width, 0),
-            new Vector2(width, float.MaxValue));
-        ImGui.SetNextWindowBgAlpha(BgAlpha);
-    }
-
     private static void Section(string title, Vector4 accent, Action rows, bool defaultOpen = true)
     {
         var open = Widgets.BeginPanel(title, accent, defaultOpen);   // colored, collapsible header
-        if (open) 
+        if (open)
             rows();
-        
+
         Widgets.EndPanel(open);
     }
 
@@ -191,20 +164,11 @@ public class StatsOverlay
         ImGui.SetCursorPosX(startX + MathF.Max(Widgets.Scale(LabelWidth), textW + Widgets.Scale(8f)));
 
         var tinted = color.W > 0f;
-        if (tinted) 
+        if (tinted)
             ImGui.PushStyleColor(ImGuiCol.Text, color);
-        
-        ImGui.TextUnformatted(value);
-        if (tinted) 
-            ImGui.PopStyleColor();
-    }
 
-    private static ImGuiWindowFlags GetModeDependentFlags(ViewMode activeMode)
-    {
-        var flags = Flags;
-        if (activeMode == ViewMode.Fly)
-            flags |= ImGuiWindowFlags.NoInputs;
-        
-        return flags;
+        ImGui.TextUnformatted(value);
+        if (tinted)
+            ImGui.PopStyleColor();
     }
 }

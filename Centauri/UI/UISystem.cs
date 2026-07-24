@@ -3,6 +3,7 @@ namespace Centauri.UI;
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
 using Silk.NET.Input;
+using ImGuiNET;
 
 using Config;
 using World;
@@ -14,19 +15,27 @@ using Rendering;
 using Rendering.Profiling;
 using Loading;
 using Gizmos;
+using Layout;
+using Common;
 
-// Owns the whole ImGui surface — the controller plus every panel.
-// RenderingSystem holds one of these instead of juggling them individually.
+// Owns the whole ImGui surface — the controller plus every panel. RenderingSystem holds one of
+// these instead of juggling them individually.
+//
+// Layout is fully docked (see EditorLayout.cs): TopBar decides which EditorWorkspace is active,
+// EditorLayout.Compute turns that + the current viewport size into exact tiling rects, and every
+// panel is handed the rect it should occupy for this frame rather than positioning itself. No
+// panel floats or overlaps another — see EditorLayoutTests for the geometry that guarantees it.
 public sealed class UISystem : IDisposable
 {
     private readonly AppConfig      _config;
     private readonly ImGuiManager   _imGui;
     private readonly StatsOverlay   _statsOverlay;
+    private readonly PerformancePanel _performance;
     private readonly PropertiesPanel _properties;
     private readonly HierarchyPanel _outliner;
-    private readonly ViewportToolbar _toolbar;
+    private readonly TopBar         _topBar;
     private readonly TransformGizmo _gizmo;
-    private readonly GizmoModeBar _gizmoModeBar;
+    private readonly GizmoModeBar   _gizmoModeBar;
 
     // The gizmo isn't an ImGui window, so it doesn't set WantCaptureMouse — fold its own
     // hover/drag state in so InputSystem suppresses viewport picking while a handle is engaged.
@@ -40,10 +49,11 @@ public sealed class UISystem : IDisposable
         _imGui        = new ImGuiManager(gl, config.ImGui, window, input);
 
         _statsOverlay = new StatsOverlay(_imGui.Font, config);
-        _properties    = new PropertiesPanel(_imGui.Font, _config, resourceSystem, entitySetLoader);
-        _outliner = new HierarchyPanel(_imGui.Font, resourceSystem, entitySetLoader);
-        _toolbar = new ViewportToolbar(_imGui.Font, config);
-        _gizmo = new TransformGizmo();
+        _performance  = new PerformancePanel(_imGui.Font, config);
+        _properties   = new PropertiesPanel(_imGui.Font, _config, resourceSystem, entitySetLoader);
+        _outliner     = new HierarchyPanel(_imGui.Font, resourceSystem, entitySetLoader);
+        _topBar       = new TopBar(_imGui.Font, config);
+        _gizmo        = new TransformGizmo();
         _gizmoModeBar = new GizmoModeBar(_imGui.Font, _gizmo);
     }
 
@@ -53,23 +63,40 @@ public sealed class UISystem : IDisposable
     {
         using var _ = Tracy.Scope("UISystem.Render");
 
-        if (_config.Debug.ShowStatsOverlay)
+        // Pushed every frame regardless of workspace, so switching into Performance never reveals
+        // graph history with a gap in it.
+        _performance.Push(in stats, gpuTimings);
+
+        var viewport = ImGui.GetMainViewport();
+        var regions  = EditorLayout.Compute(_topBar.Workspace, viewport.WorkPos, viewport.WorkSize, Widgets.FontScale);
+
+        using (Tracy.Scope("UISystem.Render.TopBar"))
+            _topBar.Render(regions.TopBar);
+
+        if (_config.Debug.ShowStatsOverlay && regions.Stats is { } statsRect)
             using (Tracy.Scope("UISystem.Render.StatsOverlay"))
-                _statsOverlay.Render(scene, stats, gpuTimings);
+                _statsOverlay.Render(scene, stats, statsRect);
 
-        using (Tracy.Scope("UISystem.Render.Toolbar"))
-            _toolbar.Render();
+        if (regions.Performance is { } perfRect)
+            using (Tracy.Scope("UISystem.Render.Performance"))
+                _performance.Render(in stats, gpuTimings, perfRect);
 
-        if (_config.Input.Mode == ViewMode.Edit)
+        // The Edit workspace's interactive panels (sidebar + left tool column + gizmo) additionally
+        // need the camera to actually be in Edit mode (not Fly) — while flying, the cursor is
+        // captured for camera look, so there's no mouse available to click them with anyway.
+        if (regions.Outliner is { } outlinerRect && regions.Properties is { } propertiesRect && _config.Input.Mode == ViewMode.Edit)
         {
             using (Tracy.Scope("UISystem.Render.Outliner"))
-                _outliner.Render(scene);
+                _outliner.Render(scene, outlinerRect);
             using (Tracy.Scope("UISystem.Render.Properties"))
-                _properties.Render(scene);
+                _properties.Render(scene, propertiesRect);
+
             using (Tracy.Scope("UISystem.Render.Gizmo"))
                 _gizmo.Draw(scene, scene.Cameras.Active);
-            using (Tracy.Scope("UISystem.Render.GizmoModeBar"))
-                _gizmoModeBar.Render();
+
+            if (regions.LeftTools is { } leftToolsRect)
+                using (Tracy.Scope("UISystem.Render.GizmoModeBar"))
+                    _gizmoModeBar.Render(leftToolsRect);
         }
 
         using (Tracy.Scope("UISystem.Render.ImGuiFlush"))

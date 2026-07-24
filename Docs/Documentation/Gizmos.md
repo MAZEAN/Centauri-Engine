@@ -13,7 +13,8 @@ shared project → hit-test → drag scaffold.
   compose, the rotate-drag angle map). No ImGui/GL/state; this is what the unit tests target.
 - **`GizmoDraw`** — everything touching the ImGui foreground draw list (arrows, scale boxes, rings,
   centre dot, axis colours), handed already-computed screen geometry.
-- **`GizmoModeBar`** — the bottom-centre icon strip (see §2).
+- **`GizmoModeBar`** — the left tool column (see §2). Docked into `EditorLayout`'s `LeftTools`
+  rect (see `Docs/Documentation/EditorLayout.md`), not floating.
 
 ## 1. Why not ImGuizmo
 
@@ -63,11 +64,12 @@ So the gizmo is our own projection + hit-test + drag math instead.
 Mode switching reads `W`/`E`/`R` off ImGui IO, gated on no text field wanting the keyboard and no
 modifier held (so `Ctrl+Shift+R`'s scene-reset doesn't also trip scale mode), and is ignored
 mid-drag. `DebugHotkeys` (M/C/B/N/G) and camera fly (WASD, Fly-mode only) don't overlap. A
-**`GizmoModeBar`** (bottom-centre of the viewport) mirrors this: three vector-drawn icon buttons
-(Move / Rotate / Scale) that highlight the active mode and set it on click — the same
-`TransformGizmo.ActiveMode` the keys drive. Bottom-centre because the left column is the
-StatsOverlay and the right is the Outliner/Properties; icons are drawn with draw-list primitives
-since no icon font is loaded.
+**`GizmoModeBar`** (left edge of the viewport, Blender-style) mirrors this: three vector-drawn icon
+buttons (Move / Rotate / Scale), stacked vertically, that highlight the active mode and set it on
+click — the same `TransformGizmo.ActiveMode` the keys drive. It's docked into the Edit workspace's
+`LeftTools` region (see `Docs/Documentation/EditorLayout.md`) rather than floating, so it tiles
+exactly against the viewport with no gap; icons are drawn with draw-list primitives since no icon
+font is loaded.
 
 ### Rotate: keeping the inspector coherent
 
