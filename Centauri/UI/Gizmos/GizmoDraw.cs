@@ -29,8 +29,10 @@ internal static class GizmoDraw
             if (!visible[i]) continue;
 
             var color = AxisColorU32(i, i == activeAxis);
-            if (isScale) ScaleHandle(dl, oScreen, ends[i], color);
-            else         Arrow(dl, oScreen, ends[i], color);
+            if (isScale) 
+                ScaleHandle(dl, oScreen, ends[i], color);
+            else         
+                Arrow(dl, oScreen, ends[i], color);
         }
         CentreDot_(dl, oScreen);
     }
@@ -50,7 +52,9 @@ internal static class GizmoDraw
             {
                 var theta = s / (float)GizmoMath.RingSegments * MathF.Tau;
                 var world = origin + (u * MathF.Cos(theta) + v * MathF.Sin(theta)) * worldLen;
-                if (GizmoMath.Project(world, viewProj, viewport, out var p)) pts[count++] = p;
+                
+                if (GizmoMath.Project(world, viewProj, viewport, out var p)) 
+                    pts[count++] = p;
             }
             if (count < 2) continue;
 
@@ -65,6 +69,7 @@ internal static class GizmoDraw
     {
         var dir = to - from;
         var len = dir.Length();
+        
         if (len < 1e-3f) return;
         dir /= len;
 
@@ -79,6 +84,7 @@ internal static class GizmoDraw
     private static void ScaleHandle(ImDrawListPtr dl, Vector2 from, Vector2 to, uint color)
     {
         dl.AddLine(from, to, color, Widgets.Scale(LineThickness));
+        
         var h = Widgets.Scale(BoxPixels) * 0.5f;
         dl.AddRectFilled(new Vector2(to.X - h, to.Y - h), new Vector2(to.X + h, to.Y + h), color);
     }

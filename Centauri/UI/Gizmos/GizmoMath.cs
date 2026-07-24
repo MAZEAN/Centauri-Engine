@@ -27,9 +27,7 @@ internal static class GizmoMath
         }
 
         var ndc = new Vector3(clip.X, clip.Y, clip.Z) / clip.W;
-        screen = new Vector2(
-            (ndc.X * 0.5f + 0.5f) * viewport.X,
-            (1f - (ndc.Y * 0.5f + 0.5f)) * viewport.Y);
+        screen = new Vector2((ndc.X * 0.5f + 0.5f) * viewport.X, (1f - (ndc.Y * 0.5f + 0.5f)) * viewport.Y);
         return true;
     }
 
@@ -68,13 +66,20 @@ internal static class GizmoMath
                 continue;
             }
 
-            if (!haveFirst) { first = p; haveFirst = true; }
-            if (havePrev) best = MathF.Min(best, DistanceToSegment(mouse, prev, p));
+            if (!haveFirst)
+            {
+                first = p;
+                haveFirst = true;
+            }
+            if (havePrev) 
+                best = MathF.Min(best, DistanceToSegment(mouse, prev, p));
+            
             prev = p;
             havePrev = true;
         }
 
-        if (haveFirst && havePrev) best = MathF.Min(best, DistanceToSegment(mouse, prev, first)); // close the loop
+        if (haveFirst && havePrev) 
+            best = MathF.Min(best, DistanceToSegment(mouse, prev, first)); // close the loop
         return best;
     }
 
@@ -85,6 +90,7 @@ internal static class GizmoMath
         var reference = MathF.Abs(axis.X) < 0.9f ? Vector3.UnitX : Vector3.UnitY;
         var u = Vector3.Normalize(Vector3.Cross(axis, reference));
         var v = Vector3.Cross(axis, u);
+        
         return (u, v);
     }
 
@@ -129,7 +135,7 @@ internal static class GizmoMath
         return sign * gain * tangential * invRadius;
     }
 
-    public static Vector3 SafeNormalize(Vector3 v, Vector3 fallback)
+    private static Vector3 SafeNormalize(Vector3 v, Vector3 fallback)
     {
         var len = v.Length();
         return len < 1e-6f ? fallback : v / len;

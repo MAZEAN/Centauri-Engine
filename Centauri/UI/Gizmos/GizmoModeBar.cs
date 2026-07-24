@@ -56,7 +56,8 @@ internal sealed class GizmoModeBar
 
         for (var i = 0; i < Tools.Length; i++)
         {
-            if (i > 0) ImGui.SameLine();
+            if (i > 0) 
+                ImGui.SameLine();
             DrawToolButton(Tools[i].Mode, Tools[i].Tip);
         }
 
@@ -84,19 +85,24 @@ internal sealed class GizmoModeBar
         var iconColor = ImGui.GetColorU32(active ? ColorPalette.White : ColorPalette.Text);
         DrawIcon(dl, mode, p0 + size * 0.5f, Widgets.Scale(ButtonSize) * 0.30f, iconColor);
 
-        if (hovered) ImGui.SetTooltip(tip);
-        if (clicked) _gizmo.ActiveMode = mode;
+        if (hovered) 
+            ImGui.SetTooltip(tip);
+        if (clicked) 
+            _gizmo.ActiveMode = mode;
     }
 
-    // ---- vector icons, centred at c with extent e ---------------------------------------------
+    // ---- vector icons, centered at c with extent e ---------------------------------------------
     private static void DrawIcon(ImDrawListPtr dl, TransformGizmo.Mode mode, Vector2 c, float e, uint col)
     {
         var th = MathF.Max(1.5f, e * 0.16f);
         switch (mode)
         {
-            case TransformGizmo.Mode.Translate: MoveIcon(dl, c, e, th, col); break;
-            case TransformGizmo.Mode.Rotate:    RotateIcon(dl, c, e, th, col); break;
-            default:                            ScaleIcon(dl, c, e, th, col); break;
+            case TransformGizmo.Mode.Translate: 
+                MoveIcon(dl, c, e, th, col); break;
+            case TransformGizmo.Mode.Rotate:    
+                RotateIcon(dl, c, e, th, col); break;
+            default:                            
+                ScaleIcon(dl, c, e, th, col); break;
         }
     }
 
@@ -104,8 +110,10 @@ internal sealed class GizmoModeBar
     {
         var x = new Vector2(e, 0f);
         var y = new Vector2(0f, e);
+        
         dl.AddLine(c - x, c + x, col, th);
         dl.AddLine(c - y, c + y, col, th);
+        
         Arrowhead(dl, c + x, new Vector2(1f, 0f),  e, col);
         Arrowhead(dl, c - x, new Vector2(-1f, 0f), e, col);
         Arrowhead(dl, c + y, new Vector2(0f, 1f),  e, col);
@@ -116,14 +124,18 @@ internal sealed class GizmoModeBar
     {
         const int n = 20;
         const float a0 = -2.3f, a1 = 2.3f; // ~260° open arc
+        
         var prev = default(Vector2);
         for (var k = 0; k <= n; k++)
         {
             var a = a0 + (a1 - a0) * (k / (float)n);
             var p = c + new Vector2(MathF.Cos(a), MathF.Sin(a)) * e;
-            if (k > 0) dl.AddLine(prev, p, col, th);
+            
+            if (k > 0) 
+                dl.AddLine(prev, p, col, th);
             prev = p;
         }
+        
         var tangent = new Vector2(-MathF.Sin(a1), MathF.Cos(a1)); // direction of increasing angle
         Arrowhead(dl, prev, tangent, e, col);
     }
@@ -133,6 +145,7 @@ internal sealed class GizmoModeBar
         var d = new Vector2(e * 0.8f, e * 0.8f);
         var a = c - d;
         var b = c + d;
+        
         dl.AddLine(a, b, col, th);
         Box(dl, a, e * 0.34f, col);
         Box(dl, b, e * 0.34f, col);
@@ -143,6 +156,7 @@ internal sealed class GizmoModeBar
         var a    = e * 0.5f;
         var perp = new Vector2(-dir.Y, dir.X);
         var b    = tip - dir * a;
+        
         dl.AddTriangleFilled(tip, b + perp * (a * 0.6f), b - perp * (a * 0.6f), col);
     }
 
