@@ -13,25 +13,26 @@ flying, the cursor is captured for camera look, so there'd be nothing to click t
 
 ![Edit workspace, 1920x1080](images/editor-layout-edit.png)
 
-**Performance** — the 3D scene stays visible and rendering, full width, across the top; Statistics
-(full detail, not the trimmed table it used to share with the graphs) and the frame-time/GPU-timing
-graphs share a bottom strip, split left/right the same way Edit's Outliner/Properties split
-top/bottom. An earlier cut of this workspace replaced the viewport outright with Stats+graphs at
-full body height — dropped in favor of keeping the scene visible while still giving the graphs real
-width instead of the 350px card they had inside `StatsOverlay` originally.
+**Performance** — Statistics (full detail, not the trimmed table it used to share with the graphs)
+and the frame-time/GPU-timing graphs are two full-height columns on the left, mirroring Edit's
+sidebar shape (flipped to the left edge, and two side-by-side columns instead of one stacked one,
+since neither panel wants to share width with the other); the 3D scene stays visible, filling
+whatever's left to the right. Two earlier cuts of this workspace didn't work out: one replaced the
+viewport outright with Stats+graphs at full body height, another kept the viewport but squeezed
+Stats+graphs into a short bottom strip — which cut the GPU-timing graph off at the bottom, since a
+strip sized by guesswork wasn't tall enough for it. Full body height sidesteps that guessing
+entirely. The graphs column is sized *relative to Stats' width* (`PerfGraphWidthScale`, slightly
+bigger) rather than left to eat whatever's left over, so it stays proportioned instead of stretching
+edge-to-edge and swallowing the viewport on an ultrawide monitor.
 
 **Viewing** — nothing but the top bar. For presenting, recording, or just looking at the scene.
 
 Workspace tabs live in `TopBar` (renamed from the old `ViewportToolbar` — its role grew from "the
 shading-mode strip" to "the whole top bar"). `EditorWorkspace` (which panel set is on screen) and
-`Config.Input.Mode`/`ViewMode` (Fly vs. Edit camera behavior) are still separate concepts — neither
-knows about the other's storage — but `UISystem.Render` couples them each frame instead of leaving
-them to drift independently: Tab-ing into Fly mode remembers the current workspace and switches to
-Viewing (there's nothing to click while the cursor's captured for camera look anyway, so a workspace
-with visible panels just sat there uselessly before this), and Tab-ing back to Edit mode restores
-whatever workspace was active before. This is also why there's no separate Fly/Edit text indicator
-in `TopBar` — the workspace tabs themselves show it, since the highlighted tab now actually changes
-when you press Tab.
+`Config.Input.Mode`/`ViewMode` (Fly vs. Edit camera behavior) are separate concepts that
+`ModeManager` (`UI/ModeManager.cs`) couples deliberately rather than leaving them to drift
+independently — see §1a. This is also why there's no separate Fly/Edit text indicator in `TopBar`
+anymore — the workspace tabs themselves show it, since the highlighted tab changes when you press Tab.
 
 **P** jumps straight to the Performance workspace (`TopBar.HandleWorkspaceHotkeys`) — the one
 workspace switch worth a hotkey, since Edit is the default and Viewing is one click away on the
@@ -40,6 +41,27 @@ that's read off the raw Silk.NET keyboard in `InputSystem.OnKeyDown` with no mod
 so even a Ctrl/Shift combo on Tab would still fire the camera toggle alongside whatever else it's
 bound to. Read every frame regardless of the active workspace or camera mode — unlike the gizmo's
 W/E/R mode switch, jumping to Performance while flying is exactly the point.
+
+## 1a. `ModeManager` — the Workspace/ViewMode facade
+
+`UI/ModeManager.cs` is a small facade wrapping the editor's two loosely-related "mode" concepts —
+`Config.Input.Mode` (the camera's Fly/Edit behavior, still stored on `AppConfig` since `InputSystem`/
+`CameraController` need to read and drive it directly) and `EditorWorkspace` (which panel set
+`TopBar` shows, now *owned* by `ModeManager` instead of `TopBar` itself). Every caller that needs
+either — `TopBar`, `UISystem` — goes through one `ModeManager` instance instead of each reaching into
+`AppConfig` and `TopBar` independently and re-implementing how the two are supposed to stay in sync.
+
+`SyncWithViewMode()`, called once per frame from `UISystem.Render`, is where the actual coupling
+lives: it polls for a `Config.Input.Mode` transition (Tab is read off the raw keyboard entirely
+outside this facade's control, so there's no event to subscribe to) and applies a **deterministic
+mapping** — Fly always means the Viewing workspace, Edit always means the Edit workspace — rather
+than remembering and restoring whatever workspace was active before the transition. A
+remember/restore version shipped first and broke exactly the case it was meant to fix: Tab out of
+Performance correctly landed on Viewing, but Tab back *restored Performance* instead of landing on
+Edit, so Tab stopped being the simple "always Edit↔Viewing" toggle it's supposed to be — and
+Performance had no other way to exit via keyboard. Reaching Performance is a manual act (the `P`
+hotkey, or clicking its tab) and so is leaving it via anything other than Tab; Tab itself never lands
+on Performance, coming or going.
 
 ## 2. `EditorLayout` — pure, tested geometry
 
@@ -60,7 +82,9 @@ no gap.
 Small resolutions are clamped, not allowed to go negative: the tool column (small, effectively
 never clamped) is reserved first, then the sidebar takes whatever's left after reserving a
 `MinViewportW` floor for the render, so a docked sidebar can shrink but can never fully swallow the
-viewport. `Performance`'s two regions clamp the same way against a `MinPerfW` floor. See
+viewport. `Performance`'s Stats/graphs columns clamp against the same `MinViewportW` floor, then the
+graphs column itself is clamped to whatever's left after Stats (so it can shrink below its
+`PerfGraphWidthScale` target on a narrow window rather than pushing the viewport past its floor). See
 `EditorLayout.cs`'s own comments for the exact chain.
 
 ## 3. Tests
@@ -80,7 +104,7 @@ size) — 72 combinations per test:
 - **`AllWorkspaces_NeverProduceNegativeSizes`** — across all three workspaces, every region's
   width/height is ≥ 0 at every resolution in the matrix, including the deliberately pathological
   640×480 and 900×1440 cases.
-- **`Performance_ViewportStaysVisibleAboveAStatsAndGraphsStrip`** / **`Viewing_IsJustTheTopBarAndAFullWidthViewport`**
+- **`Performance_StatsAndGraphsAreFullHeightColumnsBesideTheViewport`** / **`Viewing_IsJustTheTopBarAndAFullWidthViewport`**
   — the other two workspaces' specific shapes.
 - **`Edit_AtAPathologicallySmallResolution_StillFitsWithoutNegativeViewport`** — 64×64, smaller
   than the tool column + sidebar's combined design width, still produces non-negative sizes.

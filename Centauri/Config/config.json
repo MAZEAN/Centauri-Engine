@@ -41,9 +41,9 @@
     "topBarAlpha": 0.7,
     "leftToolsAlpha": 0.7,
     "outlinerAlpha": 0.7,
-    "propertiesAlpha": 0.9,
+    "propertiesAlpha": 0.7,
     "statsAlpha": 0.7,
-    "performanceAlpha": 1.0
+    "performanceAlpha": 0.7
   },
   "debug": {
     "enableCulling": true,

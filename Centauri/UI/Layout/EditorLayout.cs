@@ -12,10 +12,10 @@ internal readonly record struct LayoutRect(Vector2 Pos, Vector2 Size)
     public float Bottom => Pos.Y + Size.Y;
 }
 
-// Which task the editor is set up for — decided by the TopBar's workspace tabs, independent of
-// Config.ViewMode (which is about the *camera*: Fly vs. Edit/pick). A user can be in the Edit
-// workspace while the camera is still in Fly mode; UISystem hides the interactive panels in that
-// combination (see its own gating) rather than EditorLayout knowing about camera state at all.
+// Which task the editor is set up for — decided by ModeManager.Workspace, a storage concept
+// EditorLayout itself knows nothing about (it just takes whichever value Compute is called with).
+// ModeManager keeps this loosely coupled to Config.ViewMode (Fly vs. Edit/pick camera behavior) —
+// see its own comments for the coupling — rather than EditorLayout knowing about camera state at all.
 internal enum EditorWorkspace { Edit, Performance, Viewing }
 
 // Every docked region for a given workspace at a given resolution. Optional slots are null when
@@ -50,11 +50,10 @@ internal static class EditorLayout
     private const float SidebarW       = 320f;
     private const float OutlinerFrac   = 0.35f; // fraction of sidebar height given to the entity list
     private const float MinViewportW   = 100f;  // floor so a docked sidebar can never fully swallow it
-    private const float MinPerfW       = 200f;
-    // Tall enough for PerformancePanel's headline + checkbox + two stacked 150px graphs (see
-    // PerformanceGraph/GPUTimingGraph's own GraphHeight) without scrolling at design scale.
-    private const float PerfStripH     = 420f;
-    private const float MinViewportH   = 100f;  // floor so the strip can never fully swallow the view
+    // The perf graphs column is sized relative to Stats' width rather than eating whatever's left —
+    // a fixed multiple keeps it proportioned instead of stretching edge-to-edge on an ultrawide
+    // monitor, which is what the "downscale the graphs" ask was really about.
+    private const float PerfGraphWidthScale = 1.15f;
 
     public static EditorRegions Compute(EditorWorkspace workspace, Vector2 workPos, Vector2 workSize, float uiScale)
     {
@@ -106,26 +105,25 @@ internal static class EditorLayout
 
     private static EditorRegions ComputePerformance(Vector2 workPos, float w, float bodyY, float bodyH, float scale, LayoutRect topBar)
     {
-        // The scene stays visible and rendering (unlike the original cut that replaced it outright)
-        // — Stats + the perf graphs live in a bottom strip instead, split left/right exactly like
-        // Edit's Outliner/Properties split top/bottom: reserve the strip height first (floored so a
-        // tiny window can shrink it rather than let the viewport go negative), then split its width.
-        var minViewportH = MathF.Min(MinViewportH * scale, bodyH);
-        var stripH       = Math.Clamp(PerfStripH * scale, 0f, bodyH - minViewportH);
-        var viewportH    = bodyH - stripH;
-
-        var minPerfW = MathF.Min(MinPerfW * scale, w);
-        var statsW   = Math.Clamp(SidebarW * scale, 0f, w - minPerfW);
-        var perfW    = w - statsW;
-
-        var stripY = bodyY + viewportH;
+        // Two full-height columns on the left — Stats, then the perf graphs immediately beside it —
+        // mirroring Edit's sidebar shape (just flipped to the left edge, and two columns instead of
+        // a stacked sidebar, since neither panel wants to share width with the other). The scene
+        // stays visible, filling whatever's left to the right, rather than being replaced outright
+        // (an earlier cut did that) or squeezed into a short bottom strip (a later one did that,
+        // and cut the GPU-timing graph off at the bottom — full body height fixes that outright
+        // instead of guessing at a tall-enough fixed strip height).
+        var minViewportW = MathF.Min(MinViewportW * scale, w);
+        var avail        = w - minViewportW; // width left for Stats + graphs, viewport floor reserved
+        var statsW       = Math.Clamp(SidebarW * scale, 0f, avail);
+        var perfW        = Math.Clamp(statsW * PerfGraphWidthScale, 0f, avail - statsW);
+        var viewportW    = w - statsW - perfW;
 
         return new EditorRegions
         {
             TopBar      = topBar,
-            Viewport    = new LayoutRect(new Vector2(workPos.X, bodyY), new Vector2(w, viewportH)),
-            Stats       = new LayoutRect(new Vector2(workPos.X, stripY), new Vector2(statsW, stripH)),
-            Performance = new LayoutRect(new Vector2(workPos.X + statsW, stripY), new Vector2(perfW, stripH)),
+            Stats       = new LayoutRect(new Vector2(workPos.X, bodyY), new Vector2(statsW, bodyH)),
+            Performance = new LayoutRect(new Vector2(workPos.X + statsW, bodyY), new Vector2(perfW, bodyH)),
+            Viewport    = new LayoutRect(new Vector2(workPos.X + statsW + perfW, bodyY), new Vector2(viewportW, bodyH)),
         };
     }
 }

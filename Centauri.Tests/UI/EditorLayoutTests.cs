@@ -107,12 +107,13 @@ public sealed class EditorLayoutTests
     }
 
     // Performance keeps the 3D scene visible (unlike an earlier cut that replaced it outright) —
-    // Viewport spans the full width on top, Stats + the perf graphs share a bottom strip, split
-    // left/right exactly like Edit's Outliner/Properties split top/bottom.
+    // Stats and the perf graphs are two full-height columns on the left (mirroring Edit's sidebar,
+    // just two columns instead of a stacked one), and the viewport fills whatever's left to the
+    // right, all three reaching the work area's full body height with no gap.
     [Theory]
     [InlineData(1280f, 720f)]
     [InlineData(1920f, 1080f)]
-    public void Performance_ViewportStaysVisibleAboveAStatsAndGraphsStrip(float w, float h)
+    public void Performance_StatsAndGraphsAreFullHeightColumnsBesideTheViewport(float w, float h)
     {
         var r = EditorLayout.Compute(EditorWorkspace.Performance, Vector2.Zero, new Vector2(w, h), 1f);
 
@@ -121,29 +122,31 @@ public sealed class EditorLayoutTests
         var stats = r.Stats!.Value;
         var perf  = r.Performance!.Value;
 
-        // Viewport spans the full width, sitting directly beneath the top bar and directly above
-        // the strip — its own shared edges are exact, same construction-not-coincidence reasoning
-        // as Edit's tiling.
-        Assert.Equal(0f, r.Viewport.Left, Eps);
-        Assert.Equal(w, r.Viewport.Right, Eps);
+        // All three regions sit directly beneath the top bar and reach the work area's bottom edge
+        // — full body height, no gap.
+        Assert.Equal(r.TopBar.Bottom, stats.Top, Eps);
+        Assert.Equal(r.TopBar.Bottom, perf.Top, Eps);
         Assert.Equal(r.TopBar.Bottom, r.Viewport.Top, Eps);
-        Assert.Equal(r.Viewport.Bottom, stats.Top, Eps);
-        Assert.Equal(r.Viewport.Bottom, perf.Top, Eps);
-
-        // Stats/Performance split the strip's width with no gap, and both reach the work area's
-        // bottom and right edges.
-        Assert.Equal(stats.Top, perf.Top, Eps);
-        Assert.Equal(stats.Bottom, perf.Bottom, Eps);
-        Assert.Equal(stats.Right, perf.Left, Eps);
-        Assert.Equal(0f, stats.Left, Eps);
-        Assert.Equal(w, perf.Right, Eps);
         Assert.Equal(h, stats.Bottom, Eps);
         Assert.Equal(h, perf.Bottom, Eps);
+        Assert.Equal(h, r.Viewport.Bottom, Eps);
+
+        // Stats, then the graphs, then the viewport — left to right, no gap, reaching both the left
+        // and right work-area edges (construction, not coincidence — same reasoning as Edit's tiling).
+        Assert.Equal(0f, stats.Left, Eps);
+        Assert.Equal(stats.Right, perf.Left, Eps);
+        Assert.Equal(perf.Right, r.Viewport.Left, Eps);
+        Assert.Equal(w, r.Viewport.Right, Eps);
+
+        // The graphs column is sized relative to Stats' width (slightly bigger), not left to eat
+        // whatever's left over — that's what keeps it from stretching edge-to-edge and swallowing
+        // the viewport on a wide monitor.
+        Assert.True(perf.Size.X >= stats.Size.X - Eps, "the perf graphs column is narrower than Stats");
 
         // Area conservation across all three regions rules out both a gap and an overlap the edge
         // checks alone might miss.
         var bodyH = h - r.TopBar.Size.Y;
-        var sumArea = Area(r.Viewport) + Area(stats) + Area(perf);
+        var sumArea = Area(stats) + Area(perf) + Area(r.Viewport);
         Assert.Equal(w * bodyH, sumArea, MathF.Max(1f, w * bodyH * 1e-4f));
     }
 

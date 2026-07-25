@@ -12,10 +12,10 @@ using Layout;
 // screen; the viewport's own shading segmented control (Shaded | Normals | Depth | ...) sits to
 // their right, unchanged from what used to be a separate floating ViewportToolbar. Always rendered,
 // in every workspace — it's how you get back to Edit from Viewing. There's deliberately no separate
-// Fly/Edit camera-mode text indicator here — UISystem couples the two: Tab into Fly auto-switches to
-// the Viewing workspace (nothing to click while the cursor's captured for camera look anyway) and
-// restores whatever workspace was active when you Tab back to Edit, so the workspace tabs
-// themselves are the indicator instead of a second readout next to them.
+// Fly/Edit camera-mode text indicator here — ModeManager couples the two (see its own comments), so
+// the workspace tabs themselves double as the indicator instead of a second readout next to them.
+// TopBar no longer owns which workspace is active (see ModeManager) — it just reads/sets
+// ModeManager.Workspace, same as every other caller that cares about it.
 internal sealed class TopBar
 {
     private const ImGuiWindowFlags Flags =
@@ -23,6 +23,7 @@ internal sealed class TopBar
 
     private readonly ImFontPtr _font;
     private readonly AppConfig _config;
+    private readonly ModeManager _modeManager;
 
     private static readonly EditorWorkspace[] Workspaces      = Enum.GetValues<EditorWorkspace>();
     private static readonly string[]          WorkspaceLabels = Array.ConvertAll(Workspaces, w => w.ToString());
@@ -30,12 +31,11 @@ internal sealed class TopBar
     private static readonly ShadingMode[] Modes      = Enum.GetValues<ShadingMode>();
     private static readonly string[]      ModeLabels = Array.ConvertAll(Modes, m => m.ToString());
 
-    public EditorWorkspace Workspace { get; set; } = EditorWorkspace.Edit;
-
-    public TopBar(ImFontPtr font, AppConfig config)
+    public TopBar(ImFontPtr font, AppConfig config, ModeManager modeManager)
     {
-        _font   = font;
-        _config = config;
+        _font        = font;
+        _config      = config;
+        _modeManager = modeManager;
     }
 
     public void Render(LayoutRect rect)
@@ -73,7 +73,7 @@ internal sealed class TopBar
         if (io.WantCaptureKeyboard || io.KeyCtrl || io.KeyShift || io.KeyAlt) return;
 
         if (ImGui.IsKeyPressed(ImGuiKey.P, repeat: false))
-            Workspace = EditorWorkspace.Performance;
+            _modeManager.Workspace = EditorWorkspace.Performance;
     }
 
     private void DrawWorkspaceTabs()
@@ -85,12 +85,12 @@ internal sealed class TopBar
             if (i > 0)
                 ImGui.SameLine();
 
-            var selected = Workspace == Workspaces[i];
+            var selected = _modeManager.Workspace == Workspaces[i];
             if (selected)
                 ImGui.PushStyleColor(ImGuiCol.Button, ColorPalette.Accent);
 
             if (ImGui.Button(WorkspaceLabels[i]))
-                Workspace = Workspaces[i];
+                _modeManager.Workspace = Workspaces[i];
 
             if (selected)
                 ImGui.PopStyleColor();
