@@ -40,7 +40,7 @@ internal sealed class PerformancePanel
 
     public void Render(in FrameStats stats, IReadOnlyList<GpuTiming> gpuTimings, LayoutRect rect)
     {
-        PanelHost.Place(rect, bgAlpha: 1.0f);
+        PanelHost.Place(rect, bgAlpha: _config.ImGui.PerformanceAlpha);
 
         if (!ImGui.Begin("Performance", PanelHost.DockedFlags))
         {

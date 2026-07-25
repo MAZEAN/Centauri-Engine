@@ -9,10 +9,13 @@ using Layout;
 
 // The docked full-width top strip — modelled on Blender's topbar. Workspace tabs (Edit / Performance
 // / Viewing — see EditorWorkspace) on the left decide which of EditorLayout's panel sets is on
-// screen; the viewport's own shading segmented control (Shaded | Normals | Depth | ...) and the
-// Fly/Edit camera-mode indicator sit to their right, unchanged from what used to be a separate
-// floating ViewportToolbar. Always rendered, in every workspace — it's how you get back to Edit
-// from Viewing.
+// screen; the viewport's own shading segmented control (Shaded | Normals | Depth | ...) sits to
+// their right, unchanged from what used to be a separate floating ViewportToolbar. Always rendered,
+// in every workspace — it's how you get back to Edit from Viewing. There's deliberately no separate
+// Fly/Edit camera-mode text indicator here — UISystem couples the two: Tab into Fly auto-switches to
+// the Viewing workspace (nothing to click while the cursor's captured for camera look anyway) and
+// restores whatever workspace was active when you Tab back to Edit, so the workspace tabs
+// themselves are the indicator instead of a second readout next to them.
 internal sealed class TopBar
 {
     private const ImGuiWindowFlags Flags =
@@ -27,14 +30,6 @@ internal sealed class TopBar
     private static readonly ShadingMode[] Modes      = Enum.GetValues<ShadingMode>();
     private static readonly string[]      ModeLabels = Array.ConvertAll(Modes, m => m.ToString());
 
-    private static readonly ViewMode[] ViewModes      = Enum.GetValues<ViewMode>();
-    private static readonly string[]   ViewModeLabels = Array.ConvertAll(ViewModes, m => m.ToString());
-
-    // Depends only on _font (fixed for the toolbar's lifetime), so it's computed once on first use
-    // rather than every frame — Enum.GetValues() + N ToString()/CalcTextSize() calls used to run
-    // per frame just to find a width that never actually changes.
-    private float? _maxModeWidth;
-
     public EditorWorkspace Workspace { get; set; } = EditorWorkspace.Edit;
 
     public TopBar(ImFontPtr font, AppConfig config)
@@ -47,7 +42,7 @@ internal sealed class TopBar
     {
         HandleWorkspaceHotkeys();
 
-        PanelHost.Place(rect, bgAlpha: 1.0f);
+        PanelHost.Place(rect, bgAlpha: _config.ImGui.TopBarAlpha);
 
         if (!ImGui.Begin("TopBar", Flags))
         {
@@ -128,15 +123,4 @@ internal sealed class TopBar
         ImGui.PopStyleVar();
     }
 
-    private float MaxModeWidth()
-    {
-        if (_maxModeWidth is { } cached) return cached;
-
-        var w = 0f;
-        foreach (var label in ViewModeLabels)
-            w = MathF.Max(w, ImGui.CalcTextSize(label).X);
-
-        _maxModeWidth = w;
-        return w;
-    }
 }

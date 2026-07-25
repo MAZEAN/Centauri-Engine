@@ -28,7 +28,7 @@ internal sealed class StatsOverlay
 
     public void Render(Scene scene, FrameStats stats, LayoutRect rect)
     {
-        PanelHost.Place(rect, bgAlpha: 1.0f);
+        PanelHost.Place(rect, bgAlpha: _config.ImGui.StatsAlpha);
 
         var flags = PanelHost.DockedFlags;
         if (_config.Input.Mode == ViewMode.Fly)

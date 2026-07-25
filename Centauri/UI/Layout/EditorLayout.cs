@@ -51,6 +51,10 @@ internal static class EditorLayout
     private const float OutlinerFrac   = 0.35f; // fraction of sidebar height given to the entity list
     private const float MinViewportW   = 100f;  // floor so a docked sidebar can never fully swallow it
     private const float MinPerfW       = 200f;
+    // Tall enough for PerformancePanel's headline + checkbox + two stacked 150px graphs (see
+    // PerformanceGraph/GPUTimingGraph's own GraphHeight) without scrolling at design scale.
+    private const float PerfStripH     = 420f;
+    private const float MinViewportH   = 100f;  // floor so the strip can never fully swallow the view
 
     public static EditorRegions Compute(EditorWorkspace workspace, Vector2 workPos, Vector2 workSize, float uiScale)
     {
@@ -102,19 +106,26 @@ internal static class EditorLayout
 
     private static EditorRegions ComputePerformance(Vector2 workPos, float w, float bodyY, float bodyH, float scale, LayoutRect topBar)
     {
+        // The scene stays visible and rendering (unlike the original cut that replaced it outright)
+        // — Stats + the perf graphs live in a bottom strip instead, split left/right exactly like
+        // Edit's Outliner/Properties split top/bottom: reserve the strip height first (floored so a
+        // tiny window can shrink it rather than let the viewport go negative), then split its width.
+        var minViewportH = MathF.Min(MinViewportH * scale, bodyH);
+        var stripH       = Math.Clamp(PerfStripH * scale, 0f, bodyH - minViewportH);
+        var viewportH    = bodyH - stripH;
+
         var minPerfW = MathF.Min(MinPerfW * scale, w);
         var statsW   = Math.Clamp(SidebarW * scale, 0f, w - minPerfW);
         var perfW    = w - statsW;
 
+        var stripY = bodyY + viewportH;
+
         return new EditorRegions
         {
             TopBar      = topBar,
-            // No live-render focus in this workspace, so Stats+Performance simply tile the whole
-            // body — Viewport still gets a (zero-width-at-worst) rect so callers never need a null
-            // check on it specifically.
-            Viewport    = new LayoutRect(new Vector2(workPos.X + statsW, bodyY), new Vector2(0f, bodyH)),
-            Stats       = new LayoutRect(new Vector2(workPos.X, bodyY), new Vector2(statsW, bodyH)),
-            Performance = new LayoutRect(new Vector2(workPos.X + statsW, bodyY), new Vector2(perfW, bodyH)),
+            Viewport    = new LayoutRect(new Vector2(workPos.X, bodyY), new Vector2(w, viewportH)),
+            Stats       = new LayoutRect(new Vector2(workPos.X, stripY), new Vector2(statsW, stripH)),
+            Performance = new LayoutRect(new Vector2(workPos.X + statsW, stripY), new Vector2(perfW, stripH)),
         };
     }
 }

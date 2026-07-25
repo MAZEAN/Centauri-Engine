@@ -37,6 +37,14 @@ public sealed class UISystem : IDisposable
     private readonly TransformGizmo _gizmo;
     private readonly GizmoModeBar   _gizmoModeBar;
 
+    // Tracks Config.Input.Mode transitions so Tab (Fly<->Edit) can drive the workspace: entering
+    // Fly auto-switches to Viewing (there's nothing to click while the cursor's captured for camera
+    // look, and this is what makes Performance/Edit's panels actually go away on Tab instead of
+    // sitting there uselessly), and returning to Edit restores whatever workspace was active before
+    // — see Render's use of these two fields for the actual coupling.
+    private ViewMode           _lastViewMode;
+    private EditorWorkspace?   _workspaceBeforeFly;
+
     // The gizmo isn't an ImGui window, so it doesn't set WantCaptureMouse — fold its own
     // hover/drag state in so InputSystem suppresses viewport picking while a handle is engaged.
     public bool WantsMouse    => _imGui.WantsMouseCapture || _gizmo.IsInteracting;
@@ -45,16 +53,17 @@ public sealed class UISystem : IDisposable
     public UISystem(GL gl, AppConfig config, IWindow window, IInputContext input, ResourceSystem resourceSystem, EntitySetLoader entitySetLoader)
     {
         _config       = config;
+        _lastViewMode = config.Input.Mode;
 
         _imGui        = new ImGuiManager(gl, config.ImGui, window, input);
 
         _statsOverlay = new StatsOverlay(_imGui.Font, config);
         _performance  = new PerformancePanel(_imGui.Font, config);
         _properties   = new PropertiesPanel(_imGui.Font, _config, resourceSystem, entitySetLoader);
-        _outliner     = new HierarchyPanel(_imGui.Font, resourceSystem, entitySetLoader);
+        _outliner     = new HierarchyPanel(_imGui.Font, config, resourceSystem, entitySetLoader);
         _topBar       = new TopBar(_imGui.Font, config);
         _gizmo        = new TransformGizmo();
-        _gizmoModeBar = new GizmoModeBar(_imGui.Font, _gizmo);
+        _gizmoModeBar = new GizmoModeBar(_imGui.Font, config, _gizmo);
     }
 
     public void Update(float deltaTime) => _imGui.Update(deltaTime);
@@ -66,6 +75,22 @@ public sealed class UISystem : IDisposable
         // Pushed every frame regardless of workspace, so switching into Performance never reveals
         // graph history with a gap in it.
         _performance.Push(in stats, gpuTimings);
+
+        if (_config.Input.Mode != _lastViewMode)
+        {
+            if (_config.Input.Mode == ViewMode.Fly)
+            {
+                _workspaceBeforeFly = _topBar.Workspace;
+                _topBar.Workspace   = EditorWorkspace.Viewing;
+            }
+            else if (_workspaceBeforeFly is { } previous)
+            {
+                _topBar.Workspace   = previous;
+                _workspaceBeforeFly = null;
+            }
+
+            _lastViewMode = _config.Input.Mode;
+        }
 
         var viewport = ImGui.GetMainViewport();
         var regions  = EditorLayout.Compute(_topBar.Workspace, viewport.WorkPos, viewport.WorkSize, Widgets.FontScale);

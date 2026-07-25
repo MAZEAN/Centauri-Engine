@@ -18,6 +18,7 @@ internal readonly record struct SectionGroup(string Name, Vector4 Accent, ISecti
 internal class PropertiesPanel
 {
     private readonly ImFontPtr _font;
+    private readonly AppConfig _config;
 
     private readonly EntityInspectorSection _entitySection;
     private readonly SectionGroup[] _groups;
@@ -25,6 +26,7 @@ internal class PropertiesPanel
     public PropertiesPanel(ImFontPtr font, AppConfig config, ResourceSystem resourceSystem, EntitySetLoader entitySetLoader)
     {
         _font = font;
+        _config = config;
         _entitySection = new EntityInspectorSection(resourceSystem, entitySetLoader);
         _groups =
         [
@@ -52,14 +54,15 @@ internal class PropertiesPanel
             new SectionGroup("Scene", ColorPalette.Amber, [
                 new CullingSection(config),
                 new ViewportSection(config.Debug, config.Render),
-                new TracySection(config.Debug)
+                new TracySection(config.Debug),
+                new PanelAppearanceSection(config.ImGui)
             ])
         ];
     }
 
     public void Render(Scene scene, LayoutRect rect)
     {
-        PanelHost.Place(rect, bgAlpha: 1.0f);
+        PanelHost.Place(rect, bgAlpha: _config.ImGui.PropertiesAlpha);
 
         if (!ImGui.Begin("Properties", PanelHost.DockedFlags))
         {

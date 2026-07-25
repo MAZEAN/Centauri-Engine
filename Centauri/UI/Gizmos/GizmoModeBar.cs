@@ -3,6 +3,7 @@ namespace Centauri.UI.Gizmos;
 using System.Numerics;
 using ImGuiNET;
 
+using Config;
 using Common;
 using Layout;
 
@@ -32,17 +33,19 @@ internal sealed class GizmoModeBar
     ];
 
     private readonly ImFontPtr _font;
+    private readonly AppConfig _config;
     private readonly TransformGizmo _gizmo;
 
-    public GizmoModeBar(ImFontPtr font, TransformGizmo gizmo)
+    public GizmoModeBar(ImFontPtr font, AppConfig config, TransformGizmo gizmo)
     {
-        _font  = font;
-        _gizmo = gizmo;
+        _font   = font;
+        _config = config;
+        _gizmo  = gizmo;
     }
 
     public void Render(LayoutRect rect)
     {
-        PanelHost.Place(rect, bgAlpha: 1.0f);
+        PanelHost.Place(rect, bgAlpha: _config.ImGui.LeftToolsAlpha);
 
         if (!ImGui.Begin("GizmoModeBar", Flags))
         {

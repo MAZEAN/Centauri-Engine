@@ -4,6 +4,7 @@ using ImGuiNET;
 using System.Numerics;
 
 using World;
+using Config;
 using Common;
 using Layout;
 using Rendering;
@@ -20,6 +21,7 @@ using Loading;
 internal sealed class HierarchyPanel
 {
     private readonly ImFontPtr _font;
+    private readonly AppConfig _config;
     private readonly ResourceSystem _resourceSystem;
     private readonly EntitySetLoader _entitySetLoader;
 
@@ -34,16 +36,17 @@ internal sealed class HierarchyPanel
     private string[]? _materialIds;
     private int _selectedMaterial;
 
-    public HierarchyPanel(ImFontPtr font, ResourceSystem resourceSystem, EntitySetLoader entitySetLoader)
+    public HierarchyPanel(ImFontPtr font, AppConfig config, ResourceSystem resourceSystem, EntitySetLoader entitySetLoader)
     {
         _font = font;
+        _config = config;
         _resourceSystem = resourceSystem;
         _entitySetLoader = entitySetLoader;
     }
 
     public void Render(Scene scene, LayoutRect rect)
     {
-        PanelHost.Place(rect, bgAlpha: 1.0f);
+        PanelHost.Place(rect, bgAlpha: _config.ImGui.OutlinerAlpha);
 
         if (!ImGui.Begin("Outliner", PanelHost.DockedFlags))
         {

@@ -13,26 +13,25 @@ flying, the cursor is captured for camera look, so there'd be nothing to click t
 
 ![Edit workspace, 1920x1080](images/editor-layout-edit.png)
 
-**Performance** — Statistics (full detail, not the trimmed table it used to share with the graphs)
-on the left, the frame-time/GPU-timing graphs filling the rest. This is the payoff of splitting
-`PerformancePanel` out of `StatsOverlay`: the graphs finally get real width instead of being
-squeezed into a 350px card.
-
-![Performance workspace, 1920x1080](images/editor-layout-performance.png)
+**Performance** — the 3D scene stays visible and rendering, full width, across the top; Statistics
+(full detail, not the trimmed table it used to share with the graphs) and the frame-time/GPU-timing
+graphs share a bottom strip, split left/right the same way Edit's Outliner/Properties split
+top/bottom. An earlier cut of this workspace replaced the viewport outright with Stats+graphs at
+full body height — dropped in favor of keeping the scene visible while still giving the graphs real
+width instead of the 350px card they had inside `StatsOverlay` originally.
 
 **Viewing** — nothing but the top bar. For presenting, recording, or just looking at the scene.
 
-![Viewing workspace, 1920x1080](images/editor-layout-viewing.png)
-
-The same Edit workspace at 1024×768, to show the tiling holds at a smaller resolution too (see §3):
-
-![Edit workspace, 1024x768](images/editor-layout-edit-1024x768.png)
-
 Workspace tabs live in `TopBar` (renamed from the old `ViewportToolbar` — its role grew from "the
-shading-mode strip" to "the whole top bar") and are independent of `Config.ViewMode` (Fly vs. Edit
-camera behavior) — you can be in the Edit *workspace* while the camera is in Fly *mode*; `UISystem`
-hides the interactive panels in that combination rather than `EditorLayout` knowing about camera
-state at all.
+shading-mode strip" to "the whole top bar"). `EditorWorkspace` (which panel set is on screen) and
+`Config.Input.Mode`/`ViewMode` (Fly vs. Edit camera behavior) are still separate concepts — neither
+knows about the other's storage — but `UISystem.Render` couples them each frame instead of leaving
+them to drift independently: Tab-ing into Fly mode remembers the current workspace and switches to
+Viewing (there's nothing to click while the cursor's captured for camera look anyway, so a workspace
+with visible panels just sat there uselessly before this), and Tab-ing back to Edit mode restores
+whatever workspace was active before. This is also why there's no separate Fly/Edit text indicator
+in `TopBar` — the workspace tabs themselves show it, since the highlighted tab now actually changes
+when you press Tab.
 
 **P** jumps straight to the Performance workspace (`TopBar.HandleWorkspaceHotkeys`) — the one
 workspace switch worth a hotkey, since Edit is the default and Viewing is one click away on the
@@ -81,16 +80,15 @@ size) — 72 combinations per test:
 - **`AllWorkspaces_NeverProduceNegativeSizes`** — across all three workspaces, every region's
   width/height is ≥ 0 at every resolution in the matrix, including the deliberately pathological
   640×480 and 900×1440 cases.
-- **`Performance_StatsAndGraphsTileTheBodyExactly`** / **`Viewing_IsJustTheTopBarAndAFullWidthViewport`**
+- **`Performance_ViewportStaysVisibleAboveAStatsAndGraphsStrip`** / **`Viewing_IsJustTheTopBarAndAFullWidthViewport`**
   — the other two workspaces' specific shapes.
 - **`Edit_AtAPathologicallySmallResolution_StillFitsWithoutNegativeViewport`** — 64×64, smaller
   than the tool column + sidebar's combined design width, still produces non-negative sizes.
 
-201 tests total in the suite after this (148 new). The actual ImGui rendering (window flags,
-`SetNextWindowPos`/`Size`, docked-vs-floating flag differences) isn't unit-tested — it needs a live
-ImGui frame — but was verified visually headless at four real resolutions (1024×768, 1280×720,
-1920×1080, 2560×1440; see the screenshots in §1) plus all three workspaces, confirming the
-math the tests pin actually matches what gets drawn on screen.
+201 tests total in the suite. The actual ImGui rendering (window flags, `SetNextWindowPos`/`Size`,
+docked-vs-floating flag differences) isn't unit-tested — it needs a live ImGui frame — but was
+verified visually headless, confirming the math the tests pin actually matches what gets drawn on
+screen.
 
 ### A note on headless resolution testing
 
@@ -136,3 +134,14 @@ top of it, and a window's true outer edge bleeds a couple of pixels past the scr
 hardware viewport clips it instead of leaving a gap. Panel-internal layout math (e.g. `GizmoModeBar`
 centering its buttons) keeps using the original, un-bled `LayoutRect.Size`, so this only affects what
 ImGui rasterizes, not any panel's own content layout.
+
+## 5. Panel transparency
+
+Each docked panel's background opacity (the `bgAlpha` `PanelHost.Place` takes) is configurable
+per-panel via `AppConfig.ImGui.{TopBar,LeftTools,Outliner,Properties,Stats,Performance}Alpha` —
+`PanelAppearanceSection` (Properties → Scene → Panel Transparency) exposes them as live drag sliders,
+following the same `ISection`/`Widgets.DragRow` pattern as every other live-tunable setting in that
+panel (e.g. `ViewportSection`). Floored at 0.2 rather than 0: since `PropertiesAlpha` controls the
+very panel the slider lives in, letting it reach full transparency would leave nothing to click to
+bring it back up. Runtime-only, like the rest of `Debug`'s toggles — not written back to
+`config.json`.

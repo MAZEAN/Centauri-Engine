@@ -106,10 +106,13 @@ public sealed class EditorLayoutTests
         }
     }
 
+    // Performance keeps the 3D scene visible (unlike an earlier cut that replaced it outright) —
+    // Viewport spans the full width on top, Stats + the perf graphs share a bottom strip, split
+    // left/right exactly like Edit's Outliner/Properties split top/bottom.
     [Theory]
     [InlineData(1280f, 720f)]
     [InlineData(1920f, 1080f)]
-    public void Performance_StatsAndGraphsTileTheBodyExactly(float w, float h)
+    public void Performance_ViewportStaysVisibleAboveAStatsAndGraphsStrip(float w, float h)
     {
         var r = EditorLayout.Compute(EditorWorkspace.Performance, Vector2.Zero, new Vector2(w, h), 1f);
 
@@ -118,14 +121,30 @@ public sealed class EditorLayoutTests
         var stats = r.Stats!.Value;
         var perf  = r.Performance!.Value;
 
+        // Viewport spans the full width, sitting directly beneath the top bar and directly above
+        // the strip — its own shared edges are exact, same construction-not-coincidence reasoning
+        // as Edit's tiling.
+        Assert.Equal(0f, r.Viewport.Left, Eps);
+        Assert.Equal(w, r.Viewport.Right, Eps);
+        Assert.Equal(r.TopBar.Bottom, r.Viewport.Top, Eps);
+        Assert.Equal(r.Viewport.Bottom, stats.Top, Eps);
+        Assert.Equal(r.Viewport.Bottom, perf.Top, Eps);
+
+        // Stats/Performance split the strip's width with no gap, and both reach the work area's
+        // bottom and right edges.
         Assert.Equal(stats.Top, perf.Top, Eps);
         Assert.Equal(stats.Bottom, perf.Bottom, Eps);
         Assert.Equal(stats.Right, perf.Left, Eps);
         Assert.Equal(0f, stats.Left, Eps);
         Assert.Equal(w, perf.Right, Eps);
+        Assert.Equal(h, stats.Bottom, Eps);
+        Assert.Equal(h, perf.Bottom, Eps);
 
+        // Area conservation across all three regions rules out both a gap and an overlap the edge
+        // checks alone might miss.
         var bodyH = h - r.TopBar.Size.Y;
-        Assert.Equal(w * bodyH, stats.Size.X * stats.Size.Y + perf.Size.X * perf.Size.Y, MathF.Max(1f, w * bodyH * 1e-4f));
+        var sumArea = Area(r.Viewport) + Area(stats) + Area(perf);
+        Assert.Equal(w * bodyH, sumArea, MathF.Max(1f, w * bodyH * 1e-4f));
     }
 
     [Fact]
