@@ -70,6 +70,14 @@ public sealed class UISystem : IDisposable
         var viewport = ImGui.GetMainViewport();
         var regions  = EditorLayout.Compute(_topBar.Workspace, viewport.WorkPos, viewport.WorkSize, Widgets.FontScale);
 
+        // Docked panels tile exactly (EditorLayout is pixel-exact), but the theme's WindowRounding
+        // (Theme.cs) rounds every window's corners — against another panel that shows as a sliver of
+        // background at the shared edge, and against the work-area edge it shows as a gap around the
+        // outside. Docked panels are meant to read as one seamless surface, not floating cards, so
+        // rounding is suppressed for exactly this block and restored after (floating windows —
+        // popups, tooltips, ImGui debug windows — keep the themed rounding).
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, 0f);
+
         using (Tracy.Scope("UISystem.Render.TopBar"))
             _topBar.Render(regions.TopBar);
 
@@ -98,6 +106,8 @@ public sealed class UISystem : IDisposable
                 using (Tracy.Scope("UISystem.Render.GizmoModeBar"))
                     _gizmoModeBar.Render(leftToolsRect);
         }
+
+        ImGui.PopStyleVar();
 
         using (Tracy.Scope("UISystem.Render.ImGuiFlush"))
             _imGui.Render();

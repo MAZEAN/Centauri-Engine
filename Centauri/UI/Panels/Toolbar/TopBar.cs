@@ -45,6 +45,8 @@ internal sealed class TopBar
 
     public void Render(LayoutRect rect)
     {
+        HandleWorkspaceHotkeys();
+
         PanelHost.Place(rect, bgAlpha: 1.0f);
 
         if (!ImGui.Begin("TopBar", Flags))
@@ -61,6 +63,22 @@ internal sealed class TopBar
 
         ImGui.PopFont();
         ImGui.End();
+    }
+
+    // P jumps straight to the Performance workspace — the one workspace switch worth a hotkey (Edit
+    // is the default you start in and Viewing is one click away on the always-visible tabs). Doesn't
+    // reuse Tab: that's already Config.Input.ToggleModeKey for Fly/Edit camera mode, read off the raw
+    // Silk.NET keyboard in InputSystem.OnKeyDown with no modifier check at all, so even a Ctrl/Shift
+    // combo on Tab would still fire the camera toggle alongside whatever we bound it to here. Read
+    // every frame regardless of which workspace is active or the camera's Fly/Edit mode — unlike the
+    // gizmo's W/E/R mode switch, jumping to Performance while flying is exactly the point.
+    private void HandleWorkspaceHotkeys()
+    {
+        var io = ImGui.GetIO();
+        if (io.WantCaptureKeyboard || io.KeyCtrl || io.KeyShift || io.KeyAlt) return;
+
+        if (ImGui.IsKeyPressed(ImGuiKey.P, repeat: false))
+            Workspace = EditorWorkspace.Performance;
     }
 
     private void DrawWorkspaceTabs()

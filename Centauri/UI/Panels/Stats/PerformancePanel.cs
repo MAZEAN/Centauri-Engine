@@ -59,15 +59,13 @@ internal sealed class PerformancePanel
             _config.Debug.ShowGPUTimings = gpu;
 
         var showGpu = gpu && gpuTimings.Count > 0;
-        if (showGpu) ImGui.Columns(2, "perfcols", false);
 
+        // Stacked vertically rather than side-by-side: each graph plots against wall-clock time on
+        // its X axis, so the two only compare meaningfully when they share the same width/timescale
+        // — splitting the panel into side-by-side columns halves both instead.
         _perfGraph.Draw();
         if (showGpu)
-        {
-            ImGui.NextColumn();
             _gpuGraph.Draw();
-            ImGui.Columns(1);
-        }
 
         ImGui.PopFont();
         ImGui.End();

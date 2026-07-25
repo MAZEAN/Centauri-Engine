@@ -34,6 +34,14 @@ camera behavior) — you can be in the Edit *workspace* while the camera is in F
 hides the interactive panels in that combination rather than `EditorLayout` knowing about camera
 state at all.
 
+**P** jumps straight to the Performance workspace (`TopBar.HandleWorkspaceHotkeys`) — the one
+workspace switch worth a hotkey, since Edit is the default and Viewing is one click away on the
+always-visible tabs. Doesn't reuse Tab (`Config.Input.ToggleModeKey`, the Fly/Edit camera toggle):
+that's read off the raw Silk.NET keyboard in `InputSystem.OnKeyDown` with no modifier check at all,
+so even a Ctrl/Shift combo on Tab would still fire the camera toggle alongside whatever else it's
+bound to. Read every frame regardless of the active workspace or camera mode — unlike the gizmo's
+W/E/R mode switch, jumping to Performance while flying is exactly the point.
+
 ## 2. `EditorLayout` — pure, tested geometry
 
 `EditorLayout.Compute(workspace, workPos, workSize, uiScale)` turns a workspace + the current
@@ -108,3 +116,23 @@ since it doesn't depend on any of that.
 `LayoutRect` parameter now instead of positioning themselves; `TopBar` and `GizmoModeBar` do the
 same. None of them know their own screen position — `UISystem.Render` is the one place that calls
 `EditorLayout.Compute` and hands each panel the slot it got.
+
+The theme's `WindowRounding` (`Theme.cs`) rounds every ImGui window's corners by default, which reads
+fine for a floating card but leaves a visible sliver of background at a docked panel's shared edge
+with its neighbour, and a matching sliver around the outside against the work-area edge — the exact
+tiling `EditorLayout` computes doesn't survive being drawn with rounded corners. `UISystem.Render`
+pushes `WindowRounding = 0` around the whole docked-panel block for exactly this reason (and pops it
+before `_imGui.Render()`, so floating windows — popups, tooltips — keep the themed rounding).
+
+Separately, `PanelHost.Place` grows every docked window's *drawn* size by a couple of pixels
+(`OuterBleed`) beyond what `EditorLayout` computed. This isn't a layout bug — `EditorLayoutTests`
+already proves the math lands every shared interior edge exactly — it's a render-backend quirk:
+verified by pixel-sampling real headless captures, only the true outer edge of the screen (the very
+last device-pixel row/column, at the work area's right and bottom bound) was left uncovered, showing
+a sliver of the 3D scene through what should've been opaque panel background; the interior seams
+between panels were already pixel-exact. Bleeding every docked window's size compensates: an interior
+neighbour drawn afterward (see `UISystem.Render`'s call order) simply repaints the harmless overlap on
+top of it, and a window's true outer edge bleeds a couple of pixels past the screen bound, where the
+hardware viewport clips it instead of leaving a gap. Panel-internal layout math (e.g. `GizmoModeBar`
+centering its buttons) keeps using the original, un-bled `LayoutRect.Size`, so this only affects what
+ImGui rasterizes, not any panel's own content layout.
