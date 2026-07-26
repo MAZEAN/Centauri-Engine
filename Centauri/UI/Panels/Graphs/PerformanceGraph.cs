@@ -60,6 +60,7 @@ internal sealed class PerformanceGraph
         var peak = 1f;
         for (var i = 0; i < _count; i++) 
             peak = MathF.Max(peak, _samples[i]);
+        
         _yMax = NiceCeil(peak);
 
         for (var d = 0; d <= Divs; d++)
@@ -99,7 +100,8 @@ internal sealed class PerformanceGraph
 
         // ── Y scale + gridlines ──────────────────────────────────────────────
         var peak = 1f;
-        for (var i = 0; i < _count; i++) peak = MathF.Max(peak, _samples[i]);
+        for (var i = 0; i < _count; i++) 
+            peak = MathF.Max(peak, _samples[i]);
         var yMax = _yMax;
 
         for (var d = 0; d <= Divs; d++)
@@ -133,6 +135,7 @@ internal sealed class PerformanceGraph
         // ── X labels + current value ───────────────────────────────────────────
         var labelGap = Widgets.Scale(2f);
         dl.AddText(new Vector2(p0.X, p1.Y + labelGap), tick, WindowLabel);
+        
         var nowSz = ImGui.CalcTextSize("now");
         dl.AddText(new Vector2(p1.X - nowSz.X, p1.Y + labelGap), tick, "now");
 

@@ -50,10 +50,6 @@ internal sealed class PerformancePanel
 
         ImGui.PushFont(_font);
 
-        ImGui.TextColored(ColorPalette.Amber, $"{Widgets.Float(stats.FPS)} FPS");
-        ImGui.SameLine();
-        ImGui.TextUnformatted($"   {Widgets.Float(stats.FrameTime)} ms");
-
         var gpu = _config.Debug.ShowGPUTimings;
         if (ImGui.Checkbox("GPU Timings", ref gpu))
             _config.Debug.ShowGPUTimings = gpu;
