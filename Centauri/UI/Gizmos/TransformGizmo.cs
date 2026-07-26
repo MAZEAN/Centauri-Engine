@@ -5,6 +5,7 @@ using ImGuiNET;
 
 using World;
 using Common;
+using Editing.Undo;
 
 // Screen-space transform gizmo for the selected entity — translate / rotate / scale, switched with
 // W / E / R. This class owns the *interaction*: mode, hover/drag state, and turning mouse motion
@@ -36,9 +37,16 @@ internal sealed class TransformGizmo
     private const float RotateGain            = 1f;
     private const float MinRotateRadiusPixels = 8f;
 
+    private readonly CommandHistory _commandHistory;
+
     private Mode _mode  = Mode.Translate;
     private Axis _hover = Axis.None;
     private Axis _drag  = Axis.None;
+
+    // The Transform's full state at drag-start, for the undo command pushed at drag-end
+    // (EndDrag) — separate from the mode-specific "reference geometry" fields below, which exist
+    // purely to drive the drag math and get reset per-mode.
+    private TransformState _dragStart;
 
     // Reference state frozen at drag start so the mapping doesn't drift as the object (and thus the
     // projected handle) moves mid-drag. Which fields are live depends on the mode.
@@ -67,6 +75,8 @@ internal sealed class TransformGizmo
         get => _mode;
         set => _mode = value;
     }
+
+    public TransformGizmo(CommandHistory commandHistory) => _commandHistory = commandHistory;
 
     public void Draw(Scene scene, Camera camera)
     {
@@ -146,11 +156,13 @@ internal sealed class TransformGizmo
         {
             if (ImGui.IsMouseDown(ImGuiMouseButton.Left))
             {
-                if (isScale) ApplyScaleDrag(t, mouse);
-                else         ApplyTranslateDrag(t, mouse);
+                if (isScale) 
+                    ApplyScaleDrag(t, mouse);
+                else         
+                    ApplyTranslateDrag(t, mouse);
             }
             else
-                _drag = Axis.None;
+                EndDrag(t);
         }
 
         GizmoDraw.LinearHandles(oScreen, ends, visible, isScale, ActiveAxis());
@@ -165,6 +177,7 @@ internal sealed class TransformGizmo
         if (screenLen < 1e-3f) return; // handle points straight at the camera — no usable drag axis
 
         _drag           = _hover;
+        _dragStart      = TransformState.Of(t);
         _dragAxisIndex  = i;
         _dragStartMouse = mouse;
         _dragScreenDir  = screenAxis / screenLen;
@@ -236,7 +249,7 @@ internal sealed class TransformGizmo
             if (ImGui.IsMouseDown(ImGuiMouseButton.Left))
                 ApplyRotateDrag(t, mouse);
             else
-                _drag = Axis.None;
+                EndDrag(t);
         }
 
         GizmoDraw.Rings(origin, axes, worldLen, viewProj, viewport, oScreen, ActiveAxis());
@@ -249,6 +262,7 @@ internal sealed class TransformGizmo
         var radius = MathF.Max(radial.Length(), Widgets.Scale(MinRotateRadiusPixels));
 
         _drag             = _hover;
+        _dragStart        = TransformState.Of(t);
         _dragStartRot     = t.Rotation;
         _dragRotAxis      = axes[i];
         _dragStartMouse   = mouse;
@@ -267,6 +281,20 @@ internal sealed class TransformGizmo
     {
         var phi = GizmoMath.RotationAngleDelta(_dragRotRadialHat, _dragRotInvRadius, mouse - _dragStartMouse, _dragRotSign, RotateGain);
         t.SetRotation(GizmoMath.ComposeWorldRotation(_dragStartRot, _dragRotAxis, phi));
+    }
+
+    // Common release path for both LinearMode and RotateMode: clears the drag state and, if the
+    // gesture actually changed anything (a click-release with no mouse movement in between is a
+    // no-op drag, not worth an undo step), pushes one TransformCommand for the whole gesture —
+    // the drag itself already applied every intermediate frame live, so this is purely recording
+    // start/end for undo, not re-applying anything.
+    private void EndDrag(Transform t)
+    {
+        _drag = Axis.None;
+
+        var after = TransformState.Of(t);
+        if (after != _dragStart)
+            _commandHistory.Push(new TransformCommand(t, _dragStart, after));
     }
 
     // Nearest straight handle within the pick radius. Doesn't hijack the cursor when an ImGui panel

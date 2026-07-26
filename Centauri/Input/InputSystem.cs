@@ -9,6 +9,7 @@ using Config;
 using World;
 using Rendering;
 using Loading;
+using Editing.Undo;
 
 public class InputSystem : IDisposable
 {
@@ -17,6 +18,7 @@ public class InputSystem : IDisposable
     private readonly AppConfig _config;
     private readonly RenderingSystem _renderingSystem;
     private readonly EntitySetLoader _entitySetLoader;
+    private readonly CommandHistory _commandHistory;
 
     private IKeyboard _keyboard = null!;
     public IInputContext InputContext { get; private set; } = null!;
@@ -26,13 +28,14 @@ public class InputSystem : IDisposable
     private readonly Dictionary<Camera, CameraController> _controllers = new();
     private readonly DebugHotkeys _hotkeys;
 
-    public InputSystem(IWindow window, Scene scene, AppConfig config, RenderingSystem renderingSystem, EntitySetLoader entitySetLoader)
+    public InputSystem(IWindow window, Scene scene, AppConfig config, RenderingSystem renderingSystem, EntitySetLoader entitySetLoader, CommandHistory commandHistory)
     {
         _window          = window;
         _scene           = scene;
         _config          = config;
         _renderingSystem = renderingSystem;
         _entitySetLoader = entitySetLoader;
+        _commandHistory  = commandHistory;
 
         _hotkeys         = new DebugHotkeys(config, scene, ResetActiveController);
 
@@ -119,6 +122,21 @@ public class InputSystem : IDisposable
             return;
         }
 
+        // Undo/redo — same raw-keyboard pattern as Ctrl+S/Ctrl+Shift+R above, so (like those) this
+        // doesn't check whether an ImGui text field has focus and would rather handle Ctrl+Z itself
+        // (a pre-existing gap, not new to this).
+        if (key == Key.Z && ctrl)
+        {
+            _commandHistory.Undo();
+            return;
+        }
+
+        if (key == Key.Y && ctrl)
+        {
+            _commandHistory.Redo();
+            return;
+        }
+
         if (key == _config.Input.ToggleModeKey)
         {
             ToggleMode(); _scene.ClearSelection();
@@ -127,6 +145,11 @@ public class InputSystem : IDisposable
 
         if (key == Key.Delete && _config.Input.Mode == ViewMode.Edit && _scene.Selected is { } selected)
         {
+            // Captured *before* deleting — DeleteEntity untracks the entity, which is exactly the
+            // bookkeeping Capture needs to still be intact.
+            if (_entitySetLoader.Capture(selected) is { } captured)
+                _commandHistory.Push(new DeleteEntityCommand(_entitySetLoader, selected, captured.Definition, captured.SourcePath));
+
             _entitySetLoader.DeleteEntity(selected);
             return;
         }
@@ -154,6 +177,11 @@ public class InputSystem : IDisposable
         try
         {
             _entitySetLoader.Reset();
+
+            // Every command on the stack potentially references an Entity/Transform Reset just
+            // disposed — see CommandHistory.Clear's own comment.
+            _commandHistory.Clear();
+
             Console.WriteLine("[Scene] Reset to last saved state.");
         }
         catch (Exception ex)

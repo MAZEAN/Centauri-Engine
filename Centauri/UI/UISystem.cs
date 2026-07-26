@@ -17,6 +17,7 @@ using Loading;
 using Gizmos;
 using Layout;
 using Common;
+using Editing.Undo;
 
 // Owns the whole ImGui surface — the controller plus every panel. RenderingSystem holds one of
 // these instead of juggling them individually.
@@ -43,7 +44,7 @@ public sealed class UISystem : IDisposable
     public bool WantsMouse    => _imGui.WantsMouseCapture || _gizmo.IsInteracting;
     public bool WantsKeyboard => _imGui.WantsKeyboardCapture;
 
-    public UISystem(GL gl, AppConfig config, IWindow window, IInputContext input, ResourceSystem resourceSystem, EntitySetLoader entitySetLoader)
+    public UISystem(GL gl, AppConfig config, IWindow window, IInputContext input, ResourceSystem resourceSystem, EntitySetLoader entitySetLoader, CommandHistory commandHistory)
     {
         _config      = config;
         _modeManager = new ModeManager(config);
@@ -53,9 +54,9 @@ public sealed class UISystem : IDisposable
         _statsOverlay = new StatsOverlay(_imGui.Font, config);
         _performance  = new PerformancePanel(_imGui.Font, config);
         _properties   = new PropertiesPanel(_imGui.Font, _config, resourceSystem, entitySetLoader);
-        _outliner     = new HierarchyPanel(_imGui.Font, config, resourceSystem, entitySetLoader);
+        _outliner     = new HierarchyPanel(_imGui.Font, config, resourceSystem, entitySetLoader, commandHistory);
         _topBar       = new TopBar(_imGui.Font, config, _modeManager);
-        _gizmo        = new TransformGizmo();
+        _gizmo        = new TransformGizmo(commandHistory);
         _gizmoModeBar = new GizmoModeBar(_imGui.Font, config, _gizmo);
     }
 

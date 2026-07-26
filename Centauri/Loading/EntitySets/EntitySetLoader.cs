@@ -290,6 +290,43 @@ public class EntitySetLoader
         _tracked.Untrack(entity);
     }
 
+    // Captures enough to reconstruct this entity later via Restore (Editing.Undo.
+    // DeleteEntityCommand) — the same EntityDefinition snapshot Save() would write for it right
+    // now, plus which file it's tracked under. Untracked entities (e.g. the environment's own
+    // "sun") return null; DeleteEntity's only caller (InputSystem's Delete-key handler) already
+    // gates deletion behind Edit mode + a live selection, but an untracked entity was never
+    // deletable through that path to begin with (DeleteEntity itself doesn't check tracking, so
+    // this guard exists for Capture specifically, not to duplicate that gate).
+    public (EntityDefinition Definition, string SourcePath)? Capture(Entity entity)
+    {
+        var sourcePath = _tracked.FileOf(entity);
+        if (sourcePath is null) 
+            return null;
+
+        return (ToDefinition(entity), sourcePath);
+    }
+
+    // The Undo counterpart to DeleteEntity — re-inserts an entity from a previously-captured
+    // EntityDefinition (see Capture above) and re-parents it if the definition names a parent
+    // that's still present in the scene (first name match wins, same tiebreak
+    // EntityHierarchyWiring uses at load time). Doesn't attempt to restore any children the
+    // entity had *before* its deletion — DeleteEntity already promoted them to the scene root as
+    // a permanent side effect at delete time, and re-linking that here is out of scope for this
+    // first, coarse undo pass (see Docs/Documentation/Undo.md).
+    public Entity Restore(EntityDefinition definition, string sourcePath)
+    {
+        var entity = AddFromDefinition(definition, sourcePath);
+
+        if (!string.IsNullOrEmpty(definition.Parent))
+        {
+            var parent = _scene.Entities.FirstOrDefault(e => e.Name == definition.Parent);
+            if (parent is not null)
+                entity.Transform.Parent = parent.Transform;
+        }
+
+        return entity;
+    }
+
     // Writes every known file back out (grouping live entities by file), one EntitySetDefinition
     // per file — composing several sets together at load time never collapses them into one on
     // save. Iterates the tracked file list rather than deriving it from _scene.Entities, so

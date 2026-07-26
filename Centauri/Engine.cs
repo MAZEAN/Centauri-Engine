@@ -12,6 +12,7 @@ using Input;
 using Loading;
 using Windowing;
 using Simulation;
+using Editing.Undo;
 
 public class Engine : IWindowCallbacks
 {
@@ -25,6 +26,7 @@ public class Engine : IWindowCallbacks
     private EnvironmentLoader _environmentLoader = null!;
     private EntitySetLoader _entitySetLoader = null!;
     private SimulationSystem _simulation = null!;
+    private CommandHistory _commandHistory = null!;
     private ShaderHotReload? _shaderHotReload;
 
     private int _frameCount;
@@ -66,6 +68,7 @@ public class Engine : IWindowCallbacks
         _resourceSystem  = new ResourceSystem(_gl, _config);
         _renderingSystem = new RenderingSystem(_gl, _config);
         _simulation = new SimulationSystem(_config);
+        _commandHistory = new CommandHistory();
 
         if (_config.Debug.ShaderHotReload)
             _shaderHotReload = new ShaderHotReload(PathResolver.Resolve("Shaders"));
@@ -85,9 +88,9 @@ public class Engine : IWindowCallbacks
 
     private void InitializeInput()
     {
-        _inputSystem = new InputSystem(_window, _scene, _config, _renderingSystem, _entitySetLoader);
+        _inputSystem = new InputSystem(_window, _scene, _config, _renderingSystem, _entitySetLoader, _commandHistory);
 
-        _renderingSystem.InitializeComponents(_window, _inputSystem.InputContext, _resourceSystem, _entitySetLoader);
+        _renderingSystem.InitializeComponents(_window, _inputSystem.InputContext, _resourceSystem, _entitySetLoader, _commandHistory);
 
         var fb = _window.FramebufferSize;
         _renderingSystem.Resize((uint)fb.X, (uint)fb.Y);

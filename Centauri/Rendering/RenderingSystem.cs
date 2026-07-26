@@ -13,6 +13,7 @@ using Graphics.Geometry;
 using Utils.Misc;
 using UI;
 using Loading;
+using Editing.Undo;
 using IBL;
 using Postprocessing;
 using Prepass;
@@ -102,7 +103,7 @@ public class RenderingSystem : IDisposable
         _reflectionProbe = new ReflectionProbeBaker(gl, _config.ReflectionProbe, _ibl, _mainRenderer, _skyboxRenderer);
     }
     
-    public void InitializeComponents(IWindow window, IInputContext input, ResourceSystem resourceSystem, EntitySetLoader entitySetLoader)
+    public void InitializeComponents(IWindow window, IInputContext input, ResourceSystem resourceSystem, EntitySetLoader entitySetLoader, CommandHistory commandHistory)
     {
         var framebufferSize = window.FramebufferSize;
         _outputWidth  = (uint)framebufferSize.X;
@@ -114,7 +115,7 @@ public class RenderingSystem : IDisposable
 
         _post = new PostProcessor(_gl, hdr, _config, _context.Profiler,
             renderWidth, renderHeight, _outputWidth, _outputHeight);
-        _ui   = new UISystem(_gl, _config, window, input, resourceSystem, entitySetLoader);
+        _ui   = new UISystem(_gl, _config, window, input, resourceSystem, entitySetLoader, commandHistory);
         _prepass = new GeometryPrepass(_gl, _config, renderWidth, renderHeight, _instances);
         _gtao    = new GTAOPass(_gl, _config.GTAO, renderWidth, renderHeight);
         _planar  = new PlanarReflectionPass(_gl, _config.PlanarReflection, _mainRenderer, _skyboxRenderer,

@@ -5,10 +5,10 @@ using System.Numerics;
 
 using World;
 using Config;
-using Common;
 using Layout;
 using Rendering;
 using Loading;
+using Editing.Undo;
 
 // Scene hierarchy — lists every entity (including light-only ones that can't be
 // ray-picked in the viewport) and selects on click. Selection drives the
@@ -24,6 +24,7 @@ internal sealed class HierarchyPanel
     private readonly AppConfig _config;
     private readonly ResourceSystem _resourceSystem;
     private readonly EntitySetLoader _entitySetLoader;
+    private readonly CommandHistory _commandHistory;
 
     // Lazily built once (the registry doesn't change at runtime) rather than allocating a
     // fresh sorted array from ResourceSystem.ModelIds every frame just to feed the combo.
@@ -36,12 +37,13 @@ internal sealed class HierarchyPanel
     private string[]? _materialIds;
     private int _selectedMaterial;
 
-    public HierarchyPanel(ImFontPtr font, AppConfig config, ResourceSystem resourceSystem, EntitySetLoader entitySetLoader)
+    public HierarchyPanel(ImFontPtr font, AppConfig config, ResourceSystem resourceSystem, EntitySetLoader entitySetLoader, CommandHistory commandHistory)
     {
         _font = font;
         _config = config;
         _resourceSystem = resourceSystem;
         _entitySetLoader = entitySetLoader;
+        _commandHistory = commandHistory;
     }
 
     public void Render(Scene scene, LayoutRect rect)
@@ -98,7 +100,9 @@ internal sealed class HierarchyPanel
             var modelId = modelIds[_selectedModel];
             var materialId = _selectedMaterial == 0 ? null : materialIds[_selectedMaterial];
             var entity = _entitySetLoader.CreateEntity(modelId, materialId, name: modelId);
+            
             scene.Select(entity);
+            _commandHistory.Push(new CreateEntityCommand(_entitySetLoader, entity, modelId, materialId, modelId));
         }
 
         ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
