@@ -6,15 +6,22 @@ using Graphics.Resources;
 // in the skybox shader. Exposure and black level are only meaningful for HDR
 // panoramas. Mutable (a class, not a record struct) so the inspector can tune
 // the live instance and the renderer picks it up the same frame.
-public class Skybox(GLTexture texture, float exposure, float blackLevel)
+public class Skybox(string name, string panoramaPath, GLTexture texture, float exposure, float blackLevel)
 {
+    // Name/PanoramaPath aren't live-editable (unlike Exposure/BlackLevel below) — there's no
+    // inspector UI to rename a skybox or repoint it at a different panorama file, only to add one
+    // at load time (EnvironmentLoader.LoadSkyboxes). Carried here anyway so
+    // EnvironmentLoader.Save can round-trip the full SkyboxDefinition without needing its own
+    // separate name/path tracking alongside this set.
+    public string Name         { get; } = name;
+    public string PanoramaPath { get; } = panoramaPath;
     public GLTexture Texture    { get; }      = texture;
     public float     Exposure   { get; set; } = exposure;
     public float     BlackLevel { get; set; } = blackLevel;
-    
+
     public float AuthoredExposure   { get; } = exposure;
     public float AuthoredBlackLevel { get; } = blackLevel;
-    
+
     // baked IBL (0 until baked)
     public uint IrradianceMap { get; set; }
     public uint PrefilteredMap { get; set; }
@@ -26,12 +33,12 @@ public class SkyboxSet
     private readonly List<Skybox> _items = [];
     private readonly Dictionary<string, Skybox> _byName = new();
     public Skybox? Active { get; private set; }
-    
+
     public IReadOnlyList<Skybox> All => _items;
 
-    public void Add(string name, GLTexture panorama, float exposure = 1.0f, float blackLevel = 0.0f)
+    public void Add(string name, string panoramaPath, GLTexture panorama, float exposure = 1.0f, float blackLevel = 0.0f)
     {
-        var sky = new Skybox(panorama, exposure, blackLevel);
+        var sky = new Skybox(name, panoramaPath, panorama, exposure, blackLevel);
         _byName[name] = sky;
         _items.Add(sky);
         Active ??= sky;

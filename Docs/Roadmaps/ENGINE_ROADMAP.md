@@ -126,9 +126,17 @@ JSON by hand or dragging a number field to the value you want. This is the actua
   bulk delete, both as a single undo step via the new `Editing/Undo/CompositeCommand`. See
   `Docs/Documentation/Multiselect.md` for what's covered and what's deliberately out of scope
   (multi-entity property editing, true shared-pivot group transforms, box-select).
-- [ ] **Persist what's currently live-only:** material property overrides (Color/Roughness/
-  Metallic/Translucency/UV — see `EntityInspectorSection`'s own comments on this gap),
-  camera/skybox edits (`EnvironmentLoader` has no `Save()` at all right now).
+- [x] **Persist what's currently live-only** — **done**. Material property overrides
+  (Color/Roughness/Metallic/Translucency/UV/etc.) now round-trip via a new per-slot
+  `MaterialOverride` snapshot, written by `EntityDefinitionWriter` for any slot
+  `Entity.OwnsMaterial` (clone-on-write via the pre-existing `MakeMaterialUnique`) and reapplied by
+  `EntityFactory.ResolveMaterials` on load; see `Docs/Documentation/MaterialPersistence.md`.
+  `EnvironmentLoader` gained a `Save()` (cameras, skybox exposure/black-level, the optional sun),
+  wired into the same Ctrl+S as entity-set saves; see `Docs/Documentation/EnvironmentPersistence.md`
+  for what's covered and what's deliberately deferred (no symmetric `Reset()` for the environment
+  half, no dirty-tracking). Material-override persistence is code-reviewed and build-verified but
+  not live-verified in this sandbox (no model assets present to test against); environment
+  persistence was live-verified headless end to end.
 
 **Exit criteria:** a scene can be built and iterated on entirely through the editor, and every
 edit made through the editor survives a save/reload.

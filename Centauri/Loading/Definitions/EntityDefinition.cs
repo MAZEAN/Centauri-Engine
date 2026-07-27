@@ -33,4 +33,11 @@ public class EntityDefinition
     // a model to deviate from what its assigned material(s) normally do.
     [JsonPropertyName("triplanar")]      public bool?  TriplanarOverride      { get; set; }
     [JsonPropertyName("triplanarScale")] public float? TriplanarScaleOverride { get; set; }
+
+    // Per-mesh-slot live property edits (EntityMaterialSection — Color/Roughness/Metallic/etc.),
+    // positional like "materials"' own Indexed form (index i is this entity's mesh slot i), null
+    // entries where that slot has no override (still using the assigned material asset's own
+    // values as-is). Null overall when nothing on this entity has ever been edited — see
+    // MaterialOverride and EntityDefinitionWriter.Write.
+    [JsonPropertyName("materialOverrides")] public MaterialOverride?[]? MaterialOverrides { get; set; }
 }

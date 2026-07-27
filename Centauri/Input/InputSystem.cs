@@ -18,6 +18,7 @@ public class InputSystem : IDisposable
     private readonly AppConfig _config;
     private readonly RenderingSystem _renderingSystem;
     private readonly EntitySetLoader _entitySetLoader;
+    private readonly EnvironmentLoader _environmentLoader;
     private readonly CommandHistory _commandHistory;
 
     private IKeyboard _keyboard = null!;
@@ -28,13 +29,14 @@ public class InputSystem : IDisposable
     private readonly Dictionary<Camera, CameraController> _controllers = new();
     private readonly DebugHotkeys _hotkeys;
 
-    public InputSystem(IWindow window, Scene scene, AppConfig config, RenderingSystem renderingSystem, EntitySetLoader entitySetLoader, CommandHistory commandHistory)
+    public InputSystem(IWindow window, Scene scene, AppConfig config, RenderingSystem renderingSystem, EntitySetLoader entitySetLoader, EnvironmentLoader environmentLoader, CommandHistory commandHistory)
     {
         _window          = window;
         _scene           = scene;
         _config          = config;
         _renderingSystem = renderingSystem;
         _entitySetLoader = entitySetLoader;
+        _environmentLoader = environmentLoader;
         _commandHistory  = commandHistory;
 
         _hotkeys         = new DebugHotkeys(config, scene, ResetActiveController);
@@ -192,6 +194,7 @@ public class InputSystem : IDisposable
         try
         {
             _entitySetLoader.Save();
+            _environmentLoader.Save();
             Console.WriteLine("[Scene] Saved.");
         }
         catch (Exception ex)

@@ -85,15 +85,35 @@ public class EntityFactory
         var triplanar      = e.TriplanarOverride      ?? modelDef?.TriplanarOverride;
         var triplanarScale = e.TriplanarScaleOverride ?? modelDef?.TriplanarScaleOverride;
 
-        Material Resolve(string path)
+        // A saved live-property edit (EntityMaterialSection, round-tripped through
+        // EntityDefinitionWriter.BuildMaterialOverrides) for this specific mesh slot — restores
+        // exactly the same "cloned + edited" state MakeMaterialUnique would produce live, so a
+        // reloaded entity looks identical to how it did right before the save.
+        var overrides = e.MaterialOverrides;
+        MaterialOverride? OverrideFor(int slot) =>
+            overrides is not null && (uint)slot < (uint)overrides.Length ? overrides[slot] : null;
+
+        Material Resolve(string path, int slot)
         {
             var mat = _resourceSystem.GetMaterial(path);
-            if (triplanar is null && triplanarScale is null)
+            var over = OverrideFor(slot);
+            if (triplanar is null && triplanarScale is null && over is null)
                 return mat;
 
             var overridden = mat.Clone();
             if (triplanar is { } t) overridden.Triplanar = t;
             if (triplanarScale is { } s) overridden.TriplanarScale = s;
+            over?.ApplyTo(overridden);
+            return overridden;
+        }
+
+        Material ResolveDefault(int slot)
+        {
+            var mat = _resourceSystem.DefaultMaterial;
+            if (OverrideFor(slot) is not { } over) return mat;
+
+            var overridden = mat.Clone();
+            over.ApplyTo(overridden);
             return overridden;
         }
 
@@ -105,8 +125,8 @@ public class EntityFactory
             {
                 var meshName = model.Meshes[i].Name;
                 result[i] = !string.IsNullOrEmpty(meshName) && named.TryGetValue(meshName, out var path)
-                    ? Resolve(path)
-                    : _resourceSystem.DefaultMaterial;
+                    ? Resolve(path, i)
+                    : ResolveDefault(i);
             }
             return result;
         }
@@ -115,8 +135,8 @@ public class EntityFactory
 
         for (var i = 0; i < count; i++)
             result[i] = paths is null
-                ? _resourceSystem.DefaultMaterial
-                : Resolve(paths[Math.Min(i, paths.Length - 1)]);
+                ? ResolveDefault(i)
+                : Resolve(paths[Math.Min(i, paths.Length - 1)], i);
 
         return result;
     }

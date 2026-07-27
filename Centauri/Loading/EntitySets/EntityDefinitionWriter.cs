@@ -27,8 +27,30 @@ internal static class EntityDefinitionWriter
             Components = source.Components,
             TriplanarOverride      = source.TriplanarOverride,
             TriplanarScaleOverride = source.TriplanarScaleOverride,
+            MaterialOverrides = BuildMaterialOverrides(entity),
             Parent    = parentName,
         };
+    }
+
+    // One MaterialOverride per mesh slot that's actually been edited (Entity.OwnsMaterial —
+    // cloned via MakeMaterialUnique, not the shared asset instance every other entity using it
+    // still points at); null for the rest, and null overall if nothing on this entity was ever
+    // edited, so an untouched entity's saved JSON doesn't grow a needless all-null array.
+    private static MaterialOverride?[]? BuildMaterialOverrides(Entity entity)
+    {
+        if (entity.Materials.Count == 0) return null;
+
+        var overrides = new MaterialOverride?[entity.Materials.Count];
+        var any = false;
+
+        for (var i = 0; i < overrides.Length; i++)
+        {
+            if (!entity.OwnsMaterial(i) || entity.Materials[i] is not { } mat) continue;
+            overrides[i] = MaterialOverride.From(mat);
+            any = true;
+        }
+
+        return any ? overrides : null;
     }
 
     private static LightDefinition ToDefinition(Light l) => l switch

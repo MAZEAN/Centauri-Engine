@@ -111,6 +111,12 @@ public class Entity : IDisposable
         }
     }
     
+    // Whether slot `index` currently holds a per-entity clone (MakeMaterialUnique) rather than
+    // the shared, cache-owned Material every other entity using the same asset also points at —
+    // what EntityDefinitionWriter checks to decide which slots need a MaterialOverride captured.
+    public bool OwnsMaterial(int index) =>
+        (uint)index < (uint)_ownsMaterial.Length && _ownsMaterial[index];
+
     public bool MakeMaterialUnique(int index)
     {
         if ((uint)index >= (uint)_materials.Length || _ownsMaterial[index] || _materials[index] is null)
