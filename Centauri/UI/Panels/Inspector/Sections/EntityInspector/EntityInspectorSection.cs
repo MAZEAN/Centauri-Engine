@@ -34,6 +34,16 @@ public sealed class EntityInspectorSection : ISection
         }
 
         DrawHeader(entity);
+
+        // Multi-select (Scene.SelectedEntities) edits every selected entity together via the
+        // gizmo and bulk-deletes them all, but this inspector still only displays/edits the one
+        // *primary* entity's own properties — building real multi-entity property editing (what
+        // happens when the same field differs across the selection) is its own feature. This just
+        // makes it visible that there's more selected than what's shown, rather than silently
+        // looking like a single-select.
+        if (scene.SelectedEntities.Count > 1)
+            ImGui.TextDisabled($"+{scene.SelectedEntities.Count - 1} more selected");
+
         Widgets.CheckRow("Enabled", entity.Enabled, v => entity.Enabled = v);
         ImGui.Spacing();
 

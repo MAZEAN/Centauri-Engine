@@ -94,8 +94,23 @@ public class InputSystem : IDisposable
     {
         var cam = _scene.Cameras.Active;
         var ray = cam.ScreenPointToRay(_mousePos, new Vector2(_window.Size.X, _window.Size.Y));
-        
-        _scene.Select(_scene.Pick(ray));
+        var picked = _scene.Pick(ray);
+
+        // Ctrl+click in the viewport toggles, same as the Outliner's Ctrl+click — no Shift-range-
+        // select here though, there's no natural "list order" to range over in the 3D view the way
+        // there is in the Outliner's rows. Ctrl+click on empty space (picked is null) is a no-op —
+        // it leaves whatever's already selected alone, rather than clearing it, matching every
+        // other app's "Ctrl+click misses everything" behavior.
+        var ctrl = _keyboard.IsKeyPressed(Key.ControlLeft) || _keyboard.IsKeyPressed(Key.ControlRight);
+
+        if (ctrl)
+        {
+            if (picked is not null) _scene.ToggleSelect(picked);
+        }
+        else
+        {
+            _scene.Select(picked);
+        }
     }
 
     private void OnKeyDown(IKeyboard keyboard, Key key, int code)
@@ -143,14 +158,27 @@ public class InputSystem : IDisposable
             return;
         }
 
-        if (key == Key.Delete && _config.Input.Mode == ViewMode.Edit && _scene.Selected is { } selected)
+        if (key == Key.Delete && _config.Input.Mode == ViewMode.Edit && _scene.SelectedEntities.Count > 0)
         {
-            // Captured *before* deleting — DeleteEntity untracks the entity, which is exactly the
-            // bookkeeping Capture needs to still be intact.
-            if (_entitySetLoader.Capture(selected) is { } captured)
-                _commandHistory.Push(new DeleteEntityCommand(_entitySetLoader, selected, captured.Definition, captured.SourcePath));
+            // Snapshotted first — deleting mutates Scene.SelectedEntities (RemoveEntity drops the
+            // deleted entity from it), so iterating the live list while deleting from it would skip
+            // entries.
+            var toDelete = _scene.SelectedEntities.ToList();
+            var commands = new List<ICommand>(toDelete.Count);
 
-            _entitySetLoader.DeleteEntity(selected);
+            foreach (var entity in toDelete)
+            {
+                // Captured *before* deleting — DeleteEntity untracks the entity, which is exactly
+                // the bookkeeping Capture needs to still be intact.
+                if (_entitySetLoader.Capture(entity) is { } captured)
+                    commands.Add(new DeleteEntityCommand(_entitySetLoader, entity, captured.Definition, captured.SourcePath));
+
+                _entitySetLoader.DeleteEntity(entity);
+            }
+
+            // One CompositeCommand (via PushRange) for the whole selection, not one Ctrl+Z per
+            // entity — same reasoning as the gizmo's multi-select drag (TransformGizmo.EndDrag).
+            _commandHistory.PushRange(commands);
             return;
         }
 

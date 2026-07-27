@@ -7,9 +7,10 @@ using World;
 using Common;
 using Editing.Undo;
 
-// Screen-space transform gizmo for the selected entity — translate / rotate / scale, switched with
-// W / E / R. This class owns the *interaction*: mode, hover/drag state, and turning mouse motion
-// into Transform edits. The pure geometry lives in GizmoMath and the rendering in GizmoDraw.
+// Screen-space transform gizmo for the selected entity/entities — translate / rotate / scale,
+// switched with W / E / R. This class owns the *interaction*: mode, hover/drag state, and turning
+// mouse motion into Transform edits. The pure geometry lives in GizmoMath and the rendering in
+// GizmoDraw.
 //
 // It's driven entirely off ImGui's own IO mouse/keyboard state during the frame and draws into the
 // foreground draw list — so it needs no new pass, no native dependency (ImGuizmo et al.), and
@@ -17,6 +18,14 @@ using Editing.Undo;
 // Translate and rotate act on world axes; scale acts on the object's *local* basis (Transform.Scale
 // is local — a world-axis scale of a rotated object isn't representable by it). See
 // Docs/Documentation/Gizmos.md.
+//
+// Multi-select (Scene.SelectedEntities): the handles themselves are drawn anchored to
+// Scene.Selected (the *primary* — the most recently clicked entity), but a drag moves/rotates/
+// scales *every* selected entity together — each by the same world-space delta / rotation angle /
+// scale factor, applied to its own frozen start state, not orbiting around the primary's origin.
+// That's "bulk transform," not a true shared-pivot group transform (which would also revolve each
+// entity's *position* around the primary when rotating/scaling a group) — simpler, and matches
+// what "at least for bulk transform edits" in the roadmap asked for.
 internal sealed class TransformGizmo
 {
     private enum Axis { None, X, Y, Z }
@@ -43,21 +52,23 @@ internal sealed class TransformGizmo
     private Axis _hover = Axis.None;
     private Axis _drag  = Axis.None;
 
-    // The Transform's full state at drag-start, for the undo command pushed at drag-end
-    // (EndDrag) — separate from the mode-specific "reference geometry" fields below, which exist
-    // purely to drive the drag math and get reset per-mode.
-    private TransformState _dragStart;
+    // Every selected entity's Transform + its full state at drag-start, captured once when the
+    // handle is grabbed (BeginLinearDrag/BeginRotateDrag) — what each Apply*Drag mutates every
+    // frame the mouse stays down, and what EndDrag diffs against to build one TransformCommand per
+    // entity that actually changed (see EndDrag). Frozen for the whole gesture so the mapping
+    // doesn't drift as entities move mid-drag; StartWorld is the *world* position specifically
+    // (translate's delta is computed in world space, unlike Before.Position which is local — see
+    // TransformState).
+    private readonly List<(Transform Transform, TransformState Before, Vector3 StartWorld)> _dragGroup = [];
 
-    // Reference state frozen at drag start so the mapping doesn't drift as the object (and thus the
-    // projected handle) moves mid-drag. Which fields are live depends on the mode.
+    // Reference geometry frozen at drag start, derived from the *primary* selection only — the
+    // single shared delta (world offset / rotation angle / scale factor) every entity in
+    // _dragGroup above gets, not a separate one per entity. Which fields are live depends on mode.
     private int        _dragAxisIndex;
     private Vector2    _dragStartMouse;
     private Vector2    _dragScreenDir;       // translate + scale: unit screen direction of the axis
-    private Vector3    _dragStartWorld;      // translate
     private Vector3    _dragAxisDir;         // translate: world axis being slid along
     private float      _dragWorldPerPixel;   // translate
-    private Vector3    _dragStartScale;      // scale
-    private Quaternion _dragStartRot;        // rotate
     private Vector3    _dragRotAxis;         // rotate: world axis being spun about
     private Vector2    _dragRotRadialHat;    // rotate: unit centre→grab screen direction, frozen
     private float      _dragRotInvRadius;    // rotate: 1 / (grab distance from centre), frozen
@@ -105,9 +116,9 @@ internal sealed class TransformGizmo
         var worldLen = MathF.Max(Vector3.Distance(camera.Position, origin) * HandleScreenFraction, 1e-3f);
 
         if (_mode == Mode.Rotate)
-            RotateMode(t, io, camera, origin, oScreen, worldLen, viewProj, viewport);
+            RotateMode(t, scene.SelectedEntities, io, camera, origin, oScreen, worldLen, viewProj, viewport);
         else
-            LinearMode(t, io, origin, oScreen, worldLen, viewProj, viewport, isScale: _mode == Mode.Scale);
+            LinearMode(t, scene.SelectedEntities, io, origin, oScreen, worldLen, viewProj, viewport, isScale: _mode == Mode.Scale);
     }
 
     // The one axis drawn highlighted: the drag axis if dragging, else the hovered one, else none.
@@ -131,7 +142,7 @@ internal sealed class TransformGizmo
     // ---- Translate + Scale: three straight axis handles ---------------------------------------
     // Identical geometry/hit-test; they differ only in the axis frame (world vs. the object's local
     // basis), the tip glyph (arrow vs. box), and what the drag writes (Position vs. Scale).
-    private void LinearMode(Transform t, ImGuiIOPtr io, Vector3 origin, Vector2 oScreen,
+    private void LinearMode(Transform t, IReadOnlyList<Entity> selected, ImGuiIOPtr io, Vector3 origin, Vector2 oScreen,
         float worldLen, Matrix4x4 viewProj, Vector2 viewport, bool isScale)
     {
         Span<Vector3> axes = stackalloc Vector3[3];
@@ -149,27 +160,27 @@ internal sealed class TransformGizmo
             _hover = NearestHandle(mouse, oScreen, ends, visible, io.WantCaptureMouse);
 
             if (_hover != Axis.None && ImGui.IsMouseClicked(ImGuiMouseButton.Left))
-                BeginLinearDrag(t, mouse, oScreen, ends, axes, origin, worldLen, isScale);
+                BeginLinearDrag(selected, mouse, oScreen, ends, axes, worldLen, isScale);
         }
 
         if (_drag != Axis.None)
         {
             if (ImGui.IsMouseDown(ImGuiMouseButton.Left))
             {
-                if (isScale) 
-                    ApplyScaleDrag(t, mouse);
-                else         
-                    ApplyTranslateDrag(t, mouse);
+                if (isScale)
+                    ApplyScaleDrag(mouse);
+                else
+                    ApplyTranslateDrag(mouse);
             }
             else
-                EndDrag(t);
+                EndDrag();
         }
 
         GizmoDraw.LinearHandles(oScreen, ends, visible, isScale, ActiveAxis());
     }
 
-    private void BeginLinearDrag(Transform t, Vector2 mouse, Vector2 oScreen, ReadOnlySpan<Vector2> ends,
-        ReadOnlySpan<Vector3> axes, Vector3 origin, float worldLen, bool isScale)
+    private void BeginLinearDrag(IReadOnlyList<Entity> selected, Vector2 mouse, Vector2 oScreen, ReadOnlySpan<Vector2> ends,
+        ReadOnlySpan<Vector3> axes, float worldLen, bool isScale)
     {
         var i          = (int)_hover - 1;
         var screenAxis = ends[i] - oScreen;
@@ -177,48 +188,52 @@ internal sealed class TransformGizmo
         if (screenLen < 1e-3f) return; // handle points straight at the camera — no usable drag axis
 
         _drag           = _hover;
-        _dragStart      = TransformState.Of(t);
         _dragAxisIndex  = i;
         _dragStartMouse = mouse;
         _dragScreenDir  = screenAxis / screenLen;
 
-        if (isScale)
+        if (!isScale)
         {
-            _dragStartScale = t.Scale;
-        }
-        else
-        {
-            _dragStartWorld    = origin;
             _dragAxisDir       = axes[i];
             _dragWorldPerPixel = worldLen / screenLen;
         }
+
+        CaptureDragGroup(selected);
     }
 
-    private void ApplyTranslateDrag(Transform t, Vector2 mouse)
+    private void ApplyTranslateDrag(Vector2 mouse)
     {
         var alongPixels = Vector2.Dot(mouse - _dragStartMouse, _dragScreenDir);
-        var newWorld    = _dragStartWorld + _dragAxisDir * (alongPixels * _dragWorldPerPixel);
+        var worldDelta  = _dragAxisDir * (alongPixels * _dragWorldPerPixel);
 
-        // Transform.Position is parent-local; WorldPosition = Transform(local, parentWorld), so
-        // invert the parent to turn the desired world position back into a local one. No parent
-        // (or a degenerate/non-invertible parent) collapses to newWorld unchanged.
-        if (t.Parent is { } parent && Matrix4x4.Invert(parent.WorldMatrix, out var invParent))
-            t.Position = Vector3.Transform(newWorld, invParent);
-        else
-            t.Position = newWorld;
+        foreach (var (transform, _, startWorld) in _dragGroup)
+        {
+            var newWorld = startWorld + worldDelta;
+
+            // Transform.Position is parent-local; WorldPosition = Transform(local, parentWorld), so
+            // invert the parent to turn the desired world position back into a local one. No parent
+            // (or a degenerate/non-invertible parent) collapses to newWorld unchanged.
+            if (transform.Parent is { } parent && Matrix4x4.Invert(parent.WorldMatrix, out var invParent))
+                transform.Position = Vector3.Transform(newWorld, invParent);
+            else
+                transform.Position = newWorld;
+        }
     }
 
-    private void ApplyScaleDrag(Transform t, Vector2 mouse)
+    private void ApplyScaleDrag(Vector2 mouse)
     {
         var alongPixels = Vector2.Dot(mouse - _dragStartMouse, _dragScreenDir);
         var factor      = MathF.Max(MinScale, 1f + alongPixels * ScaleSensitivity);
-        var scaled      = MathF.Max(MinScale, GizmoMath.GetComponent(_dragStartScale, _dragAxisIndex) * factor);
 
-        t.Scale = GizmoMath.WithComponent(_dragStartScale, _dragAxisIndex, scaled);
+        foreach (var (transform, before, _) in _dragGroup)
+        {
+            var scaled = MathF.Max(MinScale, GizmoMath.GetComponent(before.Scale, _dragAxisIndex) * factor);
+            transform.Scale = GizmoMath.WithComponent(before.Scale, _dragAxisIndex, scaled);
+        }
     }
 
     // ---- Rotate: three world-axis rings -------------------------------------------------------
-    private void RotateMode(Transform t, ImGuiIOPtr io, Camera camera, Vector3 origin, Vector2 oScreen,
+    private void RotateMode(Transform t, IReadOnlyList<Entity> selected, ImGuiIOPtr io, Camera camera, Vector3 origin, Vector2 oScreen,
         float worldLen, Matrix4x4 viewProj, Vector2 viewport)
     {
         Span<Vector3> axes = [Vector3.UnitX, Vector3.UnitY, Vector3.UnitZ];
@@ -241,29 +256,27 @@ internal sealed class TransformGizmo
             }
 
             if (_hover != Axis.None && ImGui.IsMouseClicked(ImGuiMouseButton.Left))
-                BeginRotateDrag(t, camera, mouse, oScreen, axes);
+                BeginRotateDrag(selected, camera, mouse, oScreen, axes);
         }
 
         if (_drag != Axis.None)
         {
             if (ImGui.IsMouseDown(ImGuiMouseButton.Left))
-                ApplyRotateDrag(t, mouse);
+                ApplyRotateDrag(mouse);
             else
-                EndDrag(t);
+                EndDrag();
         }
 
         GizmoDraw.Rings(origin, axes, worldLen, viewProj, viewport, oScreen, ActiveAxis());
     }
 
-    private void BeginRotateDrag(Transform t, Camera camera, Vector2 mouse, Vector2 oScreen, ReadOnlySpan<Vector3> axes)
+    private void BeginRotateDrag(IReadOnlyList<Entity> selected, Camera camera, Vector2 mouse, Vector2 oScreen, ReadOnlySpan<Vector3> axes)
     {
         var i      = (int)_hover - 1;
         var radial = mouse - oScreen;
         var radius = MathF.Max(radial.Length(), Widgets.Scale(MinRotateRadiusPixels));
 
         _drag             = _hover;
-        _dragStart        = TransformState.Of(t);
-        _dragStartRot     = t.Rotation;
         _dragRotAxis      = axes[i];
         _dragStartMouse   = mouse;
         _dragRotRadialHat = radial / radius;
@@ -275,26 +288,51 @@ internal sealed class TransformGizmo
         _dragRotSign = MathF.Sign(Vector3.Dot(camera.Forward, axes[i]));
         if (_dragRotSign == 0f)
             _dragRotSign = 1f;
+
+        CaptureDragGroup(selected);
     }
 
-    private void ApplyRotateDrag(Transform t, Vector2 mouse)
+    private void ApplyRotateDrag(Vector2 mouse)
     {
         var phi = GizmoMath.RotationAngleDelta(_dragRotRadialHat, _dragRotInvRadius, mouse - _dragStartMouse, _dragRotSign, RotateGain);
-        t.SetRotation(GizmoMath.ComposeWorldRotation(_dragStartRot, _dragRotAxis, phi));
+
+        foreach (var (transform, before, _) in _dragGroup)
+            transform.SetRotation(GizmoMath.ComposeWorldRotation(before.Rotation, _dragRotAxis, phi));
     }
 
-    // Common release path for both LinearMode and RotateMode: clears the drag state and, if the
-    // gesture actually changed anything (a click-release with no mouse movement in between is a
-    // no-op drag, not worth an undo step), pushes one TransformCommand for the whole gesture —
-    // the drag itself already applied every intermediate frame live, so this is purely recording
-    // start/end for undo, not re-applying anything.
-    private void EndDrag(Transform t)
+    // Snapshots every currently-selected entity's Transform state (+ world position, for
+    // translate's math) at the moment a handle is grabbed — shared by both BeginLinearDrag and
+    // BeginRotateDrag.
+    private void CaptureDragGroup(IReadOnlyList<Entity> selected)
+    {
+        _dragGroup.Clear();
+        foreach (var entity in selected)
+        {
+            var et = entity.Transform;
+            _dragGroup.Add((et, TransformState.Of(et), et.WorldPosition));
+        }
+    }
+
+    // Common release path for both LinearMode and RotateMode: clears the drag state and, for every
+    // entity in the group that the gesture actually changed (a click-release with no mouse movement
+    // in between is a no-op drag, not worth an undo step), pushes one TransformCommand — as a single
+    // CompositeCommand if more than one entity changed, so a multi-select drag is still one Ctrl+Z
+    // (see CommandHistory.PushRange). The drag itself already applied every intermediate frame live,
+    // so this is purely recording start/end for undo, not re-applying anything.
+    private void EndDrag()
     {
         _drag = Axis.None;
 
-        var after = TransformState.Of(t);
-        if (after != _dragStart)
-            _commandHistory.Push(new TransformCommand(t, _dragStart, after));
+        var commands = new List<ICommand>(_dragGroup.Count);
+        foreach (var (transform, before, _) in _dragGroup)
+        {
+            var after = TransformState.Of(transform);
+            if (after != before)
+                commands.Add(new TransformCommand(transform, before, after));
+        }
+
+        _commandHistory.PushRange(commands);
+        _dragGroup.Clear();
     }
 
     // Nearest straight handle within the pick radius. Doesn't hijack the cursor when an ImGui panel

@@ -18,10 +18,52 @@ public class Scene
     private Component? _lastFindResult;
     private int         _lastFindRevision = -1;
 
-    public Entity? Selected { get; private set; }
-    public void Select(Entity? entity) => Selected = entity;
-    public void ClearSelection()       => Selected = null;
-    
+    // Ordered (insertion order, not scene order) so Shift-range-select in the Outliner has a
+    // stable "last thing you touched" anchor to extend from, and so a plain click always ends up
+    // as the sole entry regardless of how big the set was before it. Small in practice (a user's
+    // selection, not the whole scene), so a List's O(n) Contains/Remove is fine — no need for a
+    // HashSet's O(1) at this scale.
+    private readonly List<Entity> _selected = [];
+    public IReadOnlyList<Entity> SelectedEntities => _selected;
+
+    // The "primary" selection — the Outliner's most recent plain/Ctrl-click, or the last entity a
+    // Shift-range-select added. What the Properties panel's single-entity inspector shows/edits,
+    // and what the gizmo anchors its screen position to when multiple entities are selected (see
+    // TransformGizmo — dragging still moves/rotates/scales every selected entity together, this is
+    // only about where the handles themselves get drawn). Null when nothing's selected.
+    public Entity? Selected => _selected.Count > 0 ? _selected[^1] : null;
+
+    public bool IsSelected(Entity entity) => _selected.Contains(entity);
+
+    // Replaces the whole selection with just this entity (or clears it, for null) — a plain click,
+    // in the Outliner or the viewport.
+    public void Select(Entity? entity)
+    {
+        _selected.Clear();
+        if (entity is not null) _selected.Add(entity);
+    }
+
+    // Adds without disturbing whatever else is already selected — a Shift-range-select extending
+    // an existing selection. AddToSelection alone (not exposed) would just be Select's single-entity
+    // case with extra steps, so there's no separate single-add method — callers building a range
+    // call this in a loop after ClearSelection.
+    public void AddToSelection(Entity entity)
+    {
+        if (!_selected.Contains(entity))
+            _selected.Add(entity);
+    }
+
+    // Ctrl-click: in the set, out; not in, in. The entity becomes (or stops being) the primary
+    // selection either way, so a following Shift-range-select extends from wherever this just
+    // toggled — matches the anchor-follows-the-click convention most multi-select lists use.
+    public void ToggleSelect(Entity entity)
+    {
+        if (!_selected.Remove(entity))
+            _selected.Add(entity);
+    }
+
+    public void ClearSelection() => _selected.Clear();
+
     public void MarkDirty() => Revision++;
 
     // CullingSystem's SpatialGrid buckets entities by world position at whatever Revision it
@@ -45,8 +87,7 @@ public class Scene
     {
         entity.Transform.OnChanged -= MarkDirty;
         _entities.Remove(entity);
-        if (Selected == entity)
-            Selected = null;   // keep selection valid
+        _selected.Remove(entity);   // keep selection valid
         Revision++;
     }
 
@@ -89,8 +130,8 @@ public class Scene
 
     public void Dispose()
     {
-        Selected = null;
-        foreach (var entity in _entities) 
+        _selected.Clear();
+        foreach (var entity in _entities)
             entity.Dispose();
         _entities.Clear();
     }

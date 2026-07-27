@@ -37,6 +37,13 @@ internal sealed class HierarchyPanel
     private string[]? _materialIds;
     private int _selectedMaterial;
 
+    // The row a Shift-range-select extends from — set on every plain or Ctrl click (so the anchor
+    // "follows" the click, same convention Windows Explorer/most multi-select lists use), left
+    // alone by Shift-clicks themselves (so repeated Shift-clicks keep adjusting the range from the
+    // same anchor rather than moving it each time). -1 means no anchor yet — a Shift-click before
+    // any other click is currently just treated as a plain click (see DrawRow).
+    private int _selectionAnchor = -1;
+
     public HierarchyPanel(ImFontPtr font, AppConfig config, ResourceSystem resourceSystem, EntitySetLoader entitySetLoader, CommandHistory commandHistory)
     {
         _font = font;
@@ -68,7 +75,7 @@ internal sealed class HierarchyPanel
         {
             ImGui.PushID(i);
 
-            DrawRow(scene, entities[i]);
+            DrawRow(scene, entities, i);
 
             ImGui.PopID();
         }
@@ -100,8 +107,9 @@ internal sealed class HierarchyPanel
             var modelId = modelIds[_selectedModel];
             var materialId = _selectedMaterial == 0 ? null : materialIds[_selectedMaterial];
             var entity = _entitySetLoader.CreateEntity(modelId, materialId, name: modelId);
-            
+
             scene.Select(entity);
+            _selectionAnchor = scene.Entities.Count - 1; // Scene.AddEntity appends, so this is `entity`
             _commandHistory.Push(new CreateEntityCommand(_entitySetLoader, entity, modelId, materialId, modelId));
         }
 
@@ -118,16 +126,41 @@ internal sealed class HierarchyPanel
         return options;
     }
 
-    private static void DrawRow(Scene scene, Entity entity)
+    private void DrawRow(Scene scene, IReadOnlyList<Entity> entities, int index)
     {
-        var selected = ReferenceEquals(scene.Selected, entity);
+        var entity   = entities[index];
+        var selected = scene.IsSelected(entity);
 
         var dim = !entity.Enabled;
         if (dim)
             ImGui.PushStyleColor(ImGuiCol.Text, ImGui.GetStyle().Colors[(int)ImGuiCol.TextDisabled]);
 
         if (ImGui.Selectable($"{Tag(entity)}  {entity.Name}", selected))
-            scene.Select(entity);
+        {
+            var io = ImGui.GetIO();
+
+            if (io.KeyShift && _selectionAnchor >= 0)
+            {
+                // Range-select from the anchor to here, inclusive — replaces the selection rather
+                // than adding to it (matching Explorer/Blender), so a Shift-click after some
+                // unrelated Ctrl-clicks doesn't leave stray entities selected outside the range.
+                scene.ClearSelection();
+                var lo = Math.Min(_selectionAnchor, index);
+                var hi = Math.Max(_selectionAnchor, index);
+                for (var i = lo; i <= hi; i++)
+                    scene.AddToSelection(entities[i]);
+            }
+            else if (io.KeyCtrl)
+            {
+                scene.ToggleSelect(entity);
+                _selectionAnchor = index;
+            }
+            else
+            {
+                scene.Select(entity);
+                _selectionAnchor = index;
+            }
+        }
 
         if (dim)
             ImGui.PopStyleColor();

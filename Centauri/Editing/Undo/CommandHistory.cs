@@ -34,6 +34,21 @@ public sealed class CommandHistory
         _redo.Clear(); // a fresh edit invalidates whatever redo history existed
     }
 
+    // A multi-select bulk edit (drag/delete every selected entity) builds one ICommand per entity
+    // as it goes and doesn't know up front how many there'll be — this pushes nothing for zero,
+    // the command directly for exactly one (so a single-entity edit isn't wrapped in a pointless
+    // CompositeCommand), and a CompositeCommand for more than one, so the whole gesture is still
+    // one Ctrl+Z regardless of how many entities it touched.
+    internal void PushRange(IReadOnlyList<ICommand> commands)
+    {
+        switch (commands.Count)
+        {
+            case 0: return;
+            case 1: Push(commands[0]); return;
+            default: Push(new CompositeCommand(commands)); return;
+        }
+    }
+
     public void Undo()
     {
         if (_undo.Last is not { } node) return;

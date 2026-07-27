@@ -142,14 +142,23 @@ public sealed class DebugRenderer : IDisposable
     public void DrawSelection(Scene scene)
     {
         AssertActive();
-        if (scene.Selected is not { } e || e.Model is null) return;
-        
+        if (scene.SelectedEntities.Count == 0) return;
+
         Span<Vector3> corners = stackalloc Vector3[8];
-        e.GetWorldBounds().GetBoxCorners(corners);
 
         _draw.Model(Matrix4x4.Identity);
         _draw.Color(ColorPalette.Selected);
-        _draw.Lines(Shapes.BoxEdges(corners));
+
+        // Every selected entity gets an outline, not just the primary — otherwise a multi-select
+        // would look and feel like a single-select with extra steps, since nothing on screen would
+        // show what a Ctrl/Shift-click actually added.
+        foreach (var e in scene.SelectedEntities)
+        {
+            if (e.Model is null) continue;
+
+            e.GetWorldBounds().GetBoxCorners(corners);
+            _draw.Lines(Shapes.BoxEdges(corners));
+        }
     }
     
     public void DrawCullingGrid(Scene scene, SpatialGrid grid)

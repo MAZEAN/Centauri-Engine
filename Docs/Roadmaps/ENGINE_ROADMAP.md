@@ -121,7 +121,11 @@ JSON by hand or dragging a number field to the value you want. This is the actua
   deliberately deferred (inspector field edits, material/rigidbody/reparent edits, a deleted
   entity's former children), and the known object-identity limitation across a delete→undo→further-
   undo sequence.
-- [ ] **Multi-select** in the Outliner, at least for bulk transform edits and delete.
+- [x] **Multi-select** — **done**. `Scene.SelectedEntities` (Outliner Ctrl/Shift-click, viewport
+  Ctrl+click) — bulk gizmo drag (every selected entity moves/rotates/scales by the same delta) and
+  bulk delete, both as a single undo step via the new `Editing/Undo/CompositeCommand`. See
+  `Docs/Documentation/Multiselect.md` for what's covered and what's deliberately out of scope
+  (multi-entity property editing, true shared-pivot group transforms, box-select).
 - [ ] **Persist what's currently live-only:** material property overrides (Color/Roughness/
   Metallic/Translucency/UV — see `EntityInspectorSection`'s own comments on this gap),
   camera/skybox edits (`EnvironmentLoader` has no `Save()` at all right now).
