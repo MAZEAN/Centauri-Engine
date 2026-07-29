@@ -114,13 +114,16 @@ JSON by hand or dragging a number field to the value you want. This is the actua
   performance graphs are their own panel (`PerformancePanel`) so they get real width instead of a
   350px card; the gizmo mode bar moved to a left tool column. See
   `Docs/Documentation/EditorLayout.md`.
-- [x] **Undo/redo** — **first pass done**. `Editing/Undo/` — a Command-pattern `CommandHistory`
-  (Ctrl+Z/Ctrl+Y), coarse/gesture-level as this row itself invited: one step per completed gizmo
-  drag (`TransformCommand`) or entity create/delete (`CreateEntityCommand`/`DeleteEntityCommand`),
-  not a per-frame or per-keystroke diff. See `Docs/Documentation/Undo.md` for what's covered, what's
-  deliberately deferred (inspector field edits, material/rigidbody/reparent edits, a deleted
-  entity's former children), and the known object-identity limitation across a delete→undo→further-
-  undo sequence.
+- [x] **Undo/redo** — **first pass done, since extended to inspector field edits**.
+  `Editing/Undo/` — a Command-pattern `CommandHistory` (Ctrl+Z/Ctrl+Y), coarse/gesture-level as this
+  row itself invited: one step per completed gizmo drag or inspector Transform-section gesture
+  (`TransformCommand`), entity create/delete (`CreateEntityCommand`/`DeleteEntityCommand`), or
+  completed Material-field edit (`FieldEditCommand<T>`, via new optional `CommandHistory` tracking
+  in `Widgets`' row helpers), not a per-frame or per-keystroke diff. See `Docs/Documentation/Undo.md`
+  for what's covered, what's still deliberately deferred (rigidbody edits, re-parenting, a deleted
+  entity's former children), and two known limitations: object identity across a
+  delete→undo→further-undo sequence, and a rare stale-tracking-key edge case in the new field-edit
+  mechanism.
 - [x] **Multi-select** — **done**. `Scene.SelectedEntities` (Outliner Ctrl/Shift-click, viewport
   Ctrl+click) — bulk gizmo drag (every selected entity moves/rotates/scales by the same delta) and
   bulk delete, both as a single undo step via the new `Editing/Undo/CompositeCommand`. See

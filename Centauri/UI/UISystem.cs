@@ -53,7 +53,7 @@ public sealed class UISystem : IDisposable
 
         _statsOverlay = new StatsOverlay(_imGui.Font, config);
         _performance  = new PerformancePanel(_imGui.Font, config);
-        _properties   = new PropertiesPanel(_imGui.Font, _config, resourceSystem, entitySetLoader);
+        _properties   = new PropertiesPanel(_imGui.Font, _config, resourceSystem, entitySetLoader, commandHistory);
         _outliner     = new HierarchyPanel(_imGui.Font, config, resourceSystem, entitySetLoader, commandHistory);
         _topBar       = new TopBar(_imGui.Font, config, _modeManager);
         _gizmo        = new TransformGizmo(commandHistory);

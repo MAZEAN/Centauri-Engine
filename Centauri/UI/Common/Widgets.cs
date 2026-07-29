@@ -4,6 +4,8 @@ using ImGuiNET;
 using System.Numerics;
 using System.Globalization;
 
+using Editing.Undo;
+
 internal static class Widgets
 {
     // Every fixed-pixel layout constant across the UI (label widths, graph padding, panel
@@ -132,66 +134,88 @@ internal static class Widgets
     // for a pair that's always edited together and doesn't need a per-axis reset, just a single
     // whole-vector one (right-click, same gesture DragRow/SliderRow use) when a sensible baseline
     // exists — e.g. Material.UvScale/UvOffset's own defaults (1,1)/(0,0), "no tiling override".
-    public static void Vec2Row(string label, Vector2 v, Action<Vector2> set, float speed, string fmt = "%.3f", Vector2? reset = null)
+    // `undo`, when passed, turns a completed drag/slider-hop/toggle/reset into one CommandHistory
+    // entry — see TrackEditBegin/TrackEditEnd. Every non-entity call site (PostFX/Reflections/
+    // Environment/Scene config panels) leaves it null and behaves exactly as before; only the
+    // entity inspector's Transform/Material sections pass a real CommandHistory.
+    public static void Vec2Row(string label, Vector2 v, Action<Vector2> set, float speed, string fmt = "%.3f", Vector2? reset = null, CommandHistory? undo = null)
     {
         RowLabel(label);
 
         var id = "##" + label;
+        TrackEditBegin(id, v, undo);
         var changed = ImGui.DragFloat2(id, ref v, speed, 0f, 0f, fmt);
+        TrackEditEnd(id, v, set, undo);
 
         if (reset is { } r)
-            changed |= ResetMenu(id, ref v, r);
+            changed |= ResetRow(id, ref v, r, set, undo);
 
         if (changed)
             set(v);
     }
 
-    public static void DragRow(string label, float v, Action<float> set, float speed, float min, float max, string fmt = "%.3f", float? reset = null)
+    public static void DragRow(string label, float v, Action<float> set, float speed, float min, float max, string fmt = "%.3f", float? reset = null, CommandHistory? undo = null)
     {
         RowLabel(label);
-        
+
         var id = "##" + label;
+        TrackEditBegin(id, v, undo);
         var changed = ImGui.DragFloat(id, ref v, speed, min, max, fmt);
-        
-        if (reset is { } r) 
-            changed |= ResetMenu(id, ref v, r);
-        
-        if (changed) 
+        TrackEditEnd(id, v, set, undo);
+
+        if (reset is { } r)
+            changed |= ResetRow(id, ref v, r, set, undo);
+
+        if (changed)
             set(v);
     }
 
-    public static void SliderRow(string label, float v, Action<float> set, float min, float max, float? reset = null)
+    public static void SliderRow(string label, float v, Action<float> set, float min, float max, float? reset = null, CommandHistory? undo = null)
     {
         RowLabel(label);
-        
+
         var id = "##" + label;
+        TrackEditBegin(id, v, undo);
         var changed = ImGui.SliderFloat(id, ref v, min, max, "%.3f");
-        
-        if (reset is { } r) 
-            changed |= ResetMenu(id, ref v, r);
-        
-        if (changed) 
+        TrackEditEnd(id, v, set, undo);
+
+        if (reset is { } r)
+            changed |= ResetRow(id, ref v, r, set, undo);
+
+        if (changed)
             set(v);
     }
 
-    public static void ColorRow4(string label, Vector4 v, Action<Vector4> set)
+    public static void ColorRow4(string label, Vector4 v, Action<Vector4> set, CommandHistory? undo = null)
     {
         RowLabel(label);
-        if (ImGui.ColorEdit4("##" + label, ref v, SwatchFlags)) 
+        var id = "##" + label;
+        TrackEditBegin(id, v, undo);
+        var changed = ImGui.ColorEdit4(id, ref v, SwatchFlags);
+        TrackEditEnd(id, v, set, undo);
+        if (changed)
             set(v);
     }
 
-    public static void ColorRow3(string label, Vector3 v, Action<Vector3> set)
+    public static void ColorRow3(string label, Vector3 v, Action<Vector3> set, CommandHistory? undo = null)
     {
         RowLabel(label);
-        if (ImGui.ColorEdit3("##" + label, ref v, SwatchFlags)) 
+        var id = "##" + label;
+        TrackEditBegin(id, v, undo);
+        var changed = ImGui.ColorEdit3(id, ref v, SwatchFlags);
+        TrackEditEnd(id, v, set, undo);
+        if (changed)
             set(v);
     }
 
-    public static void CheckRow(string label, bool v, Action<bool> set)
+    public static void CheckRow(string label, bool v, Action<bool> set, CommandHistory? undo = null)
     {
         RowLabel(label);
-        if (ImGui.Checkbox("##" + label, ref v)) 
+        var id = "##" + label;
+        TrackEditBegin(id, v, undo);
+        var changed = ImGui.Checkbox(id, ref v);
+        TrackEditEnd(id, v, set, undo);
+        if (changed)
             set(v);
     }
 
@@ -227,6 +251,64 @@ internal static class Widgets
         ImGui.EndPopup();
 
         return hit;
+    }
+
+    // Right-click "Reset" is a single instant edit, not a drag — it can't go through
+    // TrackEditBegin/End (that pair straddles the *primary* widget's own Activate/Deactivate,
+    // which a popup-menu click never triggers). Pushed directly here instead, comparing the
+    // value from immediately before the popup's MenuItem fired to the reset target.
+    private static bool ResetRow(string id, ref float v, float reset, Action<float> apply, CommandHistory? undo)
+    {
+        var before = v;
+        var hit = ResetMenu(id, ref v, reset);
+        if (hit && undo != null && before != v)
+            undo.Push(new FieldEditCommand<float>(apply, before, v));
+        return hit;
+    }
+
+    private static bool ResetRow(string id, ref Vector2 v, Vector2 reset, Action<Vector2> apply, CommandHistory? undo)
+    {
+        var before = v;
+        var hit = ResetMenu(id, ref v, reset);
+        if (hit && undo != null && before != v)
+            undo.Push(new FieldEditCommand<Vector2>(apply, before, v));
+        return hit;
+    }
+
+    // Field-level undo tracking for the entity inspector's Transform/Material rows — every other
+    // Widgets call site (PostFX/Reflections/Environment/Scene config panels) passes undo: null and
+    // skips this entirely. Keyed by each row's ImGui id string (e.g. "##Roughness"), since Widgets
+    // itself is a stateless static class with nothing per-entity/per-slot to hang state on. Gated
+    // on "no pending entry yet" (TrackEditBegin) rather than ImGui.IsItemActivated() directly,
+    // because a click-type widget (Checkbox, a slider hop) mutates its value the same frame it
+    // activates — reading the value only after that frame would already miss the pre-click state.
+    // Capturing on every frame the field *isn't* already pending means a multi-frame drag's
+    // "before" stays the value from drag-start, not merely a frame ago.
+    //
+    // Known gap: the dictionary key is just the row's label string, not the entity/slot it belongs
+    // to (Widgets has no such context) — two different entities' same-named field (e.g. slot 0's
+    // "Roughness" on two different trees) safely reuse the same key sequentially since only one
+    // widget can be ImGui-active at a time, but a drag abandoned mid-gesture by something other
+    // than releasing the mouse over it (e.g. Ctrl+Shift+R while dragging) can leave a stale pending
+    // entry that a later, unrelated field with the same label picks up. Rare and low-consequence
+    // (a mismatched undo/redo pair on that one field, not corruption) — accepted for this pass
+    // rather than threading extra identity through every Widgets call site.
+    private static readonly Dictionary<string, object?> _editStart = new();
+
+    private static void TrackEditBegin<T>(string id, T entryValue, CommandHistory? undo)
+    {
+        if (undo != null && !_editStart.ContainsKey(id))
+            _editStart[id] = entryValue;
+    }
+
+    private static void TrackEditEnd<T>(string id, T current, Action<T> apply, CommandHistory? undo)
+    {
+        if (undo is null || ImGui.IsItemActive()) return;
+        if (!_editStart.TryGetValue(id, out var startObj) || startObj is not T start) return;
+
+        _editStart.Remove(id);
+        if (!EqualityComparer<T>.Default.Equals(start, current))
+            undo.Push(new FieldEditCommand<T>(apply, start, current));
     }
 
     // ── formatting ──────────────────────────────────────────────────────────────

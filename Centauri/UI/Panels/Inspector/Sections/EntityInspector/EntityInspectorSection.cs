@@ -6,6 +6,7 @@ using World;
 using Common;
 using Rendering;
 using Loading;
+using Editing.Undo;
 
 // The selected-entity inspector: name/enabled header, then delegates each collapsible block
 // (Transform / Hierarchy / Material / Light / Physics) to its own sub-section — see the
@@ -17,12 +18,14 @@ public sealed class EntityInspectorSection : ISection
     private readonly EntityMaterialSection  _material;
     private readonly EntityLightSection     _light = new();
     private readonly EntityPhysicsSection   _physics;
+    private readonly CommandHistory _commandHistory;
 
-    public EntityInspectorSection(ResourceSystem resourceSystem, EntitySetLoader entitySetLoader)
+    public EntityInspectorSection(ResourceSystem resourceSystem, EntitySetLoader entitySetLoader, CommandHistory commandHistory)
     {
         _hierarchy = new EntityHierarchySection(entitySetLoader);
-        _material  = new EntityMaterialSection(resourceSystem, entitySetLoader);
+        _material  = new EntityMaterialSection(resourceSystem, entitySetLoader, commandHistory);
         _physics   = new EntityPhysicsSection(entitySetLoader);
+        _commandHistory = commandHistory;
     }
 
     public void Draw(Scene scene)
@@ -47,7 +50,7 @@ public sealed class EntityInspectorSection : ISection
         Widgets.CheckRow("Enabled", entity.Enabled, v => entity.Enabled = v);
         ImGui.Spacing();
 
-        _transform.Draw(entity);
+        _transform.Draw(entity, _commandHistory);
         _hierarchy.Draw(entity, scene);
         _material.Draw(entity, scene);
         _light.Draw(entity);

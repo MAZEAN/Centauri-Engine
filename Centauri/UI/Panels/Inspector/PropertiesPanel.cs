@@ -10,6 +10,7 @@ using Layout;
 using Sections;
 using Rendering;
 using Loading;
+using Editing.Undo;
 
 internal readonly record struct SectionGroup(string Name, Vector4 Accent, ISection[] Sections);
 
@@ -23,11 +24,11 @@ internal class PropertiesPanel
     private readonly EntityInspectorSection _entitySection;
     private readonly SectionGroup[] _groups;
 
-    public PropertiesPanel(ImFontPtr font, AppConfig config, ResourceSystem resourceSystem, EntitySetLoader entitySetLoader)
+    public PropertiesPanel(ImFontPtr font, AppConfig config, ResourceSystem resourceSystem, EntitySetLoader entitySetLoader, CommandHistory commandHistory)
     {
         _font = font;
         _config = config;
-        _entitySection = new EntityInspectorSection(resourceSystem, entitySetLoader);
+        _entitySection = new EntityInspectorSection(resourceSystem, entitySetLoader, commandHistory);
         _groups =
         [
             new SectionGroup("Environment", ColorPalette.Green, [

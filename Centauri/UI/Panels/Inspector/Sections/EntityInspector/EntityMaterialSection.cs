@@ -8,20 +8,23 @@ using Common;
 using Graphics.Resources.Materials;
 using Rendering;
 using Loading;
+using Editing.Undo;
 
 internal sealed class EntityMaterialSection
 {
     private readonly ResourceSystem _resourceSystem;
     private readonly EntitySetLoader _entitySetLoader;
+    private readonly CommandHistory _commandHistory;
 
     // Lazily built once (the registry doesn't change at runtime) — see HierarchyPanel's
     // identical pattern for the "+ Add" model/material pickers.
     private string[]? _materialIds;
 
-    public EntityMaterialSection(ResourceSystem resourceSystem, EntitySetLoader entitySetLoader)
+    public EntityMaterialSection(ResourceSystem resourceSystem, EntitySetLoader entitySetLoader, CommandHistory commandHistory)
     {
         _resourceSystem  = resourceSystem;
         _entitySetLoader = entitySetLoader;
+        _commandHistory  = commandHistory;
     }
 
     public void Draw(Entity e, Scene scene)
@@ -66,9 +69,9 @@ internal sealed class EntityMaterialSection
             // now (Material.UvScale/UvOffset, applied as a per-draw-call uniform — see
             // ShaderUniformBinder.UploadMaterial), matching every other per-slot property below.
             Widgets.Vec2Row("UV Scale",  mat.UvScale,  v => EditMaterial(e, scene, index, m => m.UvScale  = v),
-                0.01f, "%.3f", Vector2.One);
+                0.01f, "%.3f", Vector2.One, _commandHistory);
             Widgets.Vec2Row("UV Offset", mat.UvOffset, v => EditMaterial(e, scene, index, m => m.UvOffset = v),
-                0.01f, "%.3f", Vector2.Zero);
+                0.01f, "%.3f", Vector2.Zero, _commandHistory);
 
             // UvScale/UvOffset only affect texture-sampled shading (fUv in the fragment shader) —
             // a slot with no bound texture maps has nothing for them to tile/shift, so dragging
@@ -81,16 +84,16 @@ internal sealed class EntityMaterialSection
                 ImGui.PopStyleColor();
             }
 
-            Widgets.ColorRow4("Base Color", mat.Color, v => EditMaterial(e, scene, index, m => m.Color = v));
-            Widgets.SliderRow("Roughness", mat.RoughnessScalar, v => EditMaterial(e, scene, index, m => m.RoughnessScalar = v), 0f, 1f, 0.5f);
-            Widgets.SliderRow("Metallic",  mat.MetallicScalar,  v => EditMaterial(e, scene, index, m => m.MetallicScalar  = v), 0f, 1f, 0.1f);
-            Widgets.SliderRow("Translucency", mat.Translucency, v => EditMaterial(e, scene, index, m => m.Translucency = v), 0f, 1f, 0f);
-            Widgets.CheckRow("Two-Sided", mat.TwoSided, v => EditMaterial(e, scene, index, m => m.TwoSided = v));
-            Widgets.CheckRow("Wind",      mat.Wind,     v => EditMaterial(e, scene, index, m => m.Wind     = v));
-            Widgets.CheckRow("Triplanar", mat.Triplanar, v => EditMaterial(e, scene, index, m => m.Triplanar = v));
+            Widgets.ColorRow4("Base Color", mat.Color, v => EditMaterial(e, scene, index, m => m.Color = v), _commandHistory);
+            Widgets.SliderRow("Roughness", mat.RoughnessScalar, v => EditMaterial(e, scene, index, m => m.RoughnessScalar = v), 0f, 1f, 0.5f, _commandHistory);
+            Widgets.SliderRow("Metallic",  mat.MetallicScalar,  v => EditMaterial(e, scene, index, m => m.MetallicScalar  = v), 0f, 1f, 0.1f, _commandHistory);
+            Widgets.SliderRow("Translucency", mat.Translucency, v => EditMaterial(e, scene, index, m => m.Translucency = v), 0f, 1f, 0f, _commandHistory);
+            Widgets.CheckRow("Two-Sided", mat.TwoSided, v => EditMaterial(e, scene, index, m => m.TwoSided = v), _commandHistory);
+            Widgets.CheckRow("Wind",      mat.Wind,     v => EditMaterial(e, scene, index, m => m.Wind     = v), _commandHistory);
+            Widgets.CheckRow("Triplanar", mat.Triplanar, v => EditMaterial(e, scene, index, m => m.Triplanar = v), _commandHistory);
             if (mat.Triplanar)
                 Widgets.DragRow("Triplanar Scale", mat.TriplanarScale,
-                    v => EditMaterial(e, scene, index, m => m.TriplanarScale = v), 0.05f, 0.01f, 100f, "%.2f m", 1f);
+                    v => EditMaterial(e, scene, index, m => m.TriplanarScale = v), 0.05f, 0.01f, 100f, "%.2f m", 1f, _commandHistory);
 
             // The checkbox itself has no "binding" toggle equivalent — unlike Triplanar/Wind it
             // needs a height map bound in the first place (see HasAnyTexture), which the
@@ -103,11 +106,13 @@ internal sealed class EntityMaterialSection
             if (mat.Height != null)
             {
                 Widgets.CheckRow("Displacement", mat.ParallaxEnabled,
-                    v => EditMaterial(e, scene, index, m => m.ParallaxEnabled = v));
+                    v => EditMaterial(e, scene, index, m => m.ParallaxEnabled = v),
+                    _commandHistory);
 
                 if (mat.ParallaxEnabled)
                     Widgets.DragRow("Parallax Scale", mat.ParallaxScale,
-                        v => EditMaterial(e, scene, index, m => m.ParallaxScale = v), 0.005f, 0f, 0.5f, "%.3f", 0.05f);
+                        v => EditMaterial(e, scene, index, m => m.ParallaxScale = v),
+                        0.005f, 0f, 0.5f, "%.3f", 0.05f, _commandHistory);
             }
 
             ImGui.PopID();
