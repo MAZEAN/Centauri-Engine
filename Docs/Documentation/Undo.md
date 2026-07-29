@@ -24,8 +24,13 @@ roadmap itself invited ("even a coarse one — snapshot/diff per edit gesture").
 - **`CreateEntityCommand`** / **`DeleteEntityCommand`** — one Outliner "+ Add" / one Delete-key
   press.
 - **`FieldEditCommand<T>`** — one completed inspector field edit outside the Transform section
-  (currently: Material properties, §2) — a drag-to-release, a slider hop, a checkbox toggle, or a
-  right-click "Reset," generic over the field's own type rather than one command class per field.
+  (Material properties and RigidBody Mass, §2) — a drag-to-release, a slider hop, a checkbox toggle,
+  or a right-click "Reset," generic over the field's own type rather than one command class per
+  field.
+- **`RigidBodyCommand`** (+ `RigidBodyState`, its Kind/Shape before/after snapshot) — one completed
+  Body-kind or Shape combo change in `EntityPhysicsSection` (attach, detach, or switch
+  Dynamic/Static/Box/Sphere).
+- **`ReparentCommand`** — one completed Parent-picker selection in `EntityHierarchySection`.
 
 One `CommandHistory` instance lives on `Engine` (constructed in `InitializeSystems`, alongside the
 other top-level systems) and is threaded into both `InputSystem` (Ctrl+Z/Ctrl+Y, and the Delete-key
@@ -94,16 +99,32 @@ one step. This also means Transform-row edits share every property `TransformCom
 including restoring rotation through `Transform.SetRotation` so the inspector's own `EulerAngles`
 cache stays coherent (§2's opening paragraph above).
 
+**RigidBody edits and re-parenting.** The two pieces named as still-deferred by the previous round
+of this document — closed out this pass.
+
+`EntityPhysicsSection`'s Body-kind combo (None/Dynamic/Static) and Shape combo (Box/Sphere) don't
+fit `FieldEditCommand<T>`: attaching or detaching the `RigidBody` component is a structural change,
+not a value swap, and every edit — attach, detach, or a Kind/Shape change on an already-attached
+body — has to replay two side effects the live edit path itself performs: `RigidBody.MarkDirty()`
+(so `PhysicsSystem` tears down and rebuilds the BEPU body on its next `Sync` instead of silently
+keeping the stale one) and `EntitySetLoader.SyncRigidBodyDefinition` (so the saved definition stays
+in step with the live component). `RigidBodyCommand` captures the whole before/after `RigidBodyState`
+(Kind + Shape; `null` for "no `RigidBody` attached") and replays both side effects on *either*
+direction — `Undo` isn't just "put the old value back," it's "reapply the same attach/detach/rebuild
+path the original edit used, aimed at the old state." Mass, by contrast, doesn't attach or detach
+anything — it's a plain per-frame drag whose `set` closure already calls `MarkDirty()`/`Sync` on
+every value, old or new — so it goes straight through the generic `Widgets`/`FieldEditCommand<float>`
+mechanism above rather than needing its own command.
+
+`EntityHierarchySection`'s Parent combo is simpler: one `EntitySetLoader.SetParent` call per
+selection, so `ReparentCommand` just replays that same call with the old or new parent — no separate
+before/after state type needed, and (since `SetParent` itself refuses a cycle rather than assuming
+its caller already filtered one out) a redo that would recreate a cycle in some scene that changed
+shape since the original edit is refused the same way the live edit was, rather than corrupting the
+hierarchy.
+
 ## 3. What's deliberately out of scope (this pass)
 
-- **Rigidbody edits and re-parenting via the Hierarchy section's parent picker** still aren't
-  undoable. Both are qualitatively different from a plain value swap: a rigidbody edit
-  (`EntityPhysicsSection`) triggers `EntitySetLoader.SyncRigidBodyDefinition`, which rebuilds
-  physics-engine state as a side effect of the edit itself — undoing the *value* without also
-  correctly unwinding that rebuild isn't a `FieldEditCommand`-shaped problem. Re-parenting mutates
-  the scene graph (detaching from one parent, attaching to another), closer in kind to entity
-  create/delete than to a scalar field — plausibly buildable on the same primitives, but not
-  attempted this pass.
 - **A deleted entity's *former children*** — `DeleteEntity` already promotes a deleted entity's
   children to the scene root as a permanent side effect *before* the delete command even captures
   anything; undoing the delete brings the entity itself back but doesn't re-link those children to
@@ -165,3 +186,10 @@ boot smoke test (full `Engine` → `UISystem` → `PropertiesPanel` → `EntityI
 review; the actual drag-then-release undo behavior — same as the gizmo's and the Outliner's own
 interaction paths above — needs a live cursor to exercise and wasn't interactively verified this
 pass.
+
+`RigidBodyCommand` and `ReparentCommand` are the same story again: both need a real `EntitySetLoader`
+(GL-backed `ResourceSystem`) and a live combo interaction to exercise, so — like
+`CreateEntityCommand`/`DeleteEntityCommand` before them — they're verified by a headless boot smoke
+test of the full `Engine` → `UISystem` → `PropertiesPanel` → `EntityInspectorSection` →
+`EntityPhysicsSection`/`EntityHierarchySection` wiring plus code review, not a live click-drag-undo
+interaction.

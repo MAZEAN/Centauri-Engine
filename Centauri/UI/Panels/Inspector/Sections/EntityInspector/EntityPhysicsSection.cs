@@ -6,6 +6,7 @@ using World;
 using Common;
 using Loading;
 using Simulation.Physics;
+using Editing.Undo;
 
 // Attaches/edits/detaches a RigidBody on the selected entity. Shape is derived from the
 // model's own bounds (see PhysicsSystem.Register) — there's nothing to author there beyond
@@ -22,7 +23,7 @@ internal sealed class EntityPhysicsSection
 
     public EntityPhysicsSection(EntitySetLoader entitySetLoader) => _entitySetLoader = entitySetLoader;
 
-    public void Draw(Entity e)
+    public void Draw(Entity e, CommandHistory? undo)
     {
         using var s = Widgets.Section("Physics");
         if (!s.Open) return;
@@ -37,12 +38,19 @@ internal sealed class EntityPhysicsSection
 
         if (Widgets.ComboRow("Body", ref kindIndex, PhysicsKinds))
         {
+            // Kind/Shape edits attach, detach, or rebuild the component itself — not a plain value
+            // swap the generic Widgets undo mechanism can express — so RigidBodyCommand captures
+            // the whole before/after RigidBodyState (or null for "no RigidBody") and replays the
+            // same MarkDirty()/SyncRigidBodyDefinition() side effects on both Undo and Redo.
+            var before = rb is null ? (RigidBodyState?)null : RigidBodyState.Of(rb);
+
             if (kindIndex == 0)
             {
                 if (rb is not null)
                 {
                     e.RemoveComponent<RigidBody>();
                     _entitySetLoader.SyncRigidBodyDefinition(e, null);
+                    undo?.Push(new RigidBodyCommand(e, _entitySetLoader, before, null));
                 }
                 return;
             }
@@ -58,6 +66,7 @@ internal sealed class EntityPhysicsSection
                 rb.MarkDirty();
             }
             _entitySetLoader.SyncRigidBodyDefinition(e, rb);
+            undo?.Push(new RigidBodyCommand(e, _entitySetLoader, before, RigidBodyState.Of(rb)));
         }
 
         if (rb is null) return;
@@ -65,19 +74,25 @@ internal sealed class EntityPhysicsSection
         var shapeIndex = rb.Shape == BodyShape.Sphere ? 1 : 0;
         if (Widgets.ComboRow("Shape", ref shapeIndex, PhysicsShapes))
         {
+            var before = RigidBodyState.Of(rb);
             rb.Shape = shapeIndex == 1 ? BodyShape.Sphere : BodyShape.Box;
             rb.MarkDirty();
             _entitySetLoader.SyncRigidBodyDefinition(e, rb);
+            undo?.Push(new RigidBodyCommand(e, _entitySetLoader, before, RigidBodyState.Of(rb)));
         }
 
         if (rb.Kind != BodyKind.Dynamic) return;
 
+        // Mass, unlike Kind/Shape, is a plain per-frame drag with no attach/detach side effect —
+        // the closure below already performs the same MarkDirty()/Sync the RigidBodyCommand path
+        // does, so it can go straight through the generic Widgets field-edit tracking (undo just
+        // calls this same closure with the pre-drag value) rather than needing its own command.
         Widgets.DragRow("Mass", rb.Mass, v =>
         {
             rb.Mass = MathF.Max(0.001f, v);
             rb.MarkDirty();
             _entitySetLoader.SyncRigidBodyDefinition(e, rb);
-        }, 0.05f, 0.001f, 10000f, "%.3f kg", 1f);
+        }, 0.05f, 0.001f, 10000f, "%.3f kg", 1f, undo);
 
         // Live physical state — read straight off RigidBody, refreshed every fixed step by
         // PhysicsSystem.StepFixed (Vector, then magnitude for a quick at-a-glance read). All zero

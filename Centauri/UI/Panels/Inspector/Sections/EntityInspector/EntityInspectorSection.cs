@@ -51,10 +51,10 @@ public sealed class EntityInspectorSection : ISection
         ImGui.Spacing();
 
         _transform.Draw(entity, _commandHistory);
-        _hierarchy.Draw(entity, scene);
+        _hierarchy.Draw(entity, scene, _commandHistory);
         _material.Draw(entity, scene);
         _light.Draw(entity);
-        _physics.Draw(entity);
+        _physics.Draw(entity, _commandHistory);
     }
 
     private static void DrawHeader(Entity e)

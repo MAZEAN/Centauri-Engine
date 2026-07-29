@@ -5,6 +5,7 @@ using ImGuiNET;
 using World;
 using Common;
 using Loading;
+using Editing.Undo;
 
 // Parent picker — the only authoring path for Transform hierarchy this pass (no
 // drag-and-drop reparenting in the Outliner yet; see Docs/Documentation/TransformHierarchy.md
@@ -20,7 +21,7 @@ internal sealed class EntityHierarchySection
 
     public EntityHierarchySection(EntitySetLoader entitySetLoader) => _entitySetLoader = entitySetLoader;
 
-    public void Draw(Entity entity, Scene scene)
+    public void Draw(Entity entity, Scene scene, CommandHistory? undo)
     {
         using var s = Widgets.Section("Hierarchy");
         if (!s.Open) return;
@@ -41,7 +42,11 @@ internal sealed class EntityHierarchySection
         var index = Math.Max(0, candidates.IndexOf(currentParent));
 
         if (Widgets.ComboRow("Parent", ref index, names.ToArray()))
-            _entitySetLoader.SetParent(entity, candidates[index]);
+        {
+            var target = candidates[index];
+            if (_entitySetLoader.SetParent(entity, target))
+                undo?.Push(new ReparentCommand(_entitySetLoader, entity, currentParent, target));
+        }
 
         if (entity.Transform.Children.Count > 0)
             ImGui.TextDisabled($"{entity.Transform.Children.Count} child(ren)");
