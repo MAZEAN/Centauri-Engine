@@ -150,11 +150,20 @@ edit made through the editor survives a save/reload.
 Everything so far assumes small hand-placed scenes (the `TestScene.json` scale). None of it holds
 up once content count grows.
 
-- [ ] **Texture compression / a real texture budget story.** Every texture is full-resolution
-  RGBA8 in VRAM the moment its material loads (see `GLTexture.Decode` — no mip-clamping, no
-  streaming, no BC/KTX compressed formats). This was already flagged as a real gap in this
-  session's texture-resolution discussion; it's worth fixing before content count makes it a hard
-  VRAM ceiling instead of a theoretical one.
+- [x] **Texture compression / a real texture budget story** — **done**. Every LDR texture now
+  uploads as BC1 (opaque, ~6:1) or BC3 (alpha, ~4:1) instead of raw RGBA8, via a hand-written
+  `Graphics/Resources/BlockCompression.cs` encoder (no new dependency — S3TC is simple enough not
+  to need one, matching the project's existing native-binary aversion) with its own manually
+  box-filtered mip chain (GPU `glGenerateMipmap` doesn't work on compressed formats). Falls back to
+  the original uncompressed path automatically per-texture (HDR, unsupported driver, or below one
+  4x4 block) — `GL_EXT_texture_compression_s3tc` confirmed present even on this sandbox's headless
+  Mesa/llvmpipe CI target, so the compressed path is exercised for real by the existing smoke-test
+  job, not dormant. `StatsOverlay` gained a "Textures" section (compressed/uncompressed counts,
+  estimated VRAM) for budget visibility. See `Docs/Documentation/TextureCompression.md` for the
+  full writeup, including what's deliberately still out of scope: no refcounted cache eviction
+  (`TextureCacheSize` remains unused — evicting without knowing whether a live `Material` still
+  references a texture risks a use-after-free; needs its own design pass first, same as LOD below),
+  no mip-clamping/max-resolution cap, no BC7/ASTC, no pre-compressed asset (KTX2/DDS) import.
 - [ ] **LOD / impostors** (TODO.md item, currently unstarted, no design doc yet). Needs its own
   short design pass before implementation — impostor billboarking interacts with the shadow
   casters and instancing path in ways worth thinking through up front.

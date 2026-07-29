@@ -34,7 +34,7 @@ public class ResourceSystem : IDisposable
         _config = config;
 
         Textures = new AssetCache<GLTexture>(
-            key => new GLTexture(gl, DecodeTextureKey(key))
+            key => new GLTexture(gl, DecodeTextureKey(key), _config.Render.TextureCompression)
         );
 
         Shaders = new AssetCache<GLShader>(
@@ -131,7 +131,7 @@ public class ResourceSystem : IDisposable
         Time.Run("GL upload", () =>
         {
             foreach (var (key, data) in textureTask.Result)
-                Textures.Insert(key, new GLTexture(_gl, data));
+                Textures.Insert(key, new GLTexture(_gl, data, _config.Render.TextureCompression));
 
             foreach (var (key, data) in modelTask.Result)
                 Models.Insert(key, new Model(_gl, data));

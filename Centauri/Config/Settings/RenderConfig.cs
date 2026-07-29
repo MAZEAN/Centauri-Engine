@@ -37,4 +37,11 @@ public class RenderConfig
     // identical to the old unscaled behavior; below 1 trades sharpness for fill-rate, the
     // standard lever for catching up a fill-bound frame on a weak GPU.
     [JsonPropertyName("renderScale")]      public float  RenderScale      { get; set; } = 1f;
+
+    // BC1 (opaque) / BC3 (alpha) GPU texture compression for LDR textures at load time — real
+    // ~4-6x VRAM savings, no dependency needed (GLTexture's own BlockCompression encoder). Falls
+    // back to raw RGBA8 automatically per-texture when the driver doesn't report
+    // GL_EXT_texture_compression_s3tc, or the texture is smaller than one 4x4 block — see
+    // Docs/Documentation/TextureCompression.md.
+    [JsonPropertyName("textureCompression")] public bool TextureCompression { get; init; } = true;
 }

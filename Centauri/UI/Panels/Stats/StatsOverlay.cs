@@ -8,6 +8,7 @@ using World;
 using Config;
 using Common;
 using Layout;
+using Graphics.Resources;
 
 // Instantaneous engine statistics (frame time headline, renderer/culling/shadow/instancing/physics/
 // camera/config counters). The frame-time and GPU-timing *graphs* used to live here too, but they're
@@ -124,6 +125,16 @@ internal sealed class StatsOverlay
             Row("Yaw",   Widgets.SignedFloat(cam.Yaw));
             Row("Pitch", Widgets.SignedFloat(cam.Pitch));
             Row("Zoom",  Widgets.Float(cam.Zoom));
+        });
+
+        Section("Textures", ColorPalette.Amber, () =>
+        {
+            var compressed   = GLTexture.CompressedTextureCount;
+            var uncompressed = GLTexture.UncompressedTextureCount;
+            RowColored("Compressed", compressed.ToString(),
+                compressed > 0 ? ColorPalette.Green : ColorPalette.White);
+            Row("Uncompressed", uncompressed.ToString());
+            Row("Est. VRAM", $"{GLTexture.TotalApproxBytes / (1024f * 1024f):F1} MB");
         });
 
         Section("Config", ColorPalette.Purple, () =>

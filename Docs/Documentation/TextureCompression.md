@@ -1,0 +1,155 @@
+# Texture compression / a real texture budget story
+
+The first Phase 2 roadmap item — "Every texture is full-resolution RGBA8 in VRAM the moment its
+material loads (see `GLTexture.Decode` — no mip-clamping, no streaming, no BC/KTX compressed
+formats)." Every LDR (non-HDR) texture now uploads as BC1 (opaque) or BC3 (alpha) instead of raw
+RGBA8, roughly a 4-6x VRAM reduction, with a hand-written encoder rather than a new dependency.
+
+## 1. Why a hand-written encoder, not a library
+
+BC1/BC3 (a.k.a. DXT1/DXT5, part of S3TC) are old, simple, universally-supported formats — every
+desktop GPU and driver made in the last two decades decodes them naturally in the texture sampler,
+llvmpipe/Mesa included (confirmed below). Encoding one is genuinely small: a fixed 4x4 pixel block,
+two endpoint colors, and per-pixel nearest-palette-color indices — no entropy coding, no arithmetic
+coding, nothing that benefits from an established library the way, say, a modern video codec would.
+
+Writing `Graphics/Resources/BlockCompression.cs` from scratch avoids adding an external
+dependency for something this self-contained — the same reasoning `Docs/Documentation/Gizmos.md`
+§1 gives for not pulling in ImGuizmo (avoiding a per-RID native binary the 4-way CI matrix +
+headless job would all need). A managed C# BC1/BC3 encoder has no native component at all.
+
+**Quality tradeoff, stated plainly:** endpoint selection is a per-channel bounding box (min/max RGB
+across the block), not the principal-component-analysis approach real encoders (`stb_dxt`, etc.)
+use. This is a "good enough baseline" — visually solid for typical PBR textures (see §5's
+side-by-side) — not best-in-class compressed-texture quality. A PCA-based encoder would be a
+drop-in upgrade to `EncodeColorBlock` later if quality ever becomes the bottleneck rather than
+VRAM.
+
+## 2. Format selection and the encode itself
+
+`GLTexture`'s LDR upload path (the `TextureData`-taking constructor) now branches three ways:
+
+- **HDR** (`RGB16F`) — unchanged, never compressed. BC6H (the HDR-capable block format) is a
+  separate, meaningfully harder encoder; out of scope here since HDR use is limited to skybox
+  panoramas today, not the bulk of a project's texture budget.
+- **LDR, compression enabled, driver supports it, texture is at least 4x4** — compressed upload
+  (`UploadCompressed`, below).
+- **Everything else** (compression disabled in config, `GL_EXT_texture_compression_s3tc` missing,
+  or a texture smaller than one block) — the original path: raw `TexImage2D` + `GenerateMipmap`.
+
+`BlockCompression.HasAlpha` scans the source image once (any pixel below full opacity) to choose
+BC1 (no alpha channel at all, ~6:1 vs. RGBA8) or BC3 (~4:1, but round-trips alpha) — the premultiply
+step (`GLTexture.PremultiplyAlpha`, unchanged) already ran before this, so compression sees exactly
+the same premultiplied bytes the uncompressed path would have uploaded.
+
+Both formats work in fixed 4x4 blocks: `BlockCompression.EncodeColorBlock` computes a per-channel
+bounding box, quantizes the two extremes to RGB565 (nudging them apart if compression would
+otherwise land in BC1's alternate 3-color+transparency decode mode — irrelevant for BC3's color
+half, which is always 4-color, but needed for BC1 itself to stay fully opaque), expands them back to
+888 with the same high-bit-replication rule GPU decoders use, and picks each of the 16 pixels'
+nearest palette color by squared RGB distance. `EncodeAlphaBlock` does the equivalent for BC3's
+separate 8-value alpha palette, always picking `alpha0 = block max, alpha1 = block min` so it lands
+in the higher-precision 8-value interpolation mode rather than the 6-value-plus-hard-0/255 mode
+(irrelevant here — nothing needs exact punch-through alpha).
+
+## 3. Mip chain
+
+GPU-side `glGenerateMipmap` generally can't operate on compressed internal formats — they aren't
+color/framebuffer-renderable, which mipmap generation relies on. So the compressed path builds and
+uploads its own chain: `BlockCompression.Compress` repeatedly box-filter downsamples
+(`Downsample`, 2x2 average, edge-clamped) and re-encodes, one level per halving, all the way to
+1x1 — the same level count a GPU-generated chain would have
+(`floor(log2(max(width,height)))+1`). `UploadCompressed` uploads each level via
+`Gl.CompressedTexImage2D(level, ...)` and sets `TEXTURE_MAX_LEVEL` to the chain's actual top level.
+
+Every block-encode call (`Sample`, edge-clamped: reads past the image's right/bottom edge just
+clamp to the last valid pixel) works identically whether the block is a clean 4x4 region or a
+ragged one — so there's no separate "only compress if divisible by 4" restriction on either the
+base texture's own dimensions or any mip level's (which are frequently *not* multiples of 4 once
+the chain gets small, e.g. every level below 4x4 itself, or any level of a non-power-of-two source
+image). `BlockCompressionTests.Compress_MipChain_EndsAt1x1WithExpectedLevelCount` pins this for a
+regular size, a non-power-of-two size, and the 1x1 degenerate case directly.
+
+## 4. Config, fallback, and visibility
+
+`Render.TextureCompression` (default `true`) is the master switch. Per-texture, compression is
+skipped automatically (falling back to the original uncompressed path, not an error) when:
+
+- the texture is HDR,
+- `GL_EXT_texture_compression_s3tc` isn't reported by the driver (checked once via
+  `GL.IsExtensionPresent`, cached — it can't change mid-session), or
+- either dimension is below 4 pixels (the fixed per-block overhead isn't worth it for something
+  this small — `ResourceSystem`'s 1x1 default-white fallback texture is the main example).
+
+`StatsOverlay` gained a "Textures" section (`GLTexture.CompressedTextureCount`/
+`UncompressedTextureCount`/`TotalApproxBytes`, static counters updated on construct/dispose) so the
+budget is actually visible while iterating on a scene, not just something that happened silently at
+load time. `ApproxBytes` is an estimate, not a driver query — the exact encoded size for a
+compressed texture (summed across its whole mip chain), or `width*height*4` scaled by 4/3 for an
+uncompressed one to account for the ~33% a full RGBA8 mip chain adds on top of the base level.
+Good enough to eyeball; getting an exact number would mean a `glGetTexLevelParameteriv`
+per-level round trip through the driver for every texture, for a number nothing else reads.
+
+## 5. Verification
+
+**Unit tests** (`Centauri.Tests/Graphics/BlockCompressionTests.cs`, 8 tests) — `BlockCompression`
+is pure C#, no GL context needed, unlike almost everything else this session's texture/material
+work touched. Coverage: `HasAlpha` detection, BC1 vs. BC3 block-size selection, a solid-color
+block's decoded RGB landing within a few 8-bit levels of the source (565 quantization is lossy by
+design, so exact equality isn't the bar), BC3's alpha endpoints surviving exactly (only the
+*interpolated* in-between values are lossy, not the two stored endpoints), and the mip chain's
+level count/per-level byte size for a regular, a non-power-of-two, and a 1x1 image. Decoding in the
+tests is a second, independent from-spec BC1 implementation (not a call back into
+`BlockCompression`'s own private helpers) — a test failure means the *encoded bytes* are wrong, not
+just "self-consistent with whatever the encoder already believes." Spot-checked against a
+deliberately broken `Pack565` (returning a constant) to confirm the round-trip test actually fails,
+not just passes vacuously, matching this repo's established testing convention.
+
+**GPU extension support** — checked directly, not assumed: a temporary headless diagnostic
+(`GL.IsExtensionPresent` for `GL_EXT_texture_compression_s3tc`/`GL_ARB_texture_compression_rgtc`/
+`GL_ARB_texture_compression_bptc`, reverted before commit) confirmed Mesa's llvmpipe software
+rasterizer — what this sandbox's headless CI job actually runs on — reports all three. So the
+compressed path isn't merely dormant/untested in CI; the existing `headless-render-smoke-test`
+job exercises it for real on every push, same as everything else that boots.
+
+**Live render, both paths** — this sandbox checkout has no `.mat`/`Assets/Objects` content (a
+recurring constraint this session — see e.g. `Docs/Documentation/MaterialPersistence.md`), so a
+temporary `.mat` (`Testing/CorrugatedIron`'s real albedo/normal/roughness/metallic/AO textures)
+and a temporary entity-set JSON (the checked-in `Testing/Trees/Tree.glb` model, referenced by
+literal path — both `ModelRegistry`/`MaterialRegistry`'s `ResolvePath` accept a literal path
+directly, no registry entry needed) were used for a real bound-material render, then deleted
+before commit per the same "throwaway, never committed" convention `CLAUDE.md` documents for
+environment/entity-set testing. Two headless captures — `Render.TextureCompression: true` then
+`false` — both loaded the same 5 textures + 1 model without error and produced visually
+indistinguishable renders of the tree's trunk and leaves at normal viewing distance, the expected
+outcome for a lossy-but-solid compressed format.
+
+## 6. What's deliberately out of scope
+
+- **No refcounted texture eviction.** `Render.TextureCacheSize` (and `ModelCacheSize`/
+  `ShaderCacheSize`) remain unused — `AssetCache<T>` caches forever, no LRU, no budget-triggered
+  free. This was considered and explicitly rejected for this pass: entities/materials hold direct
+  references to cached `GLTexture`/`Model` instances with no reference counting anywhere in the
+  pipeline, so evicting "the least recently used" without first knowing whether anything still
+  points at it risks disposing a GL texture a live `Material` is still bound to — a real
+  use-after-free, not a hypothetical one. Building that safely needs a refcounting pass through the
+  Entity/Material lifecycle first — its own design effort, the same category of "needs a design
+  pass before implementation" the roadmap already called out for LOD/impostors. Compression (a real,
+  safe 4-6x reduction with no eviction risk at all) and budget *visibility* (StatsOverlay) are what
+  "a real texture budget story" means for this pass; unbounded cache lifetime is the named residual
+  gap, not silently unaddressed.
+- **No mip-clamping / max-resolution cap.** A texture larger than some configured ceiling still
+  decodes and compresses at full source resolution. Compression's ~4-6x reduction is the bigger
+  lever by far, so this was left out to keep this pass's scope to one clearly-bounded change — a
+  natural, small follow-up (`Render.MaxTextureSize`, downsample via the ImageSharp `Resize` already
+  in `GLTexture.Decode`'s dependency list) if VRAM pressure from oversized source art specifically
+  becomes the next bottleneck.
+- **BC7/ASTC, no runtime format negotiation.** BC7 (higher quality, Mesa reports
+  `GL_ARB_texture_compression_bptc` support too — see §5) and ASTC (mobile/tile-based GPUs) aren't
+  implemented. BC1/BC3 covers the desktop-GL case this engine targets; a real cross-platform story
+  (mobile, particularly) would need per-platform format selection this pass doesn't build.
+- **No pre-compressed asset format (KTX2/DDS) support on the *load* side.** Compression happens at
+  runtime, every time a texture is decoded — there's no way to ship an already-BC-compressed asset
+  and skip the CPU encode step. Not attempted since no such content exists in this project yet and
+  it's a separate concern (an asset-pipeline/import-time feature) from the runtime compression this
+  pass adds.

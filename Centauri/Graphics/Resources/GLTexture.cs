@@ -12,7 +12,7 @@ public sealed class TextureData
     public bool    IsHdr;
     public int     Width;
     public int     Height;
-    
+
     public byte[]?  Ldr;   // RGBA8, vertically flipped
     public float[]? Hdr;   // RGB float
 }
@@ -22,14 +22,42 @@ public class GLTexture : GLResource
     private const GLEnum               MaxSupportedAniso = (GLEnum)0x84FF;
     private const TextureParameterName TextureMaxAniso   = (TextureParameterName)0x84FE;
     private const float                AnisoRequest      = 8f;
-    
+
+    // Below this, a 4x4 BC1/BC3 block's fixed 8/16-byte cost isn't worth it — a handful of these
+    // exist already (ResourceSystem's 1x1 default-white fallback texture).
+    private const int MinCompressibleSize = 4;
+
     private static readonly List<GLTexture> Anisotropic = [];
     private static bool _anisoEnabled = true;
 
+    // GL_EXT_texture_compression_s3tc — checked once against the live context and cached, since
+    // it can't change mid-session. Every GLTexture instance shares one GL, so any instance's Gl
+    // is as good as any other's to query it from.
+    private static bool? _s3tcSupported;
+
     private float _maxAniso = 1f;   // driver-clamped per-texture ceiling (>= 1)
     public bool IsHdr { get; }
-    
-    public unsafe GLTexture(GL gl, TextureData data) : base(gl)
+
+    // True when this texture's data lives on the GPU as BC1 (opaque) or BC3 (alpha) rather than
+    // raw RGBA8 — see UploadCompressed and Docs/Documentation/TextureCompression.md.
+    public bool IsCompressed { get; private set; }
+
+    // Estimated GPU bytes this texture (base level + its full mip chain) occupies — GLTexture
+    // never queries the driver for actual allocation, so this is computed from the upload path
+    // itself: the exact encoded size for a compressed texture, or width*height*4 scaled by 4/3 to
+    // account for the ~33% a full RGBA8 mip chain adds on top of the base level for an
+    // uncompressed one. Good enough for the budget visibility StatsOverlay's "Textures" section
+    // shows — not a substitute for an actual driver query, which Silk.NET's GL binding has no
+    // portable way to make (glGetTexLevelParameteriv's *_COMPRESSED_IMAGE_SIZE query would work
+    // per-level, but summing a whole mip chain that way is a lot of round trips for a number this
+    // is only ever used to eyeball).
+    public long ApproxBytes { get; private set; }
+
+    public static long TotalApproxBytes         { get; private set; }
+    public static int  CompressedTextureCount   { get; private set; }
+    public static int  UncompressedTextureCount { get; private set; }
+
+    public unsafe GLTexture(GL gl, TextureData data, bool allowCompression = true) : base(gl)
     {
         Handle = Gl.GenTexture();
         Gl.BindTexture(TextureTarget.Texture2D, Handle);
@@ -42,6 +70,14 @@ public class GLTexture : GLResource
                     TextureTarget.Texture2D, 0, InternalFormat.Rgb16f,
                     (uint)data.Width, (uint)data.Height, 0,
                     PixelFormat.Rgb, PixelType.Float, p);
+
+            ApproxBytes = (long)data.Width * data.Height * 6; // RGB16F, no mip chain (see SetParameters)
+            SetParameters(hdr: true);
+        }
+        else if (allowCompression && data.Width >= MinCompressibleSize && data.Height >= MinCompressibleSize && S3tcSupported())
+        {
+            UploadCompressed(data);
+            SetParameters(hdr: false, skipGenerateMipmap: true);
         }
         else
         {
@@ -50,13 +86,16 @@ public class GLTexture : GLResource
                     TextureTarget.Texture2D, 0, InternalFormat.Rgba8,
                     (uint)data.Width, (uint)data.Height, 0,
                     PixelFormat.Rgba, PixelType.UnsignedByte, p);
+
+            ApproxBytes = (long)data.Width * data.Height * 4 * 4 / 3; // + ~1/3 more for GenerateMipmap's chain
+            SetParameters(hdr: false);
         }
 
-        SetParameters(IsHdr);
+        TrackCreated();
     }
-    
+
     public GLTexture(GL gl, string path) : this(gl, Decode(path)) { }
-    
+
     public static TextureData Decode(string path)
     {
         var fullPath = Path.GetFullPath(path);
@@ -76,7 +115,7 @@ public class GLTexture : GLResource
 
         return new TextureData { IsHdr = false, Width = image.Width, Height = image.Height, Ldr = pixels };
     }
-    
+
     // Merges a standalone greyscale opacity map into the albedo's alpha channel at load time —
     // most PBR/foliage texture packs ship opacity as its own file, and the cutout test
     // (shaderPBR.frag, ZPrepass, ShadowMapper) reads alpha straight off the albedo texture, so
@@ -119,9 +158,50 @@ public class GLTexture : GLResource
                 PixelFormat.Rgba, PixelType.UnsignedByte, d);
         }
 
+        ApproxBytes = (long)width * height * 4;
         SetParameters(hdr: false);
+        TrackCreated();
     }
-    
+
+    // Compresses the full LDR mip chain (BlockCompression.Compress — box-filter downsampled BC1
+    // for an opaque source, BC3 for one with any transparency) and uploads each level directly,
+    // since GPU-side glGenerateMipmap generally can't operate on compressed internal formats
+    // (they aren't framebuffer/colour-renderable, which mipmap generation relies on) — this is
+    // also why the caller passes skipGenerateMipmap: true to SetParameters afterward.
+    private unsafe void UploadCompressed(TextureData data)
+    {
+        var hasAlpha = BlockCompression.HasAlpha(data.Ldr);
+        var levels = BlockCompression.Compress(data.Ldr, data.Width, data.Height, hasAlpha);
+        var format = hasAlpha ? InternalFormat.CompressedRgbaS3TCDxt5Ext : InternalFormat.CompressedRgbS3TCDxt1Ext;
+
+        long totalBytes = 0;
+        for (var level = 0; level < levels.Count; level++)
+        {
+            var lvl = levels[level];
+            fixed (byte* p = lvl.Data)
+                Gl.CompressedTexImage2D(
+                    TextureTarget.Texture2D, level, format,
+                    (uint)lvl.Width, (uint)lvl.Height, 0,
+                    (uint)lvl.Data.Length, p);
+            totalBytes += lvl.Data.Length;
+        }
+
+        Gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMaxLevel, levels.Count - 1);
+
+        IsCompressed = true;
+        ApproxBytes  = totalBytes;
+    }
+
+    private bool S3tcSupported() => _s3tcSupported ??= Gl.IsExtensionPresent("GL_EXT_texture_compression_s3tc");
+
+    private void TrackCreated()
+    {
+        TotalApproxBytes += ApproxBytes;
+        if (IsHdr) return;
+        if (IsCompressed) CompressedTextureCount++;
+        else UncompressedTextureCount++;
+    }
+
     // Mipmap generation and bilinear/anisotropic filtering blend neighboring texels' RGB
     // independent of alpha (not alpha-weighted). For an alpha-tested cutout texture (foliage),
     // the "transparent" texels surrounding a leaf shape often carry leftover matte/background
@@ -143,7 +223,10 @@ public class GLTexture : GLResource
         }
     }
 
-    private void SetParameters(bool hdr)
+    // skipGenerateMipmap: true for a texture whose mip chain was already uploaded level-by-level
+    // (UploadCompressed) — calling GenerateMipmap on top of that would try to overwrite it (and
+    // likely silently no-op or fail outright on a compressed internal format regardless).
+    private void SetParameters(bool hdr, bool skipGenerateMipmap = false)
     {
         GLSampler.Set(Gl, TextureTarget.Texture2D,
             wrapS: GLEnum.Repeat,
@@ -154,11 +237,12 @@ public class GLTexture : GLResource
 
         if (!hdr)
         {
-            Gl.GenerateMipmap(TextureTarget.Texture2D);
-            
+            if (!skipGenerateMipmap)
+                Gl.GenerateMipmap(TextureTarget.Texture2D);
+
             Gl.GetFloat(MaxSupportedAniso, out float maxAniso);
             _maxAniso = Math.Max(1f, Math.Min(AnisoRequest, maxAniso));   // 1 = off, if unsupported
-            
+
             Gl.TexParameter(TextureTarget.Texture2D, TextureMaxAniso, _anisoEnabled ? _maxAniso : 1f);
             Anisotropic.Add(this);
         }
@@ -180,5 +264,10 @@ public class GLTexture : GLResource
     {
         Anisotropic.Remove(this);
         Gl.DeleteTexture(Handle);
+
+        TotalApproxBytes -= ApproxBytes;
+        if (IsHdr) return;
+        if (IsCompressed) CompressedTextureCount--;
+        else UncompressedTextureCount--;
     }
 }
