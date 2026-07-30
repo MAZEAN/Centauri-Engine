@@ -25,9 +25,20 @@ public static class ComponentFactory
 
             ["rigidBody"] = d => new RigidBody
             {
-                Kind  = d.String("kind", "dynamic")  == "static" ? BodyKind.Static  : BodyKind.Dynamic,
-                Shape = d.String("shape", "box")     == "sphere" ? BodyShape.Sphere : BodyShape.Box,
-                Mass  = d.Float("mass", 1f),
+                Kind = d.String("kind", "dynamic") switch
+                {
+                    "static"    => BodyKind.Static,
+                    "kinematic" => BodyKind.Kinematic,
+                    _           => BodyKind.Dynamic,
+                },
+                Shape = d.String("shape", "box") switch
+                {
+                    "sphere"  => BodyShape.Sphere,
+                    "capsule" => BodyShape.Capsule,
+                    _         => BodyShape.Box,
+                },
+                Mass     = d.Float("mass", 1f),
+                Friction = d.Float("friction", 1f),
             },
         };
 

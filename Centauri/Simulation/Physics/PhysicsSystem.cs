@@ -25,12 +25,19 @@ public sealed class PhysicsSystem : IDisposable
     private readonly BufferPool    _pool;
     private readonly Simulation    _simulation;
 
+    // Per-collidable friction, looked up by NarrowPhaseCallbacks on every contact — see
+    // PhysicsCallbacks.BodyMaterial and RigidBody.Friction. Constructed with the pool-only
+    // overload (before _simulation exists, so it can be handed to NarrowPhaseCallbacks ahead of
+    // Simulation.Create) and Initialize()'d against the live Simulation right after.
+    private readonly CollidableProperty<BodyMaterial> _materials;
+
     // Dynamic bodies only: statics never move, so once created they need no per-frame pose
     // read-back — _tracked is what StepFixed/Interpolate iterate.
-    private readonly Dictionary<RigidBody, BodyHandle>   _dynamics = new();
-    private readonly Dictionary<RigidBody, StaticHandle> _statics  = new();
-    private readonly Dictionary<RigidBody, TypedIndex>   _shapes   = new();
-    private readonly List<RigidBody>                     _tracked  = new();
+    private readonly Dictionary<RigidBody, BodyHandle>   _dynamics   = new();
+    private readonly Dictionary<RigidBody, BodyHandle>   _kinematics = new();
+    private readonly Dictionary<RigidBody, StaticHandle> _statics    = new();
+    private readonly Dictionary<RigidBody, TypedIndex>   _shapes     = new();
+    private readonly List<RigidBody>                     _tracked    = new();
 
     // Last entity known to own each currently-registered RigidBody. Sync() diffs this against the
     // entity's *current* GetComponent<RigidBody>() each frame to notice a component that was
@@ -51,11 +58,14 @@ public sealed class PhysicsSystem : IDisposable
         _config = config;
         _pool   = new BufferPool();
 
-        var narrow = new NarrowPhaseCallbacks(new SpringSettings(30, 1));
+        _materials = new CollidableProperty<BodyMaterial>(_pool);
+
+        var narrow = new NarrowPhaseCallbacks(new SpringSettings(30, 1), _materials);
         var pose   = new PoseIntegratorCallbacks(config.GravityVector);
         var solve  = new SolveDescription(config.SolverVelocityIterations, config.SolverSubsteps);
 
         _simulation = Simulation.Create(_pool, narrow, pose, solve);
+        _materials.Initialize(_simulation);
     }
 
     // Registers any entity that has picked up a RigidBody component since the last call, rebuilds
@@ -127,29 +137,42 @@ public sealed class PhysicsSystem : IDisposable
         halfExtents     = Vector3.Max(halfExtents, new Vector3(1e-3f)); // no degenerate colliders
         rb.CenterOffset = (bounds?.Center ?? Vector3.Zero) * scale;
 
-        // Sphere collapses to a single radius (the largest axis) — broadcast to all three so
+        // Sphere collapses to a single radius (the largest axis), broadcast to all three, so
         // DrawPhysicsColliders doesn't need to know which shape it's looking at to read this.
+        // Capsule and Box both keep the real per-axis half-extents — DrawPhysicsColliders derives
+        // a capsule's radius/length from them via RigidBody.CapsuleDimensions, the same call
+        // AddShape below uses, so the two can't silently disagree about what shape got built.
         rb.HalfExtents = rb.Shape == BodyShape.Sphere
-            ? new Vector3(MathF.Max(halfExtents.X, MathF.Max(halfExtents.Y, halfExtents.Z)))
+            ? new Vector3(SphereRadius(halfExtents))
             : halfExtents;
 
         var bodyPosition    = transform.Position + Vector3.Transform(rb.CenterOffset, transform.Rotation);
         var bodyOrientation = transform.Rotation;
 
-        var shapeIndex = rb.Shape == BodyShape.Sphere
-            ? _simulation.Shapes.Add(new Sphere(MathF.Max(halfExtents.X, MathF.Max(halfExtents.Y, halfExtents.Z))))
-            : _simulation.Shapes.Add(new Box(halfExtents.X * 2f, halfExtents.Y * 2f, halfExtents.Z * 2f));
+        var shapeIndex = AddShape(halfExtents, rb.Shape);
         _shapes[rb] = shapeIndex;
+
+        CollidableReference collidable;
 
         if (rb.Kind == BodyKind.Static)
         {
-            _statics[rb] = _simulation.Statics.Add(new StaticDescription(bodyPosition, bodyOrientation, shapeIndex));
+            var handle = _simulation.Statics.Add(new StaticDescription(bodyPosition, bodyOrientation, shapeIndex));
+            _statics[rb] = handle;
+            collidable = new CollidableReference(handle);
+        }
+        else if (rb.Kind == BodyKind.Kinematic)
+        {
+            var handle = _simulation.Bodies.Add(BodyDescription.CreateKinematic(
+                new RigidPose(bodyPosition, bodyOrientation),
+                new CollidableDescription(shapeIndex, 0.1f),
+                new BodyActivityDescription(0.01f)));
+
+            _kinematics[rb] = handle;
+            collidable = new CollidableReference(CollidableMobility.Kinematic, handle);
         }
         else
         {
-            var inertia = rb.Shape == BodyShape.Sphere
-                ? new Sphere(MathF.Max(halfExtents.X, MathF.Max(halfExtents.Y, halfExtents.Z))).ComputeInertia(rb.Mass)
-                : new Box(halfExtents.X * 2f, halfExtents.Y * 2f, halfExtents.Z * 2f).ComputeInertia(rb.Mass);
+            var inertia = ComputeInertia(halfExtents, rb.Shape, rb.Mass);
 
             var handle = _simulation.Bodies.Add(BodyDescription.CreateDynamic(
                 new RigidPose(bodyPosition, bodyOrientation),
@@ -159,7 +182,10 @@ public sealed class PhysicsSystem : IDisposable
 
             _dynamics[rb] = handle;
             _tracked.Add(rb);
+            collidable = new CollidableReference(CollidableMobility.Dynamic, handle);
         }
+
+        _materials[collidable] = new BodyMaterial { Friction = rb.Friction };
 
         // Seed both interpolation poses to the current Transform so the first rendered frame doesn't
         // lerp from an identity pose.
@@ -167,6 +193,29 @@ public sealed class PhysicsSystem : IDisposable
         rb.PrevRotation = rb.CurrRotation = transform.Rotation;
         rb.Registered   = true;
         rb.Dirty        = false;
+    }
+
+    private TypedIndex AddShape(Vector3 halfExtents, BodyShape shape) => shape switch
+    {
+        BodyShape.Sphere  => _simulation.Shapes.Add(new Sphere(SphereRadius(halfExtents))),
+        BodyShape.Capsule => _simulation.Shapes.Add(CapsuleShape(halfExtents)),
+        _                 => _simulation.Shapes.Add(new Box(halfExtents.X * 2f, halfExtents.Y * 2f, halfExtents.Z * 2f)),
+    };
+
+    private static BodyInertia ComputeInertia(Vector3 halfExtents, BodyShape shape, float mass) => shape switch
+    {
+        BodyShape.Sphere  => new Sphere(SphereRadius(halfExtents)).ComputeInertia(mass),
+        BodyShape.Capsule => CapsuleShape(halfExtents).ComputeInertia(mass),
+        _                 => new Box(halfExtents.X * 2f, halfExtents.Y * 2f, halfExtents.Z * 2f).ComputeInertia(mass),
+    };
+
+    private static float SphereRadius(Vector3 halfExtents) =>
+        MathF.Max(halfExtents.X, MathF.Max(halfExtents.Y, halfExtents.Z));
+
+    private static Capsule CapsuleShape(Vector3 halfExtents)
+    {
+        var (radius, length) = RigidBody.CapsuleDimensions(halfExtents);
+        return new Capsule(radius, length);
     }
 
     // Releases whatever BEPU state a registered RigidBody currently owns — body/static handle plus
@@ -179,6 +228,10 @@ public sealed class PhysicsSystem : IDisposable
         {
             _simulation.Bodies.Remove(bodyHandle);
             _tracked.Remove(rb);
+        }
+        else if (_kinematics.Remove(rb, out var kinematicHandle))
+        {
+            _simulation.Bodies.Remove(kinematicHandle);
         }
         else if (_statics.Remove(rb, out var staticHandle))
         {
@@ -204,6 +257,8 @@ public sealed class PhysicsSystem : IDisposable
             rb.PrevRotation = rb.CurrRotation;
         }
 
+        PushKinematics(dt);
+
         var sw = Stopwatch.StartNew();
         _simulation.Timestep(dt);
         LastStepMs = (float)sw.Elapsed.TotalMilliseconds;
@@ -222,6 +277,47 @@ public sealed class PhysicsSystem : IDisposable
             rb.LinearVelocity     = linearVelocity;
             rb.AngularVelocity    = body.Velocity.Angular;
         }
+    }
+
+    // The reverse data flow of a dynamic body: a Kinematic RigidBody's Transform is the source of
+    // truth (moved by whatever's driving it — today, only a live inspector/gizmo edit; a future
+    // animation/script system would be the same shape), so before each step this writes the
+    // Transform's current pose straight into the BEPU body, plus a velocity derived from how far
+    // it moved since last step. The velocity matters as much as the pose: a body that's merely
+    // teleported to a new position every step still collides correctly (speculative contacts catch
+    // it), but contact *response* — how hard a dynamic body gets pushed — comes from the
+    // kinematic's velocity, not its position alone. Without this, a "moving platform" would shove
+    // things through walls instead of carrying them smoothly.
+    private void PushKinematics(float dt)
+    {
+        foreach (var (rb, handle) in _kinematics)
+        {
+            var t = rb.Owner.Transform;
+            var newPosition    = t.Position + Vector3.Transform(rb.CenterOffset, t.Rotation);
+            var newOrientation = t.Rotation;
+
+            var body = _simulation.Bodies[handle];
+            var oldPosition    = body.Pose.Position;
+            var oldOrientation = body.Pose.Orientation;
+
+            body.Pose.Position    = newPosition;
+            body.Pose.Orientation = newOrientation;
+            body.Velocity.Linear  = (newPosition - oldPosition) / dt;
+            body.Velocity.Angular = AngularVelocityFromDelta(oldOrientation, newOrientation, dt);
+        }
+    }
+
+    // Standard small-angle finite-difference estimate: the rotation from oldRotation to
+    // newRotation, expressed as an angular-velocity vector. Takes the shorter of the two
+    // equivalent quaternion paths (q and -q represent the same rotation) so a delta near 180°
+    // doesn't get read as spinning the long way around. Accurate for the sub-frame rotation a
+    // fixed 60Hz-stepped kinematic body actually produces; not a substitute for true angular
+    // velocity integration over a large single step.
+    internal static Vector3 AngularVelocityFromDelta(Quaternion oldRotation, Quaternion newRotation, float dt)
+    {
+        var delta = newRotation * Quaternion.Inverse(oldRotation);
+        if (delta.W < 0f) delta = -delta;
+        return new Vector3(delta.X, delta.Y, delta.Z) * (2f / dt);
     }
 
     // Writes each dynamic body's pose into its Transform, blended by alpha in [0,1] between the last

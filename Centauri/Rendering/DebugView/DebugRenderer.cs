@@ -98,11 +98,12 @@ public sealed class DebugRenderer : IDisposable
         }
     }
     
-    // Wireframe box/sphere per registered RigidBody (magenta = Dynamic, blue = Static — see
-    // ColorPalette), plus a yellow arrow for a Dynamic body's current LinearVelocity, scaled by
-    // VelocityVectorScale. The collider shape mirrors PhysicsSystem.Register's own
-    // HalfExtents/CenterOffset math exactly (that's where those fields are written), so this
-    // always draws what the simulation is actually colliding against, not an approximation of it.
+    // Wireframe box/sphere/capsule per registered RigidBody (magenta = Dynamic, blue = Static,
+    // green = Kinematic — see ColorPalette), plus a yellow arrow for a Dynamic body's current
+    // LinearVelocity, scaled by VelocityVectorScale. The collider shape mirrors
+    // PhysicsSystem.Register's own HalfExtents/CenterOffset math exactly (that's where those
+    // fields are written), so this always draws what the simulation is actually colliding
+    // against, not an approximation of it.
     public void DrawPhysicsColliders(Scene scene)
     {
         AssertActive();
@@ -115,19 +116,30 @@ public sealed class DebugRenderer : IDisposable
 
             var t      = entity.Transform;
             var center = t.Position + Vector3.Transform(rb.CenterOffset, t.Rotation);
-            var color  = rb.Kind == BodyKind.Static ? ColorPalette.PhysicsStatic : ColorPalette.PhysicsDynamic;
+            var color  = rb.Kind switch
+            {
+                BodyKind.Static    => ColorPalette.PhysicsStatic,
+                BodyKind.Kinematic => ColorPalette.PhysicsKinematic,
+                _                  => ColorPalette.PhysicsDynamic,
+            };
 
             _draw.Color(color);
-            if (rb.Shape == BodyShape.Sphere)
+            switch (rb.Shape)
             {
-                _draw.Model(Matrix4x4.CreateTranslation(center));
-                _draw.Lines(Shapes.SphereEdges(rb.HalfExtents.X));
-            }
-            else
-            {
-                _draw.Model(Matrix4x4.CreateFromQuaternion(t.Rotation) * Matrix4x4.CreateTranslation(center));
-                new BoundingBox(-rb.HalfExtents, rb.HalfExtents).GetBoxCorners(corners);
-                _draw.Lines(Shapes.BoxEdges(corners));
+                case BodyShape.Sphere:
+                    _draw.Model(Matrix4x4.CreateTranslation(center));
+                    _draw.Lines(Shapes.SphereEdges(rb.HalfExtents.X));
+                    break;
+                case BodyShape.Capsule:
+                    var (radius, length) = RigidBody.CapsuleDimensions(rb.HalfExtents);
+                    _draw.Model(Matrix4x4.CreateFromQuaternion(t.Rotation) * Matrix4x4.CreateTranslation(center));
+                    _draw.Lines(Shapes.CapsuleEdges(radius, length / 2f));
+                    break;
+                default:
+                    _draw.Model(Matrix4x4.CreateFromQuaternion(t.Rotation) * Matrix4x4.CreateTranslation(center));
+                    new BoundingBox(-rb.HalfExtents, rb.HalfExtents).GetBoxCorners(corners);
+                    _draw.Lines(Shapes.BoxEdges(corners));
+                    break;
             }
 
             if (rb.Kind != BodyKind.Dynamic || rb.LinearVelocity.LengthSquared() < 1e-6f) continue;

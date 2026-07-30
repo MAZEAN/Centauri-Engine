@@ -58,6 +58,63 @@ internal static class Shapes
         return v;
     }
 
+    // Local-space, unrotated (like SphereEdges — caller translates+rotates a Model matrix to the
+    // collider's world pose): two horizontal rings at the cylinder's ±halfLength ends, four
+    // straight lines connecting them (the cylinder's silhouette), and two half-circles per end
+    // (in the XY and ZY planes) sketching the hemispherical caps. Not a full 3D capsule mesh —
+    // same "wireframe good enough to read the shape from any angle" bar SphereEdges/BoxEdges set,
+    // not a render-quality approximation.
+    public static float[] CapsuleEdges(float radius, float halfLength, int segments = 16)
+    {
+        var lines = new List<float>();
+
+        void Line(Vector3 a, Vector3 b)
+        {
+            lines.Add(a.X); lines.Add(a.Y); lines.Add(a.Z);
+            lines.Add(b.X); lines.Add(b.Y); lines.Add(b.Z);
+        }
+
+        void Ring(float y)
+        {
+            for (var s = 0; s < segments; s++)
+            {
+                var a0 = MathF.Tau * s       / segments;
+                var a1 = MathF.Tau * (s + 1) / segments;
+                Line(new Vector3(MathF.Cos(a0) * radius, y, MathF.Sin(a0) * radius),
+                     new Vector3(MathF.Cos(a1) * radius, y, MathF.Sin(a1) * radius));
+            }
+        }
+
+        // Half-circle from angle 0 to π in the given plane, centred at (0, ±halfLength, 0) so it
+        // caps the cylinder's end rather than passing back through its middle.
+        void HalfCircle(float capY, float sign, Func<float, Vector3> point)
+        {
+            for (var s = 0; s < segments; s++)
+            {
+                var a0 = MathF.PI * s       / segments;
+                var a1 = MathF.PI * (s + 1) / segments;
+                var p0 = point(a0);
+                var p1 = point(a1);
+                Line(new Vector3(p0.X, capY + sign * p0.Y, p0.Z), new Vector3(p1.X, capY + sign * p1.Y, p1.Z));
+            }
+        }
+
+        Ring(halfLength);
+        Ring(-halfLength);
+
+        Line(new Vector3(radius, halfLength, 0f),  new Vector3(radius, -halfLength, 0f));
+        Line(new Vector3(-radius, halfLength, 0f), new Vector3(-radius, -halfLength, 0f));
+        Line(new Vector3(0f, halfLength, radius),  new Vector3(0f, -halfLength, radius));
+        Line(new Vector3(0f, halfLength, -radius), new Vector3(0f, -halfLength, -radius));
+
+        HalfCircle(halfLength, 1f, a => new Vector3(MathF.Cos(a) * radius, MathF.Sin(a) * radius, 0f));
+        HalfCircle(halfLength, 1f, a => new Vector3(0f, MathF.Sin(a) * radius, MathF.Cos(a) * radius));
+        HalfCircle(-halfLength, -1f, a => new Vector3(MathF.Cos(a) * radius, MathF.Sin(a) * radius, 0f));
+        HalfCircle(-halfLength, -1f, a => new Vector3(0f, MathF.Sin(a) * radius, MathF.Cos(a) * radius));
+
+        return lines.ToArray();
+    }
+
     private static float[] Expand(ReadOnlySpan<Vector3> corners, int[] indices)
     {
         var v = new float[indices.Length * 3];

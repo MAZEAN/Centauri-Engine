@@ -9,21 +9,36 @@ using BepuPhysics.CollisionDetection;
 using BepuPhysics.Constraints;
 using BepuUtilities;
 
+// Per-collidable contact material — RigidBody.Friction copied into a BEPU
+// CollidableProperty<BodyMaterial> (PhysicsSystem._materials), indexed by handle so
+// NarrowPhaseCallbacks can look up each side of a contact without needing to walk back to the
+// owning Entity/RigidBody. Friction-only — see RigidBody.Friction's own comment for why there's
+// no Bounciness/restitution field alongside it.
+internal struct BodyMaterial
+{
+    public float Friction;
+}
+
 // Narrow-phase callbacks decide which collidable pairs generate contacts and with what material.
-// This is the minimal general-purpose implementation from the BEPU demos: every pair involving a
-// dynamic body collides, with a single shared friction/bounce material. Tuning per-material
-// behaviour would happen here later, keyed off CollidableReference.
+// Spring/recovery-velocity tuning is still a single shared default (from the BEPU demos' minimal
+// general-purpose setup, unchanged); friction is now looked up per pair from Materials and
+// combined — see ConfigureContactManifold.
 internal struct NarrowPhaseCallbacks : INarrowPhaseCallbacks
 {
     public SpringSettings ContactSpringiness;
     public float MaximumRecoveryVelocity;
-    public float FrictionCoefficient;
 
-    public NarrowPhaseCallbacks(SpringSettings contactSpringiness, float maximumRecoveryVelocity = 2f, float frictionCoefficient = 1f)
+    // Set by PhysicsSystem before Simulation.Create and Initialize()'d against the live Simulation
+    // right after — a class (reference type), so mutating it through this struct's copy still
+    // reaches the same instance the simulation holds internally. Null only in the brief window
+    // before PhysicsSystem finishes constructing (never during real contact processing).
+    public CollidableProperty<BodyMaterial>? Materials;
+
+    public NarrowPhaseCallbacks(SpringSettings contactSpringiness, CollidableProperty<BodyMaterial> materials, float maximumRecoveryVelocity = 2f)
     {
         ContactSpringiness      = contactSpringiness;
         MaximumRecoveryVelocity = maximumRecoveryVelocity;
-        FrictionCoefficient     = frictionCoefficient;
+        Materials               = materials;
     }
 
     public void Initialize(Simulation simulation)
@@ -33,7 +48,6 @@ internal struct NarrowPhaseCallbacks : INarrowPhaseCallbacks
         {
             ContactSpringiness      = new SpringSettings(30, 1);
             MaximumRecoveryVelocity = 2f;
-            FrictionCoefficient     = 1f;
         }
     }
 
@@ -49,7 +63,14 @@ internal struct NarrowPhaseCallbacks : INarrowPhaseCallbacks
     public readonly bool ConfigureContactManifold<TManifold>(int workerIndex, CollidablePair pair, ref TManifold manifold, out PairMaterialProperties pairMaterial)
         where TManifold : unmanaged, IContactManifold<TManifold>
     {
-        pairMaterial.FrictionCoefficient     = FrictionCoefficient;
+        ref var a = ref Materials![pair.A];
+        ref var b = ref Materials[pair.B];
+
+        // Geometric mean (standard combine rule — two low-friction surfaces should stay low, not
+        // average toward a medium one).
+        var friction = MathF.Sqrt(MathF.Max(a.Friction, 0f) * MathF.Max(b.Friction, 0f));
+
+        pairMaterial.FrictionCoefficient     = friction;
         pairMaterial.MaximumRecoveryVelocity = MaximumRecoveryVelocity;
         pairMaterial.SpringSettings          = ContactSpringiness;
         return true;

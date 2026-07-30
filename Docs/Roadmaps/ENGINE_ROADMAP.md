@@ -185,10 +185,23 @@ up once content count grows.
   distance) drives the tier switch, with mandatory hysteresis (a correctness requirement, not
   polish — without it the tier flickers every frame near the threshold). A phased implementation
   order is proposed in the doc's closing section for whenever this is picked up.
-- [ ] **Physics: more collider shapes (capsule at minimum, mesh colliders for statics), kinematic
-  bodies, per-material friction/restitution.** The current box/sphere-only, dynamic/static-only
-  scope was intentionally minimal for a first pass (see `Docs/Documentation/PhysicsEngine.md`);
-  this is the natural next slice, not new scope.
+- [x] **Physics: more collider shapes (capsule at minimum, mesh colliders for statics), kinematic
+  bodies, per-material friction/restitution.** — **partially done**. Capsule shape (`BodyShape.Capsule`,
+  `RigidBody.CapsuleDimensions` — radius from the larger X/Z half-extent, cylinder length fills the
+  rest of the Y extent), `BodyKind.Kinematic` (Transform-driven, pushes `Dynamic` bodies via a real
+  contact-response velocity BEPU reads, not just a teleport — `PhysicsSystem.PushKinematics`), and
+  per-body `Friction` (geometrically combined per contact via `CollidableProperty<BodyMaterial>`,
+  replacing the old single engine-wide coefficient) all shipped, with debug-draw wireframes/colors,
+  full editor/persistence round-trip, and both unit tests (`Centauri.Tests/Simulation/
+  RigidBodyShapeTests.cs`) and standalone-harness simulation verification. See
+  `Docs/Documentation/PhysicsEngine.md` §5–§8 for the writeup. Two pieces of the original scope are
+  still deferred: **mesh colliders for statics** (BEPU's `Mesh` collidable exists and would work, but
+  needs CPU-side triangle data `Mesh.cs`/`Model.cs` don't retain after GPU upload — real follow-up
+  plumbing, not attempted this round) and **restitution/bounciness** (attempted, then reverted after
+  empirical testing proved BEPU2's spring-damper contact model has no elastic-collision coefficient to
+  map a "bounciness" onto — a dropped ball showed zero rebound at any setting; a real implementation
+  needs a contact-event callback this codebase doesn't have — see `PhysicsEngine.md` §5 for the full
+  investigation).
 
 **Exit criteria:** a scene with meaningfully more content (tens-to-hundreds of instances, several
 texture sets) doesn't degrade VRAM or physics behavior in ways that require manual workarounds.

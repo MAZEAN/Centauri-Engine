@@ -266,9 +266,20 @@ public class EntitySetLoader
         def.Enabled = rb.Enabled;
         def.Params = new Dictionary<string, JsonElement>
         {
-            ["kind"]  = JsonSerializer.SerializeToElement(rb.Kind  == BodyKind.Static  ? "static"  : "dynamic"),
-            ["shape"] = JsonSerializer.SerializeToElement(rb.Shape == BodyShape.Sphere ? "sphere"  : "box"),
-            ["mass"]  = JsonSerializer.SerializeToElement(rb.Mass),
+            ["kind"]       = JsonSerializer.SerializeToElement(rb.Kind switch
+            {
+                BodyKind.Static    => "static",
+                BodyKind.Kinematic => "kinematic",
+                _                  => "dynamic",
+            }),
+            ["shape"]      = JsonSerializer.SerializeToElement(rb.Shape switch
+            {
+                BodyShape.Sphere  => "sphere",
+                BodyShape.Capsule => "capsule",
+                _                 => "box",
+            }),
+            ["mass"]     = JsonSerializer.SerializeToElement(rb.Mass),
+            ["friction"] = JsonSerializer.SerializeToElement(rb.Friction),
         };
 
         if (existing is null) components.Add(def);

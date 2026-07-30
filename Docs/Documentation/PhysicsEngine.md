@@ -53,11 +53,12 @@ The fields map 1:1 onto `Config/Settings/PhysicsConfig.cs`.
 ### From the editor
 
 Select an entity and open the Inspector's **Physics** section. The "Body" dropdown attaches
-(`Dynamic`/`Static`) or detaches (`None`) a `RigidBody`; once attached, "Shape" (`Box`/`Sphere`) and
-— for `Dynamic` bodies — "Mass" are editable. Any change after the initial attach calls
-`RigidBody.MarkDirty()`, so `PhysicsSystem` tears down and rebuilds the underlying BEPU body/shape on
-its next `Sync()` instead of silently keeping the stale one. Edits persist through Ctrl+S like any
-other authored property (see "Scene loading" in `CLAUDE.md`) — see §3.2 below for the on-disk shape.
+(`Dynamic`/`Kinematic`/`Static`) or detaches (`None`) a `RigidBody`; once attached, "Shape"
+(`Box`/`Sphere`/`Capsule`), "Friction", and — for `Dynamic` bodies only — "Mass" are editable. Any
+change after the initial attach calls `RigidBody.MarkDirty()`, so `PhysicsSystem` tears down and
+rebuilds the underlying BEPU body/shape on its next `Sync()` instead of silently keeping the stale
+one. Edits persist through Ctrl+S like any other authored property (see "Scene loading" in
+`CLAUDE.md`) — see §3.2 below for the on-disk shape.
 
 ### From code
 
@@ -71,13 +72,24 @@ using Centauri.Simulation.Physics;
 entity.AddComponent(new RigidBody { Kind = BodyKind.Dynamic, Shape = BodyShape.Box, Mass = 5f });
 
 // Immovable world geometry (floor, wall) — never moves, collides with dynamics:
-ground.AddComponent(new RigidBody { Kind = BodyKind.Static, Shape = BodyShape.Box });
+ground.AddComponent(new RigidBody { Kind = BodyKind.Static, Shape = BodyShape.Box, Friction = 1.2f });
+
+// A moving platform — its own motion (driven by whatever moves its Transform: today, a live
+// inspector/gizmo edit; a future animation/script system would be the same shape) pushes dynamic
+// bodies it collides with, but nothing (gravity, contacts) moves *it*:
+platform.AddComponent(new RigidBody { Kind = BodyKind.Kinematic, Shape = BodyShape.Box });
 ```
 
-- `Kind` — `Dynamic` (moved by the sim; its pose is written back to the `Transform` every frame) or
-  `Static` (fixed collider).
-- `Shape` — `Box` (oriented box from the bounds) or `Sphere` (radius = largest bounds half-extent).
+- `Kind` — `Dynamic` (moved by the sim; its pose is written back to the `Transform` every frame),
+  `Kinematic` (never moved by the sim, but its own Transform-driven motion pushes `Dynamic` bodies —
+  see §4), or `Static` (fixed collider, never moves at all).
+- `Shape` — `Box` (oriented box from the bounds), `Sphere` (radius = largest bounds half-extent), or
+  `Capsule` (Y-axis capsule — radius from the largest X/Z half-extent, cylinder length fills the rest
+  of the Y extent; see `RigidBody.CapsuleDimensions`).
 - `Mass` — kg, dynamic only. Inertia is computed from mass + shape.
+- `Friction` — Coulomb coefficient, every `Kind` (a `Static` floor's surface matters as much as a
+  `Dynamic` crate's). Two bodies' `Friction` values combine geometrically (`sqrt(a*b)`) on contact —
+  see §5. No `Bounciness`/restitution field — see §5 for why.
 
 `PhysicsSystem.Sync()` runs each frame and registers any entity that has gained a `RigidBody` since
 the last frame, so components added at runtime "just work" — no manual registration call. It also
@@ -96,13 +108,14 @@ already uses (`EntityDefinition.Components`, see `ComponentFactory`) — no sche
   "model": "Assets/Objects/Crate.model",
   "position": [0, 5, 0],
   "components": [
-    { "type": "rigidBody", "kind": "dynamic", "shape": "box", "mass": 5.0 }
+    { "type": "rigidBody", "kind": "dynamic", "shape": "box", "mass": 5.0, "friction": 0.8 }
   ]
 }
 ```
 
-`kind` is `"dynamic"` (default) or `"static"`; `shape` is `"box"` (default) or `"sphere"`; `mass`
-defaults to `1.0` and is ignored for static bodies.
+`kind` is `"dynamic"` (default), `"kinematic"`, or `"static"`; `shape` is `"box"` (default),
+`"sphere"`, or `"capsule"`; `mass` defaults to `1.0` and is ignored for non-dynamic bodies;
+`friction` defaults to `1.0` and applies to every kind.
 
 ## 4. How the fixed timestep works
 
@@ -123,7 +136,64 @@ BEPU is stepped **single-threaded** (`Timestep(dt)` with no `IThreadDispatcher`)
 dependency-free. Scenes here are small; a thread dispatcher is the drop-in upgrade if body counts
 ever make the step the bottleneck (and pairs naturally with the GL 4.3 work).
 
-## 5. Inspecting physics at runtime
+### Kinematic bodies: the reverse data flow
+
+A `Dynamic` body's pose flows BEPU → `Transform` (step 3 above). A `Kinematic` body's flows the
+other way: before `Simulation.Timestep()` runs, `PhysicsSystem.PushKinematics` writes the *current*
+`Transform` position/rotation straight into the BEPU body, plus a velocity derived from how far it
+moved since the last fixed step (`PhysicsSystem.AngularVelocityFromDelta` for the rotational part —
+a standard small-angle finite-difference estimate, unit-tested directly in
+`Centauri.Tests/Simulation/RigidBodyShapeTests.cs`). The velocity matters as much as the position: a
+body merely teleported to a new spot every step still collides correctly (BEPU's speculative
+contacts catch it), but contact *response* — how hard a `Dynamic` body gets pushed — comes from the
+kinematic's velocity, not its position alone. Skip the velocity and a "moving platform" would shove
+things through walls instead of carrying them smoothly.
+
+Nothing in this codebase moves a `Kinematic` body's `Transform` automatically yet — today that's a
+live inspector/gizmo edit; a future animation/script system would plug into exactly the same place
+(anything that sets `Transform.Position`/`Rotation` on a `Kinematic`-`RigidBody` entity before the
+next fixed step gets picked up). `Kinematic` bodies are never added to `PhysicsSystem`'s
+interpolation-tracked set (`_tracked`, `Dynamic`-only) — their `Transform` is the source of truth
+already, so there's nothing to interpolate back into it.
+
+## 5. Per-body friction (and why there's no restitution)
+
+Every `RigidBody` (§3) carries a `Friction` float — a standard Coulomb coefficient, defaulting to
+`1f` (BEPU's own general-purpose default), applying to `Dynamic`/`Kinematic`/`Static` alike since
+friction is a property of the *surface*, not of whether the simulation happens to move that body.
+`PhysicsSystem.Register` copies each body's `Friction` into a `CollidableProperty<BodyMaterial>`
+(`_materials`, `Simulation/Physics/PhysicsCallbacks.cs`) indexed by the BEPU `CollidableReference` —
+a handle-indexed side table, not a field on the shape itself, so it works uniformly across
+dynamic/kinematic/static collidables without needing three separate lookup paths. On every contact,
+`NarrowPhaseCallbacks.ConfigureContactManifold` looks up both sides' `BodyMaterial` and combines them
+geometrically — `sqrt(a * b)` — before handing the result to BEPU's solver as that contact's
+`PairMaterialProperties.FrictionCoefficient`. The geometric mean is the standard combine rule for
+exactly this reason: two low-friction surfaces (ice on ice) should stay low, not average toward
+something misleadingly medium the way an arithmetic mean would.
+
+Verified with the standalone harness (§7): under an identical constant sideways driving force, a
+`Friction = 0.02` box slides ~35 world units over 5 seconds while a `Friction = 3` box slides less
+than 1 — the same setup, only the coefficient changed.
+
+### Why there's no restitution/bounciness field
+
+This was attempted and reverted. BEPU2 has no native restitution concept at all — there's no
+`Restitution`, `ContactEvent`, or `IContactEventHandler` anywhere in the package (confirmed by
+searching its XML docs). Its contact model resolves penetration through a stiffness/damping spring
+(`SpringSettings`: frequency + damping ratio), not an elastic-collision coefficient — that spring
+controls how firmly overlapping bodies get pushed apart, not how much velocity survives a bounce.
+
+The first pass mapped a 0-1 `Bounciness` field onto that spring's damping ratio, on the theory that a
+looser (lower-damping) spring might visibly overshoot and rebound. It doesn't: a ball dropped from
+`y = 5` onto a static ground settled to rest at `y ≈ 1.0` with **zero** visible bounce, identically at
+`Bounciness = 0` and `Bounciness = 1` (damping ratio floored at `0.02`, the lowest BEPU tolerates). A
+real implementation needs a contact-event callback that manually reflects each contacting body's
+velocity along the contact normal *after* the solver runs — infrastructure this codebase doesn't have
+yet (`IContactEventHandler` or equivalent manual post-step velocity patch). Shipping a `Bounciness`
+slider that visibly does nothing would violate this project's own bar for finished work, so it was
+pulled rather than left in half-working — see §8 for the follow-up.
+
+## 6. Inspecting physics at runtime
 
 ### Stats Overlay
 
@@ -147,15 +217,18 @@ landing impact shows up as a large transient spike the step it happens.
 ### Viewport collider visualization
 
 Viewport section → **Physics Colliders** (`debug.showPhysicsColliders`, off by default) draws a
-wireframe box or sphere over every registered `RigidBody`, sized and oriented exactly as
-`PhysicsSystem.Register` actually built it (magenta = `Dynamic`, blue = `Static`), plus a yellow
-arrow along a `Dynamic` body's current `LinearVelocity`. Lives in `DebugRenderer.DrawPhysicsColliders`
-alongside the existing AABB/culling-grid/frustum overlays — same on/off toggle pattern, same
-immediate-mode line drawer (`Draw`/`Shapes`). Useful for confirming a collider actually matches the
-visual mesh (a Sphere shape on a long thin model, for instance, is easy to get wrong silently — see
-§7's "no collider-size feedback" note this closes).
+wireframe box, sphere, or capsule (`Shapes.CapsuleEdges` — two end rings, four silhouette lines, and
+half-circle arcs sketching the hemispherical caps; see `RigidBody.CapsuleDimensions` for the
+radius/length it's built from) over every registered `RigidBody`, sized and oriented exactly as
+`PhysicsSystem.Register` actually built it — magenta = `Dynamic`, blue = `Static`, green =
+`Kinematic` (see `ColorPalette`) — plus a yellow arrow along a `Dynamic` body's current
+`LinearVelocity`. Lives in `DebugRenderer.DrawPhysicsColliders` alongside the existing
+AABB/culling-grid/frustum overlays — same on/off toggle pattern, same immediate-mode line drawer
+(`Draw`/`Shapes`). Useful for confirming a collider actually matches the visual mesh (a Sphere shape
+on a long thin model, for instance, is easy to get wrong silently — see §8's "no collider-size
+feedback" note this closes).
 
-## 6. Verify it
+## 7. Verify it
 
 There's no in-engine test project, but the standalone-harness pattern from `CLAUDE.md` exercises the
 whole path with no GL context — a console app referencing `Centauri.csproj`. llvmpipe headless
@@ -164,40 +237,60 @@ rendering is not needed for any of this since physics is pure CPU; only the last
 Covered so far:
 
 - A dynamic box dropped from `y = 10` onto a static ground (surface at `y = 0.5`) falls and comes to
-  rest at `restY ≈ 1.0` for a 1 m box.
-- Editing a registered body's `Kind` (`Dynamic` → `Static`) and calling `MarkDirty()` actually
-  rebuilds it: the body freezes in place on the next `Sync()` instead of continuing to fall.
+  rest at `restY ≈ 1.0` for a 1 m box; a `Capsule`-shaped body with the same (default, modelless)
+  half-extents degenerates to a sphere (`radius = 0.5`, cylinder `length = 0`) and rests at the same
+  `y ≈ 1.0`, confirming `RigidBody.CapsuleDimensions` and `PhysicsSystem`'s capsule shape-building
+  agree with each other.
+- A `Kinematic` platform driven 3 world units across 2 seconds of fixed steps correctly pushes a
+  `Dynamic` box out of its path via real contact response (not a teleport-through) — confirms
+  `PhysicsSystem.PushKinematics`'s velocity derivation (§4), not just its position write.
+- Editing a registered body's `Kind` (`Dynamic` → `Kinematic`, and `Dynamic` → `Static`) and calling
+  `MarkDirty()` actually rebuilds it: a falling `Dynamic` body switched to `Kinematic` stops
+  responding to gravity on the very next `Sync()` and holds its `Transform`-driven position across 60
+  further fixed steps, rather than the stale `Dynamic` body silently continuing to fall.
+- Under an identical constant sideways driving force, a `Friction = 0.02` box slides roughly 35 world
+  units over 5 seconds of fixed steps while a `Friction = 3` box slides less than 1 — confirms §5's
+  per-body combine rule produces a real, dramatic difference, not just a wired-up no-op field.
 - `Entity.RemoveComponent<RigidBody>()` stops a body from being simulated and doesn't throw on
   subsequent `SimulationSystem.Update` calls.
 - Deleting the owning `Entity` from the `Scene` entirely (not just detaching the component) doesn't
   leak a BEPU handle or crash later steps — `PurgeOrphaned` catches it.
 - Round-tripping a `{ "type": "rigidBody", ... }` `ComponentDefinition` through `ComponentFactory`
-  produces a `RigidBody` with the expected `Kind`/`Shape`/`Mass`.
+  produces a `RigidBody` with the expected `Kind`/`Shape`/`Mass`/`Friction` — including
+  `kind: "kinematic"` and `shape: "capsule"`, not just the pre-existing dynamic/box/sphere cases.
 - The full engine still boots and shuts down cleanly headless (`CENTAURI_HEADLESS_FRAMES`) with
   `physics.enabled = true` and the inspector's Physics section compiled in.
 - Mid-fall, `LinearVelocity.Y` is substantially negative and `LinearAcceleration.Y` sits near the
-  configured gravity (`-9.81`); at rest, `LinearVelocity` decays back to ~0 — confirms §5's Inspector
+  configured gravity (`-9.81`); at rest, `LinearVelocity` decays back to ~0 — confirms §6's Inspector
   readout isn't just wired up but actually tracks real simulated motion.
 - `SimulationSystem.PhysicsDynamicBodies`/`PhysicsStaticBodies` match the bodies actually registered.
 - A modelless entity-set scene (`components: [{ "type": "rigidBody", ... }]`, no `"model"`) with
-  `debug.showPhysicsColliders = true` runs 90 headless frames without crashing, and the captured
-  screenshot shows correctly-shaped box/sphere wireframes at the falling bodies' live positions —
-  confirms the collider debug-draw path (§5) end to end, GL calls included, not just that it compiles.
+  `debug.showPhysicsColliders = true` runs 90 headless frames without crashing.
+- `RigidBody.CapsuleDimensions` (radius/length derivation) and `PhysicsSystem.AngularVelocityFromDelta`
+  (the kinematic angular-velocity finite-difference formula) are unit tested directly with real
+  numeric assertions in `Centauri.Tests/Simulation/RigidBodyShapeTests.cs` — no GL context, no
+  standalone harness needed for this pure-math part.
 
-## 7. Known limitations / next steps
+## 8. Known limitations / next steps
 
 Deliberately scoped as a foundation. In rough priority order:
 
-- **No kinematic bodies** — only `Dynamic` and `Static`. A `Kinematic` kind (Transform drives the
-  body, e.g. moving platforms) is the obvious third.
-- **Culling-grid churn** — a moving dynamic body writes its `Transform` every frame, which bumps
-  `Scene.Revision` and forces a `CullingSystem` grid rebuild each frame (exactly the case the comment
-  in `World/Scene.cs` anticipated). Harmless at current body counts; revisit with an incremental
-  grid update if physics scenes get large. As a side effect, `PhysicsSystem`'s own orphan-cleanup
-  sweep (§3) now piggybacks on that same `Scene.Revision` signal, so it's already only as expensive
-  as that existing tradeoff, not an additional one.
-- **Single friction/bounce material** — `NarrowPhaseCallbacks` uses one global material. Per-material
-  friction/restitution would key off `CollidableReference` here.
-- **No angular-velocity or torque authoring** — the inspector edits Kind/Shape/Mass but there's no way
-  to give a body initial spin or apply an impulse from the editor; `AngularVelocity` is readable (§5)
-  but not writable outside code.
+- **No mesh colliders for statics** — only `Box`/`Sphere`/`Capsule`, all derived from bounds. BEPU
+  does have a `Mesh` collidable (`Mesh(Buffer<Triangle> triangles, ref Vector3 scale, BufferPool pool)`)
+  for exact static geometry, but building one needs CPU-side triangle data this codebase doesn't
+  retain today — `Mesh.cs`/`Model.cs` discard vertex/index data once it's uploaded to the GPU. Adding
+  it means either always keeping a CPU copy (a memory cost paid even when physics is off) or a lazy
+  re-decode-via-Assimp-by-path fallback when a `Static` body first needs one — real, self-contained
+  follow-up work, not attempted this round.
+- **No restitution/bounciness** — see §5. BEPU2's contact model has no elastic-collision coefficient
+  to key off of; a real implementation needs a contact-event callback that manually reflects velocity
+  along the contact normal post-solve, which this codebase doesn't have.
+- **Culling-grid churn** — a moving dynamic (or kinematic) body writes its `Transform` every frame,
+  which bumps `Scene.Revision` and forces a `CullingSystem` grid rebuild each frame (exactly the case
+  the comment in `World/Scene.cs` anticipated). Harmless at current body counts; revisit with an
+  incremental grid update if physics scenes get large. As a side effect, `PhysicsSystem`'s own
+  orphan-cleanup sweep (§3) now piggybacks on that same `Scene.Revision` signal, so it's already only
+  as expensive as that existing tradeoff, not an additional one.
+- **No angular-velocity or torque authoring** — the inspector edits Kind/Shape/Mass/Friction but there's
+  no way to give a body initial spin or apply an impulse from the editor; `AngularVelocity` is readable
+  (§6) but not writable outside code.

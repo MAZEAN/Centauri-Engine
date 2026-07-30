@@ -10,14 +10,15 @@ using Editing.Undo;
 
 // Attaches/edits/detaches a RigidBody on the selected entity. Shape is derived from the
 // model's own bounds (see PhysicsSystem.Register) — there's nothing to author there beyond
-// Box/Sphere. Any edit after the initial attach calls RigidBody.MarkDirty() so PhysicsSystem
-// tears down and recreates the BEPU body on its next Sync instead of silently keeping the old
-// one; SyncRigidBodyDefinition mirrors the same edit into the entity's saved definition so it
-// round-trips (see EntitySetLoader.Save — it just re-emits source.Components verbatim).
+// Box/Sphere/Capsule. Any edit after the initial attach calls RigidBody.MarkDirty() so
+// PhysicsSystem tears down and recreates the BEPU body on its next Sync instead of silently
+// keeping the old one; SyncRigidBodyDefinition mirrors the same edit into the entity's saved
+// definition so it round-trips (see EntitySetLoader.Save — it just re-emits source.Components
+// verbatim).
 internal sealed class EntityPhysicsSection
 {
-    private static readonly string[] PhysicsKinds  = ["None", "Dynamic", "Static"];
-    private static readonly string[] PhysicsShapes = ["Box", "Sphere"];
+    private static readonly string[] PhysicsKinds  = ["None", "Dynamic", "Kinematic", "Static"];
+    private static readonly string[] PhysicsShapes = ["Box", "Sphere", "Capsule"];
 
     private readonly EntitySetLoader _entitySetLoader;
 
@@ -31,9 +32,10 @@ internal sealed class EntityPhysicsSection
         var rb = e.GetComponent<RigidBody>();
         var kindIndex = rb switch
         {
-            null                      => 0,
-            { Kind: BodyKind.Static } => 2,
-            _                         => 1
+            null                         => 0,
+            { Kind: BodyKind.Kinematic } => 2,
+            { Kind: BodyKind.Static }    => 3,
+            _                            => 1
         };
 
         if (Widgets.ComboRow("Body", ref kindIndex, PhysicsKinds))
@@ -55,7 +57,12 @@ internal sealed class EntityPhysicsSection
                 return;
             }
 
-            var kind = kindIndex == 2 ? BodyKind.Static : BodyKind.Dynamic;
+            var kind = kindIndex switch
+            {
+                2 => BodyKind.Kinematic,
+                3 => BodyKind.Static,
+                _ => BodyKind.Dynamic,
+            };
             if (rb is null)
             {
                 rb = e.AddComponent(new RigidBody { Kind = kind });
@@ -71,15 +78,36 @@ internal sealed class EntityPhysicsSection
 
         if (rb is null) return;
 
-        var shapeIndex = rb.Shape == BodyShape.Sphere ? 1 : 0;
+        var shapeIndex = rb.Shape switch
+        {
+            BodyShape.Sphere  => 1,
+            BodyShape.Capsule => 2,
+            _                 => 0,
+        };
         if (Widgets.ComboRow("Shape", ref shapeIndex, PhysicsShapes))
         {
             var before = RigidBodyState.Of(rb);
-            rb.Shape = shapeIndex == 1 ? BodyShape.Sphere : BodyShape.Box;
+            rb.Shape = shapeIndex switch
+            {
+                1 => BodyShape.Sphere,
+                2 => BodyShape.Capsule,
+                _ => BodyShape.Box,
+            };
             rb.MarkDirty();
             _entitySetLoader.SyncRigidBodyDefinition(e, rb);
             undo?.Push(new RigidBodyCommand(e, _entitySetLoader, before, RigidBodyState.Of(rb)));
         }
+
+        // Friction applies to every Kind — a Static floor's surface matters as much as a Dynamic
+        // crate's — unlike Mass and the live velocity readout below, which only mean anything for
+        // a body the simulation actually moves under gravity/forces. No Bounciness row: see
+        // RigidBody.Friction's own comment for why restitution isn't implemented this pass.
+        Widgets.DragRow("Friction", rb.Friction, v =>
+        {
+            rb.Friction = MathF.Max(0f, v);
+            rb.MarkDirty();
+            _entitySetLoader.SyncRigidBodyDefinition(e, rb);
+        }, 0.01f, 0f, 10f, "%.2f", 1f, undo);
 
         if (rb.Kind != BodyKind.Dynamic) return;
 
