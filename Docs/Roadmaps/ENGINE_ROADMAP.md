@@ -172,9 +172,19 @@ up once content count grows.
   without knowing whether a live `Material` still references a texture risks a use-after-free;
   needs its own design pass first, same as LOD below), no mip-clamping/max-resolution cap, no
   BC7/ASTC, no pre-compressed asset (KTX2/DDS) import.
-- [ ] **LOD / impostors** (TODO.md item, currently unstarted, no design doc yet). Needs its own
-  short design pass before implementation — impostor billboarking interacts with the shadow
-  casters and instancing path in ways worth thinking through up front.
+- [ ] **LOD / impostors** — **design pass done, implementation not started.** See
+  `Docs/Documentation/LodImpostors.md`: scopes this to impostors only for v1 (mesh-LOD chains
+  deferred — they fragment batching per source model rather than consolidating like impostors do,
+  a real complexity increase left for a later follow-up). Key decisions: a thin `LodComponent`
+  (mirrors `RigidBody`'s config-plus-live-state shape) with tier selection as a stateless
+  `LodEvaluator` query rather than a `PhysicsSystem`-style owning system (no persistent simulation
+  state to tick); `ShaderBatcher`/`Scene.Revision` stay untouched — LOD is a per-frame
+  filter-and-reroute in `MainRenderer.CollectVisibleInstances` into one shared cross-model impostor
+  batch, not a new batch-key dimension; impostor-tier entities are excluded from shadow casting
+  entirely rather than casting a flat-quad shadow; screen-space projected size (not raw world
+  distance) drives the tier switch, with mandatory hysteresis (a correctness requirement, not
+  polish — without it the tier flickers every frame near the threshold). A phased implementation
+  order is proposed in the doc's closing section for whenever this is picked up.
 - [ ] **Physics: more collider shapes (capsule at minimum, mesh colliders for statics), kinematic
   bodies, per-material friction/restitution.** The current box/sphere-only, dynamic/static-only
   scope was intentionally minimal for a first pass (see `Docs/Documentation/PhysicsEngine.md`);
