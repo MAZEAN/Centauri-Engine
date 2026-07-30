@@ -132,9 +132,13 @@ internal static class BlockCompression
         var (r0, g0, b0) = Unpack565(c0);
         var (r1, g1, b1) = Unpack565(c1);
 
-        Span<int> palR = [r0, r1, (2 * r0 + r1) / 3, (r0 + 2 * r1) / 3];
-        Span<int> palG = [g0, g1, (2 * g0 + g1) / 3, (g0 + 2 * g1) / 3];
-        Span<int> palB = [b0, b1, (2 * b0 + b1) / 3, (b0 + 2 * b1) / 3];
+        // Explicit stackalloc (not a `Span<int> x = [a, b, c, d]` collection expression) — called
+        // once per 4x4 block, tens of thousands of times per texture, so this needs to provably
+        // never heap-allocate rather than trust the compiler's lowering of a collection expression
+        // with non-constant elements.
+        Span<int> palR = stackalloc int[4] { r0, r1, (2 * r0 + r1) / 3, (r0 + 2 * r1) / 3 };
+        Span<int> palG = stackalloc int[4] { g0, g1, (2 * g0 + g1) / 3, (g0 + 2 * g1) / 3 };
+        Span<int> palB = stackalloc int[4] { b0, b1, (2 * b0 + b1) / 3, (b0 + 2 * b1) / 3 };
 
         uint indices = 0;
         for (var i = 0; i < 16; i++)

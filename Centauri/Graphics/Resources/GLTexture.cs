@@ -15,6 +15,15 @@ public sealed class TextureData
 
     public byte[]?  Ldr;   // RGBA8, vertically flipped
     public float[]? Hdr;   // RGB float
+
+    // Populated by GLTexture.CompressIfEligible — pure CPU work, deliberately *not* done inside
+    // GLTexture's own constructor (see that method's comment for why: it needs to run wherever
+    // Decode/DecodeWithOpacity themselves ran, so ResourceSystem's background decode tasks can
+    // do it off the GL thread, in parallel with every other texture, the same way decode already
+    // was). Null means "upload raw Ldr/Hdr as before" — either compression wasn't eligible, or
+    // nothing has attempted it yet.
+    internal List<BlockCompression.Level>? CompressedLevels;
+    internal bool CompressedHasAlpha;
 }
 
 public class GLTexture : GLResource
@@ -31,8 +40,10 @@ public class GLTexture : GLResource
     private static bool _anisoEnabled = true;
 
     // GL_EXT_texture_compression_s3tc — checked once against the live context and cached, since
-    // it can't change mid-session. Every GLTexture instance shares one GL, so any instance's Gl
-    // is as good as any other's to query it from.
+    // it can't change mid-session. Must be warmed (WarmCompressionSupport) from the GL thread
+    // before any background decode work starts: CompressIfEligible needs the answer but runs on
+    // ResourceSystem's Task.Run decode workers, which have no GL context of their own to query it
+    // from.
     private static bool? _s3tcSupported;
 
     private float _maxAniso = 1f;   // driver-clamped per-texture ceiling (>= 1)
@@ -57,7 +68,7 @@ public class GLTexture : GLResource
     public static int  CompressedTextureCount   { get; private set; }
     public static int  UncompressedTextureCount { get; private set; }
 
-    public unsafe GLTexture(GL gl, TextureData data, bool allowCompression = true) : base(gl)
+    public unsafe GLTexture(GL gl, TextureData data) : base(gl)
     {
         Handle = Gl.GenTexture();
         Gl.BindTexture(TextureTarget.Texture2D, Handle);
@@ -74,9 +85,9 @@ public class GLTexture : GLResource
             ApproxBytes = (long)data.Width * data.Height * 6; // RGB16F, no mip chain (see SetParameters)
             SetParameters(hdr: true);
         }
-        else if (allowCompression && data.Width >= MinCompressibleSize && data.Height >= MinCompressibleSize && S3tcSupported())
+        else if (data.CompressedLevels is { } levels)
         {
-            UploadCompressed(data);
+            UploadCompressed(levels, data.CompressedHasAlpha);
             SetParameters(hdr: false, skipGenerateMipmap: true);
         }
         else
@@ -93,6 +104,31 @@ public class GLTexture : GLResource
 
         TrackCreated();
     }
+
+    // Decides whether a decoded LDR image should be block-compressed and, if so, does the actual
+    // BC1/BC3 encoding right here — pure CPU work, no GL calls at all. Deliberately *not* done
+    // inside the constructor above (where the first version of texture compression put it): that
+    // meant real per-texture CPU cost (a nearest-palette search over every pixel of every mip
+    // level) landing serially on the GL thread during ResourceSystem's "GL upload" phase, which
+    // used to be cheap (TexImage2D + GenerateMipmap are fast, GPU-side). The fix is to call this
+    // from wherever Decode/DecodeWithOpacity themselves run — ResourceSystem.DecodeTextureKey,
+    // inside the same Task.Run worker as decode — so compression rides the same
+    // already-parallel-across-textures decode phase instead of serializing after it.
+    public static void CompressIfEligible(TextureData data, bool allowCompression)
+    {
+        if (data.IsHdr || !allowCompression) return;
+        if (data.Width < MinCompressibleSize || data.Height < MinCompressibleSize) return;
+        if (_s3tcSupported is not true) return; // WarmCompressionSupport wasn't called, or the driver doesn't have it
+
+        data.CompressedHasAlpha = BlockCompression.HasAlpha(data.Ldr);
+        data.CompressedLevels   = BlockCompression.Compress(data.Ldr!, data.Width, data.Height, data.CompressedHasAlpha);
+    }
+
+    // Must run once on the GL thread, with a live context, before any texture decode starts —
+    // CompressIfEligible needs the answer but has no GL context of its own to ask (it runs on
+    // ResourceSystem's background decode workers). Called from Engine.InitializeOpenGL, right
+    // after the context itself is created.
+    public static void WarmCompressionSupport(GL gl) => _s3tcSupported ??= gl.IsExtensionPresent("GL_EXT_texture_compression_s3tc");
 
     public GLTexture(GL gl, string path) : this(gl, Decode(path)) { }
 
@@ -163,15 +199,13 @@ public class GLTexture : GLResource
         TrackCreated();
     }
 
-    // Compresses the full LDR mip chain (BlockCompression.Compress — box-filter downsampled BC1
-    // for an opaque source, BC3 for one with any transparency) and uploads each level directly,
-    // since GPU-side glGenerateMipmap generally can't operate on compressed internal formats
-    // (they aren't framebuffer/colour-renderable, which mipmap generation relies on) — this is
-    // also why the caller passes skipGenerateMipmap: true to SetParameters afterward.
-    private unsafe void UploadCompressed(TextureData data)
+    // Uploads an already-compressed mip chain (CompressIfEligible did the actual encoding, off
+    // the GL thread) level by level, since GPU-side glGenerateMipmap generally can't operate on
+    // compressed internal formats (they aren't framebuffer/colour-renderable, which mipmap
+    // generation relies on) — this is also why the caller passes skipGenerateMipmap: true to
+    // SetParameters afterward.
+    private unsafe void UploadCompressed(List<BlockCompression.Level> levels, bool hasAlpha)
     {
-        var hasAlpha = BlockCompression.HasAlpha(data.Ldr);
-        var levels = BlockCompression.Compress(data.Ldr, data.Width, data.Height, hasAlpha);
         var format = hasAlpha ? InternalFormat.CompressedRgbaS3TCDxt5Ext : InternalFormat.CompressedRgbS3TCDxt1Ext;
 
         long totalBytes = 0;
@@ -191,8 +225,6 @@ public class GLTexture : GLResource
         IsCompressed = true;
         ApproxBytes  = totalBytes;
     }
-
-    private bool S3tcSupported() => _s3tcSupported ??= Gl.IsExtensionPresent("GL_EXT_texture_compression_s3tc");
 
     private void TrackCreated()
     {

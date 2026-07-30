@@ -13,6 +13,7 @@ using Loading;
 using Windowing;
 using Simulation;
 using Editing.Undo;
+using Graphics.Resources;
 
 public class Engine : IWindowCallbacks
 {
@@ -107,6 +108,11 @@ public class Engine : IWindowCallbacks
         {
             Console.WriteLine($"[Engine] GL: {_gl.GetStringS(GLEnum.Version)} | {_gl.GetStringS(GLEnum.Renderer)}");
         }
+
+        // Must happen before any texture decode starts — ResourceSystem's background decode
+        // workers have no GL context of their own to query GL_EXT_texture_compression_s3tc
+        // support from, so this answers it once, here, while a live context is guaranteed.
+        GLTexture.WarmCompressionSupport(_gl);
 
         var c = _config.Window.ClearColor;
         _gl.ClearColor(c[0], c[1], c[2], c[3]);

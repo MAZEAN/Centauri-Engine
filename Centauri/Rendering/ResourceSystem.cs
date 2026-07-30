@@ -34,7 +34,7 @@ public class ResourceSystem : IDisposable
         _config = config;
 
         Textures = new AssetCache<GLTexture>(
-            key => new GLTexture(gl, DecodeTextureKey(key), _config.Render.TextureCompression)
+            key => new GLTexture(gl, DecodeTextureKey(key))
         );
 
         Shaders = new AssetCache<GLShader>(
@@ -131,7 +131,7 @@ public class ResourceSystem : IDisposable
         Time.Run("GL upload", () =>
         {
             foreach (var (key, data) in textureTask.Result)
-                Textures.Insert(key, new GLTexture(_gl, data, _config.Render.TextureCompression));
+                Textures.Insert(key, new GLTexture(_gl, data));
 
             foreach (var (key, data) in modelTask.Result)
                 Models.Insert(key, new Model(_gl, data));
@@ -164,14 +164,26 @@ public class ResourceSystem : IDisposable
     private static string? AlbedoKey(string? albedo, string? opacity) =>
         albedo == null ? null : opacity == null ? albedo : $"{albedo}{OpacityKeyMarker}{opacity}";
 
-    private static TextureData DecodeTextureKey(string key)
+    // Decode AND compress (GLTexture.CompressIfEligible — pure CPU, no GL calls) happen together
+    // here rather than compression living in GLTexture's constructor, specifically so both run on
+    // whatever thread calls this: a background Task.Run worker for the parallel-preload path
+    // (DecodeAssetsInParallelAndUpload), same as decode already did, so the real per-texture CPU
+    // cost of block-compressing a whole mip chain rides that existing parallelism instead of
+    // landing serially on the GL thread afterward. For the on-demand single-texture path (a
+    // material switched to a texture nothing preloaded), this still runs synchronously on
+    // whatever thread asks for it — same as decode always did for that path; there's no batch to
+    // parallelize against when it's only one texture.
+    private TextureData DecodeTextureKey(string key)
     {
         var split = key.IndexOf(OpacityKeyMarker, StringComparison.Ordinal);
-        return split < 0
+        var data = split < 0
             ? GLTexture.Decode(PathResolver.Resolve(key))
             : GLTexture.DecodeWithOpacity(
                 PathResolver.Resolve(key[..split]),
                 PathResolver.Resolve(key[(split + OpacityKeyMarker.Length)..]));
+
+        GLTexture.CompressIfEligible(data, _config.Render.TextureCompression);
+        return data;
     }
 
     private Material LoadMaterial(string path)

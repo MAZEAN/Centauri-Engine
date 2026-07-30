@@ -20,7 +20,7 @@ headless job would all need). A managed C# BC1/BC3 encoder has no native compone
 
 **Quality tradeoff, stated plainly:** endpoint selection is a per-channel bounding box (min/max RGB
 across the block), not the principal-component-analysis approach real encoders (`stb_dxt`, etc.)
-use. This is a "good enough baseline" — visually solid for typical PBR textures (see §5's
+use. This is a "good enough baseline" — visually solid for typical PBR textures (see §6's
 side-by-side) — not best-in-class compressed-texture quality. A PCA-based encoder would be a
 drop-in upgrade to `EncodeColorBlock` later if quality ever becomes the bottleneck rather than
 VRAM.
@@ -70,7 +70,55 @@ the chain gets small, e.g. every level below 4x4 itself, or any level of a non-p
 image). `BlockCompressionTests.Compress_MipChain_EndsAt1x1WithExpectedLevelCount` pins this for a
 regular size, a non-power-of-two size, and the 1x1 degenerate case directly.
 
-## 4. Config, fallback, and visibility
+## 4. Performance: compression must not land on the GL thread
+
+**This bit it on the first real-hardware run.** The version that shipped first did the actual
+BC1/BC3 encoding — a nearest-palette search over every pixel of every mip level, real per-texture
+CPU work — inside `GLTexture`'s own constructor. That constructor only ever used to do cheap,
+GPU-side work (`TexImage2D`/`GenerateMipmap`), so nobody had previously needed the "GL upload" phase
+in `ResourceSystem.DecodeAssetsInParallelAndUpload` to happen anywhere but serially on the GL
+thread, right after the (already-parallel, `Task.Run`-per-texture) "Parallel decode" phase finished.
+Once GLTexture construction started doing real CPU work too, that serial phase — previously a
+handful of cheap driver calls — became a straight sum of every texture's compression cost. On a
+real 54-texture scene this took the "GL upload" step from ~2.5s to ~27s, a 10x regression, and made
+switching a material to a texture nothing had preloaded yet noticeably slower too (same cost, just
+on whatever thread the inspector edit ran on).
+
+**The fix: move the actual encoding to wherever decode itself runs, not wherever upload runs.**
+`GLTexture.CompressIfEligible(TextureData, bool)` is now a separate, pure-CPU, no-GL-calls static
+method — it fills in `TextureData.CompressedLevels` instead of doing anything to a live texture.
+`ResourceSystem.DecodeTextureKey` calls it immediately after `Decode`/`DecodeWithOpacity`, in the
+*same* call — which for the batch-preload path means it runs inside the same `Task.Run` worker as
+decode, across the thread pool, in parallel with every other texture being decoded, exactly the
+parallelism decode itself already had. `GLTexture`'s constructor now does zero CPU work: if
+`TextureData.CompressedLevels` is already populated, it just uploads those bytes
+(`Gl.CompressedTexImage2D` per level) — genuinely cheap, GPU-side, the same category of work
+`TexImage2D`/`GenerateMipmap` always were. The on-demand single-texture path (a material switched
+to something nothing preloaded) still pays the encoding cost synchronously on whatever thread asks
+for it — same as decoding a never-before-seen texture always cost, before compression existed at
+all; there's no batch to parallelize a single texture's own compression against.
+
+One wrinkle this move introduced: `CompressIfEligible` needs to know whether
+`GL_EXT_texture_compression_s3tc` is supported, but it runs on background threads with no GL
+context of their own to ask. `GLTexture.WarmCompressionSupport(GL)` answers that once, eagerly,
+from `Engine.InitializeOpenGL` right after the context is created — well before `ResourceSystem`
+does any decode work — so the cached answer is already there by the time a background worker needs
+it. `CompressIfEligible` treats "not yet warmed" the same as "unsupported" (falls back to
+uncompressed) rather than blocking on it, since in the shipped code path it's always warmed first.
+
+**A second, smaller fix found while benchmarking the regression.** `EncodeColorBlock`'s three
+4-entry interpolated-palette buffers were built via `Span<int> palR = [r0, r1, ...]` — a collection
+expression with non-constant elements, called once per 4x4 block (tens of thousands of times per
+texture). Rewriting these as explicit `stackalloc int[4] { ... }` — provably stack-allocated, not
+relying on the compiler's collection-expression lowering to avoid a heap array per call — cut a
+1024x1024 synthetic-noise benchmark's single-threaded compress time from 157ms to 109ms (~30%). Real
+textures (which compress *faster* than random noise, since the nearest-palette search still runs
+the same fixed amount of work either way, but real images are far more compressible in principle —
+this benchmark measured worst-case work, not best-case) should see the same proportional
+improvement. Combined with the threading fix above, a 5-texture live headless comparison in this
+sandbox went from an 840ms "GL upload" phase back down to 327ms.
+
+## 5. Config, fallback, and visibility
 
 `Render.TextureCompression` (default `true`) is the master switch. Per-texture, compression is
 skipped automatically (falling back to the original uncompressed path, not an error) when:
@@ -90,7 +138,7 @@ uncompressed one to account for the ~33% a full RGBA8 mip chain adds on top of t
 Good enough to eyeball; getting an exact number would mean a `glGetTexLevelParameteriv`
 per-level round trip through the driver for every texture, for a number nothing else reads.
 
-## 5. Verification
+## 6. Verification
 
 **Unit tests** (`Centauri.Tests/Graphics/BlockCompressionTests.cs`, 8 tests) — `BlockCompression`
 is pure C#, no GL context needed, unlike almost everything else this session's texture/material
@@ -124,7 +172,7 @@ environment/entity-set testing. Two headless captures — `Render.TextureCompres
 indistinguishable renders of the tree's trunk and leaves at normal viewing distance, the expected
 outcome for a lossy-but-solid compressed format.
 
-## 6. What's deliberately out of scope
+## 7. What's deliberately out of scope
 
 - **No refcounted texture eviction.** `Render.TextureCacheSize` (and `ModelCacheSize`/
   `ShaderCacheSize`) remain unused — `AssetCache<T>` caches forever, no LRU, no budget-triggered
@@ -145,7 +193,7 @@ outcome for a lossy-but-solid compressed format.
   in `GLTexture.Decode`'s dependency list) if VRAM pressure from oversized source art specifically
   becomes the next bottleneck.
 - **BC7/ASTC, no runtime format negotiation.** BC7 (higher quality, Mesa reports
-  `GL_ARB_texture_compression_bptc` support too — see §5) and ASTC (mobile/tile-based GPUs) aren't
+  `GL_ARB_texture_compression_bptc` support too — see §6) and ASTC (mobile/tile-based GPUs) aren't
   implemented. BC1/BC3 covers the desktop-GL case this engine targets; a real cross-platform story
   (mobile, particularly) would need per-platform format selection this pass doesn't build.
 - **No pre-compressed asset format (KTX2/DDS) support on the *load* side.** Compression happens at
