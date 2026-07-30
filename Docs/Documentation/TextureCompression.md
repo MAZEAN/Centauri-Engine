@@ -20,7 +20,7 @@ headless job would all need). A managed C# BC1/BC3 encoder has no native compone
 
 **Quality tradeoff, stated plainly:** endpoint selection is a per-channel bounding box (min/max RGB
 across the block), not the principal-component-analysis approach real encoders (`stb_dxt`, etc.)
-use. This is a "good enough baseline" — visually solid for typical PBR textures (see §6's
+use. This is a "good enough baseline" — visually solid for typical PBR textures (see §7's
 side-by-side) — not best-in-class compressed-texture quality. A PCA-based encoder would be a
 drop-in upgrade to `EncodeColorBlock` later if quality ever becomes the bottleneck rather than
 VRAM.
@@ -118,7 +118,47 @@ this benchmark measured worst-case work, not best-case) should see the same prop
 improvement. Combined with the threading fix above, a 5-texture live headless comparison in this
 sandbox went from an 840ms "GL upload" phase back down to 327ms.
 
-## 5. Config, fallback, and visibility
+## 5. Texture roles: not everything should compress
+
+**A second real-hardware issue.** On real GPU hardware (this sandbox's llvmpipe render output
+doesn't show this — the checkerboard-tile screenshot that surfaced it came from an actual desktop
+run), a mirror-like floor material showed visibly blocky, rectangular artifacts inside its specular
+highlight, and something that read as two overlapping sun reflections (a sharp bloomed core plus a
+separate blocky, unbloomed halo around it). Both symptoms trace to the same cause: the *first*
+version of this feature compressed every LDR texture uniformly, including the material's Normal,
+Roughness, and Metallic maps.
+
+That's a real mistake, not a subtle one — it's standard, widely-known practice that normal maps in
+particular should never go through plain BC1/BC3. A tangent-space normal's X/Y precision maps
+almost directly onto lighting-*direction* error, and BC1/BC3's RGB565 endpoints (5/6/5 bits per
+channel, one shared pair of colors per 4x4 block) are coarse enough that the error becomes visible
+exactly where a viewer's eye is drawn to it: a specular highlight or reflection, where lighting
+response amplifies small normal/roughness differences instead of averaging them out the way diffuse
+shading would. Real engines default normal maps to BC5/3Dc (two independent 8-bit-precision
+channels, no shared endpoints) or leave them uncompressed for exactly this reason — never plain
+BC1/BC3. Roughness and Metallic are less universally sensitive but still directly shape a specular
+lobe's sharpness, and Height drives parallax offset — all three plausibly contribute to the same
+"blocky highlight" family of artifact, so all three were pulled out alongside Normal rather than
+trying to isolate which one(s) actually caused this specific screenshot.
+
+**Fix: compression eligibility is now decided per texture *role*, not per texture.** Albedo and AO
+stay compression-eligible — both are low-frequency color/occlusion data that diffuse shading
+naturally blends across neighboring texels anyway, so BC1/BC3's block quantization doesn't produce
+a visible artifact the way it does under specular response. `ResourceSystem.LoadMaterial` routes
+Normal/Roughness/Metallic/Height through a new `GetTexture(path, allowCompression: false)` instead
+of the plain `Textures.Get(path)` those and Albedo/AO used before; the parallel-preload path
+(`PreloadEntities`) builds a parallel `noCompressPaths` set alongside its existing texture-path set,
+tagging the same four roles, and threads it through to `DecodeTextureKey`'s `allowCompression`
+parameter. `AssetCache<T>` gained a `Contains` check so `GetTexture` can populate the shared cache
+with its own (uncompressed) `GLTexture` before falling through to the ordinary `Get` — the ordinary
+factory closure, still used directly for Albedo/AO, always allows compression, so a role that needs
+it suppressed has to seed the cache first rather than relying on the factory's own decision.
+
+This does shrink the VRAM win — a typical 5-map PBR set (Albedo/Normal/Roughness/Metallic/AO) now
+only compresses 2 of 5 textures rather than all 5 — but a correct, smaller VRAM reduction beats a
+larger one that visibly damages the render it's supposed to be an invisible optimization for.
+
+## 6. Config, fallback, and visibility
 
 `Render.TextureCompression` (default `true`) is the master switch. Per-texture, compression is
 skipped automatically (falling back to the original uncompressed path, not an error) when:
@@ -138,7 +178,7 @@ uncompressed one to account for the ~33% a full RGBA8 mip chain adds on top of t
 Good enough to eyeball; getting an exact number would mean a `glGetTexLevelParameteriv`
 per-level round trip through the driver for every texture, for a number nothing else reads.
 
-## 6. Verification
+## 7. Verification
 
 **Unit tests** (`Centauri.Tests/Graphics/BlockCompressionTests.cs`, 8 tests) — `BlockCompression`
 is pure C#, no GL context needed, unlike almost everything else this session's texture/material
@@ -172,7 +212,7 @@ environment/entity-set testing. Two headless captures — `Render.TextureCompres
 indistinguishable renders of the tree's trunk and leaves at normal viewing distance, the expected
 outcome for a lossy-but-solid compressed format.
 
-## 7. What's deliberately out of scope
+## 8. What's deliberately out of scope
 
 - **No refcounted texture eviction.** `Render.TextureCacheSize` (and `ModelCacheSize`/
   `ShaderCacheSize`) remain unused — `AssetCache<T>` caches forever, no LRU, no budget-triggered
@@ -193,7 +233,7 @@ outcome for a lossy-but-solid compressed format.
   in `GLTexture.Decode`'s dependency list) if VRAM pressure from oversized source art specifically
   becomes the next bottleneck.
 - **BC7/ASTC, no runtime format negotiation.** BC7 (higher quality, Mesa reports
-  `GL_ARB_texture_compression_bptc` support too — see §6) and ASTC (mobile/tile-based GPUs) aren't
+  `GL_ARB_texture_compression_bptc` support too — see §7) and ASTC (mobile/tile-based GPUs) aren't
   implemented. BC1/BC3 covers the desktop-GL case this engine targets; a real cross-platform story
   (mobile, particularly) would need per-platform format selection this pass doesn't build.
 - **No pre-compressed asset format (KTX2/DDS) support on the *load* side.** Compression happens at

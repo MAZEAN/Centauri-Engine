@@ -159,11 +159,19 @@ up once content count grows.
   4x4 block) — `GL_EXT_texture_compression_s3tc` confirmed present even on this sandbox's headless
   Mesa/llvmpipe CI target, so the compressed path is exercised for real by the existing smoke-test
   job, not dormant. `StatsOverlay` gained a "Textures" section (compressed/uncompressed counts,
-  estimated VRAM) for budget visibility. See `Docs/Documentation/TextureCompression.md` for the
-  full writeup, including what's deliberately still out of scope: no refcounted cache eviction
-  (`TextureCacheSize` remains unused — evicting without knowing whether a live `Material` still
-  references a texture risks a use-after-free; needs its own design pass first, same as LOD below),
-  no mip-clamping/max-resolution cap, no BC7/ASTC, no pre-compressed asset (KTX2/DDS) import.
+  estimated VRAM) for budget visibility. Two real-hardware issues surfaced and fixed after initial
+  landing: the actual BC1/BC3 encoding was happening inside `GLTexture`'s constructor, landing
+  serially on the GL thread during "GL upload" instead of riding the already-parallel decode phase
+  (10x startup regression on a 54-texture scene — moved to `ResourceSystem.DecodeTextureKey`,
+  running in the same background `Task.Run` worker as decode); and every LDR texture was compressed
+  uniformly regardless of role, which visibly damaged specular response (blocky artifacts in
+  highlights/reflections) on Normal/Roughness/Metallic/Height maps — compression eligibility is now
+  decided per texture role (`ResourceSystem.GetTexture`/`AddPathNoCompress`), Albedo/AO only. See
+  `Docs/Documentation/TextureCompression.md` for the full writeup, including what's deliberately
+  still out of scope: no refcounted cache eviction (`TextureCacheSize` remains unused — evicting
+  without knowing whether a live `Material` still references a texture risks a use-after-free;
+  needs its own design pass first, same as LOD below), no mip-clamping/max-resolution cap, no
+  BC7/ASTC, no pre-compressed asset (KTX2/DDS) import.
 - [ ] **LOD / impostors** (TODO.md item, currently unstarted, no design doc yet). Needs its own
   short design pass before implementation — impostor billboarking interacts with the shadow
   casters and instancing path in ways worth thinking through up front.

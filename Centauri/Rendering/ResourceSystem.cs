@@ -33,8 +33,11 @@ public class ResourceSystem : IDisposable
         _gl = gl;
         _config = config;
 
+        // The factory closure (used by plain Textures.Get calls) always allows compression — only
+        // called for Albedo/AO/skybox paths (see LoadMaterial/AddPathNoCompress); anything
+        // precision-sensitive goes through GetTexture instead, which bypasses this factory.
         Textures = new AssetCache<GLTexture>(
-            key => new GLTexture(gl, DecodeTextureKey(key))
+            key => new GLTexture(gl, DecodeTextureKey(key, allowCompression: true))
         );
 
         Shaders = new AssetCache<GLShader>(
@@ -83,10 +86,12 @@ public class ResourceSystem : IDisposable
     {
         var texturePaths = new HashSet<string>();
 
+        // A skybox panorama is a background image, not something specular response reads —
+        // low sensitivity to block-compression quantization, same as Albedo/AO below.
         foreach (var s in def.Skyboxes)
             AddPath(texturePaths, s.Panorama);
 
-        DecodeAssetsInParallelAndUpload([], texturePaths);
+        DecodeAssetsInParallelAndUpload([], texturePaths, []);
     }
 
     public void PreloadEntities(IEnumerable<EntityDefinition> entities)
@@ -101,26 +106,27 @@ public class ResourceSystem : IDisposable
 
         var materialPaths = list.SelectMany(EntityMaterialPaths).Distinct();
         var texturePaths = new HashSet<string>();
+        var noCompressPaths = new HashSet<string>();
 
         foreach (var matPath in materialPaths)
         {
             var m = _materialRegistry.ReadDefinition(matPath);
             AddPath(texturePaths, AlbedoKey(m.Albedo, m.Opacity));
-            AddPath(texturePaths, m.Normal);
-            AddPath(texturePaths, m.Roughness);
-            AddPath(texturePaths, m.Metallic);
             AddPath(texturePaths, m.AO);
-            AddPath(texturePaths, m.Height);
+            AddPathNoCompress(texturePaths, noCompressPaths, m.Normal);
+            AddPathNoCompress(texturePaths, noCompressPaths, m.Roughness);
+            AddPathNoCompress(texturePaths, noCompressPaths, m.Metallic);
+            AddPathNoCompress(texturePaths, noCompressPaths, m.Height);
         }
 
-        DecodeAssetsInParallelAndUpload(modelPaths, texturePaths);
+        DecodeAssetsInParallelAndUpload(modelPaths, texturePaths, noCompressPaths);
     }
 
-    private void DecodeAssetsInParallelAndUpload(List<string> modelPaths, HashSet<string> texturePaths)
+    private void DecodeAssetsInParallelAndUpload(List<string> modelPaths, HashSet<string> texturePaths, HashSet<string> noCompressPaths)
     {
         // CPU decode off the GL thread
         var textureTask = Task.WhenAll(texturePaths.Select(key =>
-            Task.Run(() => (key, data: DecodeTextureKey(key)))));
+            Task.Run(() => (key, data: DecodeTextureKey(key, allowCompression: !noCompressPaths.Contains(key))))));
 
         var modelTask = Task.WhenAll(modelPaths.Select(key =>
             Task.Run(() => (key, data: Model.Decode(PathResolver.Resolve(key))))));
@@ -161,6 +167,21 @@ public class ResourceSystem : IDisposable
             set.Add(path);
     }
 
+    // Normal/Roughness/Metallic/Height all directly drive specular response (a normal map's XY
+    // precision maps almost directly to lighting-direction error; roughness/metallic shape the
+    // specular lobe itself) — BC1/BC3's RGB565 quantization is coarse enough to show up as visible
+    // blocky artifacts exactly where it matters most, a highlight or reflection. This is standard,
+    // well-known practice (real engines default these to BC5/uncompressed, never plain BC1/BC3),
+    // not a Centauri-specific guess — see Docs/Documentation/TextureCompression.md's "Texture
+    // roles" section for the regression this was cut from. Albedo/AO stay compression-eligible:
+    // low-frequency color data tolerates the same quantization without a visible lighting effect.
+    private static void AddPathNoCompress(HashSet<string> texturePaths, HashSet<string> noCompressPaths, string? path)
+    {
+        if (string.IsNullOrEmpty(path)) return;
+        texturePaths.Add(path);
+        noCompressPaths.Add(path);
+    }
+
     private static string? AlbedoKey(string? albedo, string? opacity) =>
         albedo == null ? null : opacity == null ? albedo : $"{albedo}{OpacityKeyMarker}{opacity}";
 
@@ -173,7 +194,7 @@ public class ResourceSystem : IDisposable
     // material switched to a texture nothing preloaded), this still runs synchronously on
     // whatever thread asks for it — same as decode always did for that path; there's no batch to
     // parallelize against when it's only one texture.
-    private TextureData DecodeTextureKey(string key)
+    private TextureData DecodeTextureKey(string key, bool allowCompression)
     {
         var split = key.IndexOf(OpacityKeyMarker, StringComparison.Ordinal);
         var data = split < 0
@@ -182,8 +203,21 @@ public class ResourceSystem : IDisposable
                 PathResolver.Resolve(key[..split]),
                 PathResolver.Resolve(key[(split + OpacityKeyMarker.Length)..]));
 
-        GLTexture.CompressIfEligible(data, _config.Render.TextureCompression);
+        GLTexture.CompressIfEligible(data, allowCompression && _config.Render.TextureCompression);
         return data;
+    }
+
+    // Textures.Get's own factory closure always allows compression (it's the Albedo/AO path — see
+    // AddPathNoCompress's comment on why those two are safe to compress and the other PBR maps
+    // aren't). For a role that needs compression suppressed, populate the cache with our own
+    // instance first (if it's not already there) so the factory never runs, then fall through to
+    // the ordinary Get for the resulting hit.
+    private GLTexture GetTexture(string key, bool allowCompression)
+    {
+        if (!Textures.Contains(key))
+            Textures.Insert(key, new GLTexture(_gl, DecodeTextureKey(key, allowCompression)));
+
+        return Textures.Get(key);
     }
 
     private Material LoadMaterial(string path)
@@ -196,11 +230,11 @@ public class ResourceSystem : IDisposable
         {
             Name      = def.Name,
             Albedo    = AlbedoKey(def.Albedo, def.Opacity) is { } albedoKey ? Textures.Get(albedoKey) : null,
-            Normal    = def.Normal    != null ? Textures.Get(def.Normal)    : null,
-            Roughness = def.Roughness != null ? Textures.Get(def.Roughness) : null,
-            Metallic  = def.Metallic  != null ? Textures.Get(def.Metallic)  : null,
-            AO        = def.AO        != null ? Textures.Get(def.AO)         : DefaultTexture,
-            Height    = def.Height    != null ? Textures.Get(def.Height)    : null,
+            Normal    = def.Normal    != null ? GetTexture(def.Normal,    allowCompression: false) : null,
+            Roughness = def.Roughness != null ? GetTexture(def.Roughness, allowCompression: false) : null,
+            Metallic  = def.Metallic  != null ? GetTexture(def.Metallic,  allowCompression: false) : null,
+            AO        = def.AO        != null ? Textures.Get(def.AO)     : DefaultTexture,
+            Height    = def.Height    != null ? GetTexture(def.Height,   allowCompression: false) : null,
             RoughnessScalar = def.RoughnessScalar,
             MetallicScalar  = def.MetallicScalar,
             Translucency   = def.TranslucencyScalar,
