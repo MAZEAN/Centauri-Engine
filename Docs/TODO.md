@@ -60,7 +60,7 @@
 * [ ] Skybox rotation (specifically night)
 * [ ] Make UI elements writeable not just draggable
 * [ ] Panning like blender
-* [ ] 
+* [ ] Simple startup progression bar 
 
 ## Optional
 * [ ] Hosek-Wilkie sky algorithm
