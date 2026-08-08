@@ -54,11 +54,11 @@ The fields map 1:1 onto `Config/Settings/PhysicsConfig.cs`.
 
 Select an entity and open the Inspector's **Physics** section. The "Body" dropdown attaches
 (`Dynamic`/`Kinematic`/`Static`) or detaches (`None`) a `RigidBody`; once attached, "Shape"
-(`Box`/`Sphere`/`Capsule`), "Friction", and — for `Dynamic` bodies only — "Mass" are editable. Any
-change after the initial attach calls `RigidBody.MarkDirty()`, so `PhysicsSystem` tears down and
-rebuilds the underlying BEPU body/shape on its next `Sync()` instead of silently keeping the stale
-one. Edits persist through Ctrl+S like any other authored property (see "Scene loading" in
-`CLAUDE.md`) — see §3.2 below for the on-disk shape.
+(`Box`/`Sphere`/`Capsule`, plus `Mesh` while `Body` is `Static` — see below), "Friction", and — for
+`Dynamic` bodies only — "Mass" are editable. Any change after the initial attach calls
+`RigidBody.MarkDirty()`, so `PhysicsSystem` tears down and rebuilds the underlying BEPU body/shape on
+its next `Sync()` instead of silently keeping the stale one. Edits persist through Ctrl+S like any
+other authored property (see "Scene loading" in `CLAUDE.md`) — see §3.2 below for the on-disk shape.
 
 ### From code
 
@@ -78,14 +78,19 @@ ground.AddComponent(new RigidBody { Kind = BodyKind.Static, Shape = BodyShape.Bo
 // inspector/gizmo edit; a future animation/script system would be the same shape) pushes dynamic
 // bodies it collides with, but nothing (gravity, contacts) moves *it*:
 platform.AddComponent(new RigidBody { Kind = BodyKind.Kinematic, Shape = BodyShape.Box });
+
+// Exact terrain/level geometry instead of a bounds-derived proxy shape — Static only, see the
+// "Mesh colliders" subsection below:
+terrain.AddComponent(new RigidBody { Kind = BodyKind.Static, Shape = BodyShape.Mesh });
 ```
 
 - `Kind` — `Dynamic` (moved by the sim; its pose is written back to the `Transform` every frame),
   `Kinematic` (never moved by the sim, but its own Transform-driven motion pushes `Dynamic` bodies —
   see §4), or `Static` (fixed collider, never moves at all).
-- `Shape` — `Box` (oriented box from the bounds), `Sphere` (radius = largest bounds half-extent), or
+- `Shape` — `Box` (oriented box from the bounds), `Sphere` (radius = largest bounds half-extent),
   `Capsule` (Y-axis capsule — radius from the largest X/Z half-extent, cylinder length fills the rest
-  of the Y extent; see `RigidBody.CapsuleDimensions`).
+  of the Y extent; see `RigidBody.CapsuleDimensions`), or `Mesh` (exact triangle geometry, `Static`
+  only — see below).
 - `Mass` — kg, dynamic only. Inertia is computed from mass + shape.
 - `Friction` — Coulomb coefficient, every `Kind` (a `Static` floor's surface matters as much as a
   `Dynamic` crate's). Two bodies' `Friction` values combine geometrically (`sqrt(a*b)`) on contact —
@@ -96,6 +101,41 @@ the last frame, so components added at runtime "just work" — no manual registr
 notices a `RigidBody` that was detached (inspector "Body: None", or `Entity.RemoveComponent<RigidBody>()`
 from code) or whose owning entity was deleted from the scene entirely, and releases the BEPU
 body/shape it was holding — see `PhysicsSystem.Unregister`/`PurgeOrphaned`.
+
+### Mesh colliders: exact geometry for statics
+
+`Box`/`Sphere`/`Capsule` all approximate an entity's model with a bounds-derived proxy shape — fine
+for props, wrong for terrain, level geometry, or anything else whose actual silhouette matters (a
+box collider around an archway would block the doorway). `Mesh` uses the model's real triangle data
+instead, via BEPU's own `Mesh` collidable (`BepuPhysics.Collidables.Mesh`).
+
+The catch: `Mesh.cs`/`Model.cs` don't retain a model's CPU-side vertex/index data once it's uploaded
+to the GPU (see `Model.cs`'s own comment on `Meshes`) — a permanent CPU-side copy would cost memory
+on every model whether or not it's ever used for physics. Instead, `Model` now remembers the on-disk
+path it was decoded from (`Model.SourcePath`/`ModelData.SourcePath`, set in `Model.Decode`), and
+`PhysicsSystem.TryGetTriangles` re-runs Assimp against that same path on demand
+(`PhysicsSystem.DecodeTriangles`) the first time a `Static` `Mesh` body needs it — cached per
+distinct path afterward (`_meshTriangleCache`) so placing the same model as a `Mesh` collider on
+multiple entities only pays the decode cost once. `PhysicsSystem.TrianglesFromMesh` — the actual
+interleaved-vertex-buffer-to-`Triangle[]` conversion, pulled out as its own pure function — is unit
+tested directly (`Centauri.Tests/Simulation/RigidBodyShapeTests.cs`); the full decode-and-build path
+is verified via the standalone harness and headless capture (§7).
+
+`Shape = Mesh` silently falls back to `Box` (`PhysicsSystem.Register`) in three cases, so a `Mesh`
+selection never leaves an entity with no collider at all: `Kind` isn't `Static` (BEPU's `Mesh` is a
+concave, immovable-only shape with no sensible way to integrate a body moving *through* it — convex
+decomposition for dynamic mesh colliders is real, separate follow-up work); the entity has no
+`Model`; or the `Model` was never loaded from an on-disk source (code-generated geometry —
+`SourcePath` empty). The inspector's Shape dropdown only ever offers "Mesh" while `Kind` is
+`Static` and resets `Shape` back to `Box` the moment `Kind` changes away from it
+(`EntityPhysicsSection`), so this fallback is a hand-authored-JSON safety net in practice, not
+something the UI can put you into by accident.
+
+A `Mesh` shape's `CenterOffset` (§3's bounds-derived re-centring every other shape needs) is always
+zero — the triangle data is already in the exact local space the GPU mesh renders in, so there's
+nothing to re-centre. `DebugRenderer`'s collider-visualization overlay (§6) doesn't draw the real
+triangles for a `Mesh` collider, only an approximate bounds-box wireframe, origin-centred rather than
+bounds-centred — see its own comment for why.
 
 ### 3.2 On-disk shape (entity-set JSON)
 
@@ -114,8 +154,9 @@ already uses (`EntityDefinition.Components`, see `ComponentFactory`) — no sche
 ```
 
 `kind` is `"dynamic"` (default), `"kinematic"`, or `"static"`; `shape` is `"box"` (default),
-`"sphere"`, or `"capsule"`; `mass` defaults to `1.0` and is ignored for non-dynamic bodies;
-`friction` defaults to `1.0` and applies to every kind.
+`"sphere"`, `"capsule"`, or `"mesh"` (`Static` only — see "Mesh colliders" above); `mass` defaults
+to `1.0` and is ignored for non-dynamic bodies; `friction` defaults to `1.0` and applies to every
+kind.
 
 ## 4. How the fixed timestep works
 
@@ -270,21 +311,55 @@ Covered so far:
   (the kinematic angular-velocity finite-difference formula) are unit tested directly with real
   numeric assertions in `Centauri.Tests/Simulation/RigidBodyShapeTests.cs` — no GL context, no
   standalone harness needed for this pure-math part.
+- `PhysicsSystem.TrianglesFromMesh` (the interleaved-vertex-buffer → `Triangle[]` conversion a `Mesh`
+  collider is actually built on) is unit tested against a synthetic two-triangle quad — correct
+  triangle count, correct vertex positions read through the index buffer, and an empty index buffer
+  producing no triangles — without needing Assimp or a real asset (`RigidBodyShapeTests.cs`).
+- A `Static` `Mesh` collider built from a real on-disk asset (`Model.Decode` re-run against
+  `Model.SourcePath`, exactly as `PhysicsSystem.TryGetTriangles` does it at runtime) respects the
+  *actual* triangle geometry, not just its bounding box: a single-triangle floor covering only half
+  its own AABB (a right triangle, `(-3,2,-3)`–`(3,2,-3)`–`(-3,2,3)`) catches a dynamic sphere dropped
+  onto the covered half (rests at `y ≈ 2.5`, the triangle's `y = 2` plus the sphere's `0.5` radius)
+  and lets one dropped onto the *uncovered* half of the same bounding box fall straight through to a
+  separate backing floor below (rests at `y ≈ 0.5`) — confirming the collider isn't silently using a
+  `Box` approximation of the mesh's AABB, which would have caught both. Verified headless
+  (`CENTAURI_HEADLESS_FRAMES`) with a throwaway `.obj` fixture and entity-set JSON, since building the
+  real `Model` (not just decoding its `ModelData`) needs a GL context the GL-free standalone harness
+  doesn't have.
+- Dropping a sphere down the exact centre axis of the full `Testing/Trees/Tree.glb` asset (used
+  elsewhere for foliage rendering/LOD work) fell straight through to the ground during this same
+  round of manual verification, initially read as a bug — turned out to be correct: that particular
+  tree model's trunk is a hollow shell (a common modeling convention — visible surface only, no
+  solid interior), so a sphere centred exactly on the trunk's own axis can legitimately never touch
+  the wall if the trunk's radius exceeds the sphere's. The controlled single-triangle test above is
+  what actually pins the collider's correctness; a real foliage asset's specific geometry is not a
+  reliable pass/fail signal on its own.
 
 ## 8. Known limitations / next steps
 
 Deliberately scoped as a foundation. In rough priority order:
 
-- **No mesh colliders for statics** — only `Box`/`Sphere`/`Capsule`, all derived from bounds. BEPU
-  does have a `Mesh` collidable (`Mesh(Buffer<Triangle> triangles, ref Vector3 scale, BufferPool pool)`)
-  for exact static geometry, but building one needs CPU-side triangle data this codebase doesn't
-  retain today — `Mesh.cs`/`Model.cs` discard vertex/index data once it's uploaded to the GPU. Adding
-  it means either always keeping a CPU copy (a memory cost paid even when physics is off) or a lazy
-  re-decode-via-Assimp-by-path fallback when a `Static` body first needs one — real, self-contained
-  follow-up work, not attempted this round.
 - **No restitution/bounciness** — see §5. BEPU2's contact model has no elastic-collision coefficient
   to key off of; a real implementation needs a contact-event callback that manually reflects velocity
   along the contact normal post-solve, which this codebase doesn't have.
+- **No dynamic/kinematic mesh colliders** — `Mesh` is `Static`-only (see its own subsection under
+  §3). BEPU's `Mesh` is a concave shape with no sensible way to move a body *through* — a real
+  moving/pushable mesh collider needs convex decomposition (splitting the concave mesh into a
+  compound of convex hulls BEPU's solver can actually integrate), which is separate, substantial
+  follow-up work, not an extension of what's here.
+- **No mesh-collider simplification** — a `Mesh` collider decodes and collides against a model's
+  full render-resolution triangle count, whatever that is; there's no separate, simpler collision
+  mesh a heavy asset could opt into. Fine for hand-modeled level geometry (typically already
+  collision-appropriate), a poor fit for something like dense foliage with hundreds of thousands of
+  triangles, where the Assimp re-decode alone (§3's subsection) can take several seconds and the
+  resulting BEPU BVH build adds more on top — both one-time, load-time costs, but real ones for a
+  large asset.
+- **A `Mesh` collider is exactly as solid as its actual geometry, no more** — a shell/hollow-interior
+  model (common for game-ready foliage/props — visible surface only, no capped interior) has no
+  collision response anywhere that surface doesn't exist, however far "inside" the model's bounds
+  that point is. Not a bug to route around (§7's tree-trunk example) — genuinely correct behavior for
+  an *exact* mesh collider, but a real authoring gotcha worth knowing about before relying on one for
+  gameplay-critical collision.
 - **Culling-grid churn** — a moving dynamic (or kinematic) body writes its `Transform` every frame,
   which bumps `Scene.Revision` and forces a `CullingSystem` grid rebuild each frame (exactly the case
   the comment in `World/Scene.cs` anticipated). Harmless at current body counts; revisit with an

@@ -135,6 +135,13 @@ public sealed class DebugRenderer : IDisposable
                     _draw.Model(Matrix4x4.CreateFromQuaternion(t.Rotation) * Matrix4x4.CreateTranslation(center));
                     _draw.Lines(Shapes.CapsuleEdges(radius, length / 2f));
                     break;
+                // Mesh falls through to the same box wireframe as the default case: drawing the
+                // real triangle geometry the collider actually uses would need its own dedicated
+                // (and much heavier) line-list builder, out of scope for what's meant to be a quick
+                // "does the collider roughly match the visual mesh" check. rb.HalfExtents is still
+                // the model's real bounds size, so this box is the right size — just not the exact
+                // shape, and centred on the entity origin rather than the bounds centre (Mesh's
+                // CenterOffset is always zero — see PhysicsSystem.Register).
                 default:
                     _draw.Model(Matrix4x4.CreateFromQuaternion(t.Rotation) * Matrix4x4.CreateTranslation(center));
                     new BoundingBox(-rb.HalfExtents, rb.HalfExtents).GetBoxCorners(corners);

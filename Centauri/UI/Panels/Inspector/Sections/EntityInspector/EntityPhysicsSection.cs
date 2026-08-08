@@ -17,8 +17,14 @@ using Editing.Undo;
 // verbatim).
 internal sealed class EntityPhysicsSection
 {
-    private static readonly string[] PhysicsKinds  = ["None", "Dynamic", "Kinematic", "Static"];
-    private static readonly string[] PhysicsShapes = ["Box", "Sphere", "Capsule"];
+    private static readonly string[] PhysicsKinds = ["None", "Dynamic", "Kinematic", "Static"];
+
+    // Mesh is Static-only (see RigidBody.BodyShape.Mesh) — offering it for Dynamic/Kinematic would
+    // let the dropdown show a shape the collider can never actually be built with. The Body combo
+    // handler below resets Shape off Mesh the moment Kind leaves Static, so PhysicsShapesMovable
+    // never needs a defensive clamp: whenever it's showing, rb.Shape is already guaranteed non-Mesh.
+    private static readonly string[] PhysicsShapesStatic  = ["Box", "Sphere", "Capsule", "Mesh"];
+    private static readonly string[] PhysicsShapesMovable = ["Box", "Sphere", "Capsule"];
 
     private readonly EntitySetLoader _entitySetLoader;
 
@@ -70,6 +76,11 @@ internal sealed class EntityPhysicsSection
             else
             {
                 rb.Kind = kind;
+                // Mesh only exists for Static (see RigidBody.BodyShape.Mesh) — leaving it set while
+                // switching away would show "Mesh" in a dropdown that no longer offers it. Resetting
+                // here, not just filtering the dropdown, keeps rb.Shape truthful to what's displayed.
+                if (kind != BodyKind.Static && rb.Shape == BodyShape.Mesh)
+                    rb.Shape = BodyShape.Box;
                 rb.MarkDirty();
             }
             _entitySetLoader.SyncRigidBodyDefinition(e, rb);
@@ -78,19 +89,22 @@ internal sealed class EntityPhysicsSection
 
         if (rb is null) return;
 
+        var shapeOptions = rb.Kind == BodyKind.Static ? PhysicsShapesStatic : PhysicsShapesMovable;
         var shapeIndex = rb.Shape switch
         {
             BodyShape.Sphere  => 1,
             BodyShape.Capsule => 2,
+            BodyShape.Mesh    => 3,
             _                 => 0,
         };
-        if (Widgets.ComboRow("Shape", ref shapeIndex, PhysicsShapes))
+        if (Widgets.ComboRow("Shape", ref shapeIndex, shapeOptions))
         {
             var before = RigidBodyState.Of(rb);
             rb.Shape = shapeIndex switch
             {
                 1 => BodyShape.Sphere,
                 2 => BodyShape.Capsule,
+                3 => BodyShape.Mesh,
                 _ => BodyShape.Box,
             };
             rb.MarkDirty();

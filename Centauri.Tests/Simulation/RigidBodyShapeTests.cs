@@ -1,6 +1,7 @@
 namespace Centauri.Tests.Simulation;
 
 using System.Numerics;
+using Centauri.Graphics.Geometry;
 using Centauri.Simulation.Physics;
 
 // RigidBody.CapsuleDimensions and PhysicsSystem.AngularVelocityFromDelta are pure math — no BEPU
@@ -76,5 +77,55 @@ public class RigidBodyShapeTests
         Assert.Equal(v1.X, v2.X, 3);
         Assert.Equal(v1.Y, v2.Y, 3);
         Assert.Equal(v1.Z, v2.Z, 3);
+    }
+
+    // A synthetic two-triangle quad in Mesh.cs's own interleaved vertex layout (pos(3) + normal(3)
+    // + uv(2) + tangent(3), stride 11) — the only real dependency PhysicsSystem.TrianglesFromMesh
+    // has, so a full Assimp decode of an actual asset isn't needed to pin the stride/index math a
+    // Mesh collider's triangle extraction is actually built on (see PhysicsSystem.DecodeTriangles's
+    // own comment for why re-decoding a real file was verified separately, via the standalone
+    // harness, rather than as part of this fast suite — the only asset available in this sandbox
+    // decodes in several seconds, which doesn't belong in a per-commit test).
+    private static MeshData BuildQuad()
+    {
+        var vertices = new float[]
+        {
+            // x, y, z,  nx,ny,nz,  u,v,  tx,ty,tz  (normal/uv/tangent unused by TrianglesFromMesh, left zero)
+            0f, 0f, 0f,  0,0,0, 0,0, 0,0,0,
+            1f, 0f, 0f,  0,0,0, 0,0, 0,0,0,
+            1f, 0f, 1f,  0,0,0, 0,0, 0,0,0,
+            0f, 0f, 1f,  0,0,0, 0,0, 0,0,0,
+        };
+        
+        var indices = new uint[] { 0, 1, 2, 0, 2, 3 };
+        return new MeshData(vertices, indices);
+    }
+
+    [Fact]
+    public void TrianglesFromMesh_ProducesOneTrianglePerThreeIndices()
+    {
+        var triangles = PhysicsSystem.TrianglesFromMesh(BuildQuad());
+        Assert.Equal(2, triangles.Length);
+    }
+
+    [Fact]
+    public void TrianglesFromMesh_ReadsCorrectVertexPositionsPerIndex()
+    {
+        var triangles = PhysicsSystem.TrianglesFromMesh(BuildQuad());
+
+        Assert.Equal(new Vector3(0f, 0f, 0f), triangles[0].A);
+        Assert.Equal(new Vector3(1f, 0f, 0f), triangles[0].B);
+        Assert.Equal(new Vector3(1f, 0f, 1f), triangles[0].C);
+
+        Assert.Equal(new Vector3(0f, 0f, 0f), triangles[1].A);
+        Assert.Equal(new Vector3(1f, 0f, 1f), triangles[1].B);
+        Assert.Equal(new Vector3(0f, 0f, 1f), triangles[1].C);
+    }
+
+    [Fact]
+    public void TrianglesFromMesh_EmptyIndicesProducesNoTriangles()
+    {
+        var mesh = new MeshData(Array.Empty<float>(), Array.Empty<uint>());
+        Assert.Empty(PhysicsSystem.TrianglesFromMesh(mesh));
     }
 }

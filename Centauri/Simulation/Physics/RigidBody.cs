@@ -21,7 +21,9 @@ public enum BodyShape
 {
     Box,     // oriented box derived from the entity's model bounds × scale
     Sphere,  // sphere whose radius is the largest bounds half-extent × scale
-    Capsule  // Y-axis capsule: radius from the largest X/Z bounds half-extent, cylinder length fills the rest of the Y extent
+    Capsule, // Y-axis capsule: radius from the largest X/Z bounds half-extent, cylinder length fills the rest of the Y extent
+    Mesh     // Exact triangle mesh, decoded from the entity's Model.SourcePath (PhysicsSystem.DecodeTriangles)
+             // rather than approximated by a primitive.
 }
 
 // Attach to an Entity to give it a physics presence. Deliberately BEPU-type-free: the actual body

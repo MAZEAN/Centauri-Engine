@@ -8,8 +8,12 @@ using BepuPhysics.Collidables;
 using BepuPhysics.Constraints;
 using BepuUtilities.Memory;
 
-using Centauri.Config;
+using Config;
 using World;
+
+using BepuMesh = BepuPhysics.Collidables.Mesh;
+using Model    = Graphics.Geometry.Model;
+using MeshData = Graphics.Geometry.MeshData;
 
 // Owns the BEPUphysics2 Simulation and the mapping from RigidBody components to their body handles.
 // Stepped at a fixed rate by SimulationSystem; between steps it interpolates each dynamic body's
@@ -45,6 +49,12 @@ public sealed class PhysicsSystem : IDisposable
     // component simply stops showing up when walking scene.Entities.
     private readonly Dictionary<Entity, RigidBody> _byEntity = new();
     private int _lastPurgeRevision = -1;
+
+    // Decoded triangle data for Mesh-shape statics, keyed by Model.SourcePath so re-decoding via
+    // Assimp only happens once per distinct on-disk model regardless of how many static entities
+    // reference it — see TryGetTriangles. A cached empty array (decode produced no triangles, or a
+    // path already failed once) short-circuits future lookups rather than retrying Assimp forever.
+    private readonly Dictionary<string, Triangle[]> _meshTriangleCache = new();
 
     // Stats surfaced to SimulationSystem for the Stats Overlay's "Physics" section — see §PhysicsEngine.md.
     public int   DynamicBodyCount => _tracked.Count;
@@ -135,13 +145,26 @@ public sealed class PhysicsSystem : IDisposable
         var bounds      = entity.Model?.Bounds;
         var halfExtents = (bounds?.Extents ?? new Vector3(0.5f)) * Abs(scale);
         halfExtents     = Vector3.Max(halfExtents, new Vector3(1e-3f)); // no degenerate colliders
-        rb.CenterOffset = (bounds?.Center ?? Vector3.Zero) * scale;
+
+        // Mesh is only meaningful for Static (see RigidBody.BodyShape.Mesh); TryGetTriangles returns
+        // null (silently falling back to the Box path below) for anything else — Dynamic/Kinematic
+        // Kind, no Model, code-generated geometry with no on-disk SourcePath, or a decode that
+        // produced zero triangles.
+        var meshTriangles = rb.Kind == BodyKind.Static ? TryGetTriangles(rb.Shape, entity.Model) : null;
+
+        // A Mesh collider uses the model's exact local-space geometry directly, already positioned
+        // exactly as the GPU mesh renders it — unlike Box/Sphere/Capsule, which approximate the
+        // model with a bounds-derived proxy shape and need re-centring (CenterOffset) to line up
+        // with it, a Mesh shape needs none.
+        rb.CenterOffset = meshTriangles is not null ? Vector3.Zero : (bounds?.Center ?? Vector3.Zero) * scale;
 
         // Sphere collapses to a single radius (the largest axis), broadcast to all three, so
         // DrawPhysicsColliders doesn't need to know which shape it's looking at to read this.
         // Capsule and Box both keep the real per-axis half-extents — DrawPhysicsColliders derives
         // a capsule's radius/length from them via RigidBody.CapsuleDimensions, the same call
-        // AddShape below uses, so the two can't silently disagree about what shape got built.
+        // AddShape below uses, so the two can't silently disagree about what shape got built. Mesh
+        // keeps the bounds-derived half-extents too, purely for DebugRenderer's fallback box
+        // wireframe (see its own comment) — the real collider ignores this field entirely.
         rb.HalfExtents = rb.Shape == BodyShape.Sphere
             ? new Vector3(SphereRadius(halfExtents))
             : halfExtents;
@@ -149,7 +172,9 @@ public sealed class PhysicsSystem : IDisposable
         var bodyPosition    = transform.Position + Vector3.Transform(rb.CenterOffset, transform.Rotation);
         var bodyOrientation = transform.Rotation;
 
-        var shapeIndex = AddShape(halfExtents, rb.Shape);
+        var shapeIndex = meshTriangles is not null
+            ? AddMeshShape(meshTriangles, Abs(scale))
+            : AddShape(halfExtents, rb.Shape);
         _shapes[rb] = shapeIndex;
 
         CollidableReference collidable;
@@ -202,6 +227,82 @@ public sealed class PhysicsSystem : IDisposable
         _                 => _simulation.Shapes.Add(new Box(halfExtents.X * 2f, halfExtents.Y * 2f, halfExtents.Z * 2f)),
     };
 
+    // Builds a BEPU Mesh collidable from already-decoded local-space triangles: takes a fresh
+    // Triangle buffer from the pool (BEPU's Mesh constructor consumes it directly into its own
+    // internal BVH, so it can't be a shared/reused buffer across multiple bodies even when they're
+    // built from the same cached triangle array) and copies the cached data in. Freed again in
+    // Unregister via Shapes.RemoveAndDispose, which returns this buffer (and the BVH's own) to the
+    // pool — plain Shapes.Remove would leak them, unlike Box/Sphere/Capsule which own no pool memory.
+    private TypedIndex AddMeshShape(Triangle[] triangles, Vector3 scale)
+    {
+        _pool.Take<Triangle>(triangles.Length, out var buffer);
+        triangles.AsSpan().CopyTo(buffer);
+        var mesh = new BepuMesh(buffer, in scale, _pool);
+        return _simulation.Shapes.Add(mesh);
+    }
+
+    // Resolves a Mesh-shape RigidBody's actual triangle data, or null if a Mesh collider isn't
+    // buildable for this entity — the single fallback gate AddMeshShape's caller (Register) checks
+    // against, so "when does Mesh silently become Box" lives in exactly one place. Kind==Static is
+    // checked by the caller, not here, since it's a property of the RigidBody, not the Model.
+    private Triangle[]? TryGetTriangles(BodyShape shape, Model? model)
+    {
+        if (shape != BodyShape.Mesh || model is not { SourcePath.Length: > 0 }) return null;
+
+        if (!_meshTriangleCache.TryGetValue(model.SourcePath, out var triangles))
+        {
+            triangles = DecodeTriangles(model.SourcePath);
+            _meshTriangleCache[model.SourcePath] = triangles;
+        }
+
+        return triangles.Length > 0 ? triangles : null;
+    }
+
+    // Re-runs Assimp on the model's own source file to recover the local-space vertex positions
+    // GPU upload discards — Mesh.cs/Model.cs don't retain CPU-side geometry after the VBO/EBO exist,
+    // so this is the only way to get real triangle data back. A rare, load-time-only cost (cached by
+    // TryGetTriangles per distinct path), not a per-frame one.
+    private static Triangle[] DecodeTriangles(string path)
+    {
+        var data      = Model.Decode(path);
+        var triangles = new List<Triangle>();
+
+        foreach (var mesh in data.Meshes)
+            triangles.AddRange(TrianglesFromMesh(mesh));
+
+        return triangles.ToArray();
+    }
+
+    // Pulled out of DecodeTriangles as its own pure function (no Assimp, no file I/O) so the actual
+    // novel part of a Mesh collider — interpreting a MeshData's interleaved vertex buffer via its
+    // index buffer into BEPU Triangles — is unit-testable directly against a synthetic MeshData
+    // rather than only against a real decoded asset (Centauri.Tests/Simulation/RigidBodyShapeTests.cs).
+    // Positions come straight out of Mesh.cs's own pos+normal+uv+tangent interleave (stride 11) — the
+    // same local space the GPU mesh already renders in (node transforms baked in at decode time by
+    // Model.ProcessNode/ProcessMesh), so no extra transform is needed here beyond what
+    // PhysicsSystem.Register already applies to the body's own pose and the Mesh shape's own Scale.
+    internal static Triangle[] TrianglesFromMesh(MeshData mesh)
+    {
+        const int stride = 11;
+        var triangles = new List<Triangle>(mesh.Indices.Length / 3);
+
+        for (var i = 0; i + 2 < mesh.Indices.Length; i += 3)
+        {
+            triangles.Add(new Triangle(
+                VertexPosition(mesh.Vertices, mesh.Indices[i],     stride),
+                VertexPosition(mesh.Vertices, mesh.Indices[i + 1], stride),
+                VertexPosition(mesh.Vertices, mesh.Indices[i + 2], stride)));
+        }
+
+        return triangles.ToArray();
+    }
+
+    private static Vector3 VertexPosition(float[] vertices, uint index, int stride)
+    {
+        var offset = (int)index * stride;
+        return new Vector3(vertices[offset], vertices[offset + 1], vertices[offset + 2]);
+    }
+
     private static BodyInertia ComputeInertia(Vector3 halfExtents, BodyShape shape, float mass) => shape switch
     {
         BodyShape.Sphere  => new Sphere(SphereRadius(halfExtents)).ComputeInertia(mass),
@@ -238,8 +339,12 @@ public sealed class PhysicsSystem : IDisposable
             _simulation.Statics.Remove(staticHandle);
         }
 
+        // RemoveAndDispose rather than plain Remove: a Mesh shape owns pool memory (its triangle
+        // buffer and BVH — see AddMeshShape) that Remove alone would leak. A no-op superset for
+        // Box/Sphere/Capsule, which own none, so it's safe to use unconditionally rather than
+        // needing to know which shape kind this particular RigidBody actually built.
         if (_shapes.Remove(rb, out var shapeIndex))
-            _simulation.Shapes.Remove(shapeIndex);
+            _simulation.Shapes.RemoveAndDispose(shapeIndex, _pool);
 
         rb.Registered = false;
         rb.Dirty      = false;

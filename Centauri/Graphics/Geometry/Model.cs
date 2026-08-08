@@ -27,12 +27,23 @@ public sealed class ModelData
 {
     public List<MeshData> Meshes         { get; } = new();
     public string         AssetDirectory { get; set; } = string.Empty;
+
+    // The exact path Decode(path) was called with. Empty for anything not built by Decode (e.g. a
+    // hand-assembled ModelData) — Model.SourcePath mirrors that emptiness rather than guessing.
+    public string SourcePath { get; set; } = string.Empty;
 }
 
 public class Model : IDisposable
 {
     public string      AssetDirectory { get; private set; } = string.Empty;
-    
+
+    // The on-disk path this Model was decoded from (Decode(path)'s own argument, carried through
+    // ModelData), empty for code-generated geometry (the Model(GL, IEnumerable<Mesh>) ctor below).
+    // Exists so PhysicsSystem can re-decode the same file for a Mesh collider's exact triangle data
+    // on demand — see RigidBody.BodyShape.Mesh — without Model/Mesh needing to retain a permanent
+    // CPU-side vertex/index copy of geometry most entities never use for physics at all.
+    public string      SourcePath     { get; private set; } = string.Empty;
+
     public List<Mesh>  Meshes { get; private set; }
     public BoundingBox Bounds { get; private set; }
 
@@ -40,6 +51,7 @@ public class Model : IDisposable
     public Model(GL gl, ModelData data)
     {
         AssetDirectory = data.AssetDirectory;
+        SourcePath     = data.SourcePath;
         Meshes = data.Meshes.Select(m => new Mesh(gl, m.Vertices, m.Indices, m.Name)).ToList();
         Bounds = ComputeBounds(Meshes);
     }
@@ -75,7 +87,11 @@ public class Model : IDisposable
                 throw new Exception($"Assimp failed to load '{path}': {assimp.GetErrorStringS()}");
             }
             
-            var data = new ModelData { AssetDirectory = Path.GetDirectoryName(path) ?? string.Empty };
+            var data = new ModelData
+            {
+                AssetDirectory = Path.GetDirectoryName(path) ?? string.Empty,
+                SourcePath     = path,
+            };
             ProcessNode(scene->MRootNode, scene, data.Meshes, Matrix4x4.Identity);
 
             return data;

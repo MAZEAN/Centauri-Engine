@@ -35,6 +35,7 @@ public static class ComponentFactory
                 {
                     "sphere"  => BodyShape.Sphere,
                     "capsule" => BodyShape.Capsule,
+                    "mesh"    => BodyShape.Mesh,
                     _         => BodyShape.Box,
                 },
                 Mass     = d.Float("mass", 1f),

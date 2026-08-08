@@ -276,6 +276,7 @@ public class EntitySetLoader
             {
                 BodyShape.Sphere  => "sphere",
                 BodyShape.Capsule => "capsule",
+                BodyShape.Mesh    => "mesh",
                 _                 => "box",
             }),
             ["mass"]     = JsonSerializer.SerializeToElement(rb.Mass),

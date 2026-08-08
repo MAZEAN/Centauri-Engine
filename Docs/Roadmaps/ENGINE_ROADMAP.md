@@ -186,22 +186,25 @@ up once content count grows.
   polish — without it the tier flickers every frame near the threshold). A phased implementation
   order is proposed in the doc's closing section for whenever this is picked up.
 - [x] **Physics: more collider shapes (capsule at minimum, mesh colliders for statics), kinematic
-  bodies, per-material friction/restitution.** — **partially done**. Capsule shape (`BodyShape.Capsule`,
+  bodies, per-material friction/restitution.** — **mostly done**. Capsule shape (`BodyShape.Capsule`,
   `RigidBody.CapsuleDimensions` — radius from the larger X/Z half-extent, cylinder length fills the
   rest of the Y extent), `BodyKind.Kinematic` (Transform-driven, pushes `Dynamic` bodies via a real
-  contact-response velocity BEPU reads, not just a teleport — `PhysicsSystem.PushKinematics`), and
+  contact-response velocity BEPU reads, not just a teleport — `PhysicsSystem.PushKinematics`),
   per-body `Friction` (geometrically combined per contact via `CollidableProperty<BodyMaterial>`,
-  replacing the old single engine-wide coefficient) all shipped, with debug-draw wireframes/colors,
-  full editor/persistence round-trip, and both unit tests (`Centauri.Tests/Simulation/
-  RigidBodyShapeTests.cs`) and standalone-harness simulation verification. See
-  `Docs/Documentation/PhysicsEngine.md` §5–§8 for the writeup. Two pieces of the original scope are
-  still deferred: **mesh colliders for statics** (BEPU's `Mesh` collidable exists and would work, but
-  needs CPU-side triangle data `Mesh.cs`/`Model.cs` don't retain after GPU upload — real follow-up
-  plumbing, not attempted this round) and **restitution/bounciness** (attempted, then reverted after
-  empirical testing proved BEPU2's spring-damper contact model has no elastic-collision coefficient to
-  map a "bounciness" onto — a dropped ball showed zero rebound at any setting; a real implementation
-  needs a contact-event callback this codebase doesn't have — see `PhysicsEngine.md` §5 for the full
-  investigation).
+  replacing the old single engine-wide coefficient), and **mesh colliders for statics**
+  (`BodyShape.Mesh` — BEPU's own `Mesh` collidable built from a model's real triangle data, recovered
+  via `Model.SourcePath` + an on-demand, cached Assimp re-decode since `Mesh.cs`/`Model.cs` don't
+  retain CPU-side geometry after GPU upload — `PhysicsSystem.TryGetTriangles`/`DecodeTriangles`) all
+  shipped, with debug-draw wireframes/colors, full editor/persistence round-trip, and both unit tests
+  (`Centauri.Tests/Simulation/RigidBodyShapeTests.cs`) and standalone-harness + headless-capture
+  simulation verification (a single-triangle collider proven to respect its *exact* geometry, not
+  just its bounding box). See `Docs/Documentation/PhysicsEngine.md` §3, §5–§8 for the writeup. One
+  piece of the original scope is still deferred: **restitution/bounciness** (attempted, then reverted
+  after empirical testing proved BEPU2's spring-damper contact model has no elastic-collision
+  coefficient to map a "bounciness" onto — a dropped ball showed zero rebound at any setting; a real
+  implementation needs a contact-event callback this codebase doesn't have — see `PhysicsEngine.md`
+  §5 for the full investigation). `Mesh` colliders are `Static`-only and undecomposed/unsimplified —
+  see `PhysicsEngine.md` §8 for both caveats.
 
 **Exit criteria:** a scene with meaningfully more content (tens-to-hundreds of instances, several
 texture sets) doesn't degrade VRAM or physics behavior in ways that require manual workarounds.
